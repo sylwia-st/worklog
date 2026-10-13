@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Planowane zmiany – Raport czasu{% endblock %}
+
+{% block body %}
+<h1>Planowane zmiany</h1>
+<p class="sub">Późniejsze przyjście, wcześniejsze wyjście albo krótszy dzień – zapisz, a narzędzie przygotuje mail do wysłania.</p>
+
+<div class="grid">
+<form method="post" action="{{ path('planned_create') }}" class="panel">
+    <h2>Nowa zmiana</h2>
+    <div class="row">
+        <div><label for="date">Dzień</label><input type="date" id="date" name="date" value="{{ form.date }}" required></div>
+        <div>
+            <label for="type">Rodzaj</label>
+            <select id="type" name="type">
+                {% for value, label in types %}<option value="{{ value }}" {{ form.type == value ? 'selected' }}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+        <div id="f-from"><label for="from">Przyjdę o</label><input type="time" id="from" name="from" value="{{ form.from }}" placeholder="{{ defaultStart }}"></div>
+        <div id="f-to"><label for="to">Wyjdę o</label><input type="time" id="to" name="to" value="{{ form.to }}" placeholder="{{ defaultEnd }}"></div>
+    </div>
+    <div class="field" style="margin-top:12px">
+        <label for="reason">Powód (opcjonalnie)</label>
+        <textarea id="reason" name="reason" rows="2">{{ form.reason }}</textarea>
+    </div>
+    <div class="actions"><button type="submit" class="primary">Zapisz i przygotuj mail</button></div>
+</form>
+
+<div>
+    <div class="panel">
+        <h2>Nadchodzące</h2>
+        {% for p in upcoming %}
+            {{ _self.item(p) }}
+        {% else %}
+            <p class="muted">Brak.</p>
+        {% endfor %}
+    </div>
+    {% if past is not empty %}
+    <div class="panel">
+        <h2>Minione</h2>
+        {% for p in past %}{{ _self.item(p) }}{% endfor %}
+    </div>
+    {% endif %}
+</div>
+</div>
+{% endblock %}
+
+{% macro item(p) %}
+    <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)">
+        <a href="{{ path('planned_show', {id: p.id}) }}">{{ p.date|date('d.m.Y') }} · {{ p.typeLabel }}{% if p.fromTime %} od {{ p.fromTime }}{% endif %}{% if p.toTime %} do {{ p.toTime }}{% endif %}</a>
+        {% if p.mailDoneAt %}<span class="badge ok">mail ✓</span>{% else %}<span class="badge warn">mail —</span>{% endif %}
+    </div>
+{% endmacro %}
+
+{% block scripts %}
+<script>
+    (() => {
+        const type = document.getElementById('type');
+        const sync = () => {
+            document.getElementById('f-from').style.display = ['late', 'short'].includes(type.value) ? '' : 'none';
+            document.getElementById('f-to').style.display = ['early', 'short'].includes(type.value) ? '' : 'none';
+        };
+        type.addEventListener('change', sync); sync();
+    })();
+</script>
+{% endblock %}

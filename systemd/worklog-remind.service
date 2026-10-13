@@ -1,0 +1,7 @@
+[Unit]
+Description=Przypomnienie o raporcie czasu pracy
+
+[Service]
+Type=oneshot
+Environment=WORKLOG_PORT=@PORT@
+ExecStart=@DIR@/scripts/remind.sh

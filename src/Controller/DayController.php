@@ -1,0 +1,400 @@
+<?php
+
+namespace App\Controller;
+
+use App\Domain\Template;
+use App\Domain\TimeFormat;
+use App\Entity\PlannedChange;
+use App\Entity\WorkDay;
+use App\Entity\WorklogEntry;
+use App\Repository\PlannedChangeRepository;
+use App\Repository\WorkDayRepository;
+use App\Service\ReportBuilder;
+use App\Service\Settings;
+use App\Service\WorklogSync;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Routing\Attribute\Route;
+
+final class DayController extends AbstractController
+{
+    public function __construct(
+        private readonly WorkDayRepository $days,
+        private readonly PlannedChangeRepository $planned,
+        private readonly ReportBuilder $reports,
+        private readonly WorklogSync $sync,
+        private readonly Settings $settings,
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
+
+    #[Route('/today', name: 'today', methods: ['GET'])]
+    public function today(): Response
+    {
+        return $this->redirectToRoute('day', ['date' => (new \DateTimeImmutable('today'))->format('Y-m-d')]);
+    }
+
+    #[Route('/day/{date}', name: 'day', requirements: ['date' => '\d{4}-\d{2}-\d{2}'], methods: ['GET'])]
+    public function show(string $date, Request $request): Response
+    {
+        $d = $this->parseDate($date);
+        $day = $this->days->findByDate($d);
+
+        $form = null !== $day ? $this->formFromDay($day) : $this->emptyForm($d);
+
+        if ($request->query->getBoolean('copy') && (null === $day || [] === $day->getActiveEntries())) {
+            $prev = $this->days->findPreviousWithEntries($d);
+            if (null !== $prev) {
+                $form['rows'] = array_map(static fn (WorklogEntry $e) => [
+                    'id' => 0, 'issue' => $e->getIssueKey(), 'time' => '', 'desc' => '', 'status' => null, 'error' => null,
+                ], $prev->getActiveEntries());
+                $this->addFlash('info', 'Skopiowano tickety z '.$prev->getDate()->format('d.m.Y').' – uzupełnij czas i opisy, potem zapisz.');
+            }
+        }
+
+        return $this->renderDay($d, $day, $form);
+    }
+
+    #[Route('/day/{date}', name: 'day_save', requirements: ['date' => '\d{4}-\d{2}-\d{2}'], methods: ['POST'])]
+    public function save(string $date, Request $request): Response
+    {
+        $d = $this->parseDate($date);
+        $day = $this->days->findByDate($d);
+
+        [$form, $errors] = $this->formFromRequest($request);
+        if ([] !== $errors) {
+            foreach (array_unique($errors) as $e) {
+                $this->addFlash('error', $e);
+            }
+
+            return $this->renderDay($d, $day, $form, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $day = $this->applyForm($d, $day, $form)['day'];
+
+        if ('sync' === $request->request->get('action')) {
+            foreach ($this->sync->sync($day) as $result) {
+                $this->addFlash($result['type'], $result['message']);
+            }
+            $this->em->flush();
+        } else {
+            $this->addFlash('success', 'Zapisano.');
+        }
+
+        return $this->redirectToRoute('day', ['date' => $date]);
+    }
+
+    #[Route('/day/{date}/mark/{what}', name: 'day_mark', requirements: ['date' => '\d{4}-\d{2}-\d{2}', 'what' => 'slack|mail'], methods: ['POST'])]
+    public function mark(string $date, string $what): Response
+    {
+        $day = $this->days->findByDate($this->parseDate($date)) ?? throw new NotFoundHttpException();
+        'slack' === $what ? $day->markSlackDone() : $day->markMailDone();
+        $this->em->flush();
+
+        return new Response('', Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * Autozapis z przeglądarki (co ~1 s po zmianie i przy zamykaniu karty).
+     * Zapisuje wszystko, co jest poprawne; niepoprawne wiersze/pola zostawia bez zmian i zwraca błędy.
+     */
+    #[Route('/day/{date}/autosave', name: 'day_autosave', requirements: ['date' => '\d{4}-\d{2}-\d{2}'], methods: ['POST'])]
+    public function autosave(string $date, Request $request): JsonResponse
+    {
+        $d = $this->parseDate($date);
+        [$form, $errors] = $this->formFromRequest($request);
+        $result = $this->applyForm($d, $this->days->findByDate($d), $form, partial: true);
+        $day = $result['day'];
+
+        $rowErrors = [];
+        foreach ($form['rows'] as $row) {
+            if (null !== $row['error']) {
+                $rowErrors[$row['key']] = $row['error'];
+            }
+        }
+
+        return $this->json([
+            'ok' => true,
+            'savedAt' => (new \DateTimeImmutable())->format('H:i:s'),
+            'ids' => $result['ids'],
+            'minutes' => $result['minutes'],
+            'statuses' => $this->sync->statuses($day),
+            'rowErrors' => (object) $rowErrors,
+            'dayErrors' => $form['dayErrors'],
+            'pendingDeletions' => count($day->getPendingDeletions()),
+        ]);
+    }
+
+    /** Prawa kolumna (bilans, Slack, mail) – odświeżana po autozapisie bez przeładowania strony. */
+    #[Route('/day/{date}/panels', name: 'day_panels', requirements: ['date' => '\d{4}-\d{2}-\d{2}'], methods: ['GET'])]
+    public function panels(string $date): Response
+    {
+        $d = $this->parseDate($date);
+        $day = $this->days->findByDate($d);
+
+        return $this->render('day/_panels.html.twig', $this->panelVars($d, $day));
+    }
+
+    /**
+     * Wspólny zapis formularza dla „Zapisz” i autozapisu.
+     *
+     * @param array<string, mixed> $form
+     *
+     * @return array{day: WorkDay, ids: array<string, int>, minutes: array<string, int>}
+     */
+    private function applyForm(\DateTimeImmutable $d, ?WorkDay $day, array $form, bool $partial = false): array
+    {
+        if (null === $day) {
+            $day = new WorkDay($d);
+            $this->em->persist($day);
+        }
+        if (!$partial || [] === $form['dayErrors']) {
+            $day->setStartTime($form['start']);
+            $day->setEndTime($form['end']);
+            $day->setBreakMinutes($form['breakMinutes']);
+            $day->setBreakText($form['break']);
+            $day->setWorkedThroughFixedBreak($form['lunchWorked']);
+        }
+
+        $existing = [];
+        foreach ($day->getEntries() as $e) {
+            $existing[(int) $e->getId()] = $e;
+        }
+
+        $created = [];
+        $position = 0;
+        foreach ($form['rows'] as $row) {
+            $entry = $row['id'] > 0 ? ($existing[$row['id']] ?? null) : null;
+            if ($row['delete'] && $partial) {
+                continue; // autozapis nigdy nie usuwa – usunięcie zatwierdza się przyciskiem „Zapisz”
+            }
+            if ($row['delete']) {
+                if (null !== $entry) {
+                    $entry->stopTimer(new \DateTimeImmutable());
+                    $entry->isInJira() ? $entry->markDeleted() : $day->removeEntry($entry);
+                }
+                continue;
+            }
+            if (null !== $row['error']) {
+                ++$position; // niepoprawny wiersz zostaje bez zmian (w autozapisie)
+                continue;
+            }
+            if (null !== $entry) {
+                // Czas zmieniamy tylko, gdy użytkownik go zmienił, i nigdy w trakcie działania stopera –
+                // dzięki temu stara karta przeglądarki nie nadpisze czasu doliczonego przez stoper.
+                $minutes = $entry->getMinutes();
+                if (!$entry->isTimerRunning() && $row['minutes'] !== $row['origMinutes']) {
+                    $minutes = $row['minutes'];
+                }
+                $entry->update($row['issue'], $minutes, $row['desc'], $position);
+            } else {
+                $entry = new WorklogEntry($day, $row['issue'], $row['minutes'], $row['desc'], $position);
+                $this->em->persist($entry);
+                $created[$row['key']] = $entry;
+            }
+            ++$position;
+        }
+        $this->em->flush();
+
+        $ids = [];
+        $minutes = [];
+        foreach ($form['rows'] as $row) {
+            $entry = $created[$row['key']] ?? ($row['id'] > 0 ? ($existing[$row['id']] ?? null) : null);
+            if (null !== $entry && !$row['delete'] && null !== $entry->getId()) {
+                $ids[$row['key']] = (int) $entry->getId();
+                $minutes[$row['key']] = $entry->getMinutes();
+            }
+        }
+
+        return ['day' => $day, 'ids' => $ids, 'minutes' => $minutes];
+    }
+
+    /** @return array<string, mixed> */
+    private function panelVars(\DateTimeImmutable $d, ?WorkDay $day): array
+    {
+        $hasEntries = null !== $day && [] !== $day->getActiveEntries();
+
+        return [
+            'date' => $d,
+            'day' => $day,
+            'summary' => null !== $day ? $this->reports->summary($day) : null,
+            'slack' => $hasEntries ? $this->reports->slackText($day) : null,
+            'mail' => null !== $day ? $this->reports->presenceMail($day) : null,
+        ];
+    }
+
+    /** @param array<string, mixed> $form */
+    private function renderDay(\DateTimeImmutable $d, ?WorkDay $day, array $form, int $status = 200): Response
+    {
+        $issueOptions = $this->settings->issueCache();
+        foreach ($this->days->recentIssueKeys($d->modify('-60 days')) as $key) {
+            $issueOptions[$key] ??= '';
+        }
+
+        return $this->render('day/show.html.twig', $this->panelVars($d, $day) + [
+            'prev' => $d->modify('-1 day'),
+            'next' => $d->modify('+1 day'),
+            'today' => new \DateTimeImmutable('today'),
+            'form' => $form,
+            'pendingDeletions' => null !== $day ? $day->getPendingDeletions() : [],
+            'planned' => $this->planned->findForDate($d),
+            'issueOptions' => $issueOptions,
+            'norm' => $this->settings->int('norm_minutes'),
+            'lunch' => '' !== $this->settings->get('lunch_from') && '' !== $this->settings->get('lunch_to')
+                ? $this->settings->get('lunch_from').'–'.$this->settings->get('lunch_to')
+                : null,
+            'lunchLength' => TimeFormat::format(max(1,
+                (int) TimeFormat::clockToMinutes($this->settings->get('lunch_to') ?: '00:00')
+                - (int) TimeFormat::clockToMinutes($this->settings->get('lunch_from') ?: '00:00'))),
+        ], new Response(status: $status));
+    }
+
+    /** @return array<string, mixed> */
+    private function formFromDay(WorkDay $day): array
+    {
+        $statuses = $this->sync->statuses($day);
+
+        return [
+            'start' => $day->getStartTime(),
+            'end' => $day->getEndTime(),
+            'break' => $day->getBreakText() ?? ($day->getBreakMinutes() > 0 ? TimeFormat::format($day->getBreakMinutes()) : ''),
+            'lunchWorked' => $day->hasWorkedThroughFixedBreak(),
+            'rows' => array_map(static fn (WorklogEntry $e) => [
+                'id' => (int) $e->getId(),
+                'issue' => $e->getIssueKey(),
+                'time' => $e->getMinutes() > 0 ? TimeFormat::format($e->getMinutes()) : '',
+                'desc' => $e->getDescription(),
+                'status' => $statuses[(int) $e->getId()] ?? null,
+                'error' => $e->getJiraError(),
+            ], $day->getActiveEntries()),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function emptyForm(\DateTimeImmutable $d): array
+    {
+        $start = $this->settings->get('default_start');
+        $end = $this->settings->get('default_end');
+        // zaplanowana zmiana na ten dzień → podpowiadamy jej godziny
+        foreach ($this->planned->findForDate($d) as $p) {
+            if (in_array($p->getType(), [PlannedChange::TYPE_LATE, PlannedChange::TYPE_SHORT], true) && $p->getFromTime()) {
+                $start = $p->getFromTime();
+            }
+            if (in_array($p->getType(), [PlannedChange::TYPE_EARLY, PlannedChange::TYPE_SHORT], true) && $p->getToTime()) {
+                $end = $p->getToTime();
+            }
+        }
+        $break = $this->settings->int('default_break');
+
+        return [
+            'start' => $start,
+            'end' => $end,
+            'break' => $break > 0 ? TimeFormat::format($break) : '',
+            'lunchWorked' => false,
+            'rows' => [],
+        ];
+    }
+
+    /** @return array{0: array<string, mixed>, 1: string[]} */
+    private function formFromRequest(Request $request): array
+    {
+        $dayErrors = [];
+        $p = $request->request;
+
+        $start = $this->clockField((string) $p->get('start', ''), 'Godzina rozpoczęcia', $dayErrors);
+        $end = $this->clockField((string) $p->get('end', ''), 'Godzina zakończenia', $dayErrors);
+        if ((null === $start) !== (null === $end) && [] === $dayErrors) {
+            $dayErrors[] = 'Podaj obie godziny (od i do) albo żadnej.';
+        }
+
+        $breakRaw = trim((string) $p->get('break', ''));
+        $breakSpec = TimeFormat::parseBreakSpec($breakRaw);
+        $breakMinutes = 0;
+        if (null === $breakSpec) {
+            $dayErrors[] = 'Niepoprawna przerwa – wpisz np. 30m, 1h, na raty: 20m + 40m, albo godziny: 13:30-13:50, 15:00-15:40.';
+        } else {
+            $breakMinutes = $breakSpec['minutes'];
+        }
+        $lunchWorked = $p->getBoolean('lunch_worked');
+
+        $errors = $dayErrors;
+        $rows = [];
+        foreach ($p->all('entries') as $key => $raw) {
+            if (!is_array($raw)) {
+                continue;
+            }
+            $row = [
+                'key' => (string) $key,
+                'id' => (int) ($raw['id'] ?? 0),
+                'issue' => trim((string) ($raw['issue'] ?? '')),
+                'time' => trim((string) ($raw['time'] ?? '')),
+                'desc' => trim((string) ($raw['desc'] ?? '')),
+                'delete' => !empty($raw['delete']),
+                'minutes' => 0,
+                // czas widoczny w formularzu przy wczytaniu – porównujemy z nim, czy użytkownik zmienił czas
+                'origMinutes' => TimeFormat::parse(trim((string) ($raw['orig'] ?? ''))) ?? 0,
+                'status' => null,
+                'error' => null,
+            ];
+            if (0 === $row['id'] && '' === $row['issue'] && '' === $row['time'] && '' === $row['desc']) {
+                continue; // pusty wiersz
+            }
+            if (!$row['delete']) {
+                $issue = Template::extractIssueKey($row['issue']);
+                $minutes = '' === $row['time'] ? 0 : TimeFormat::parse($row['time']); // puste = 0m (np. czeka na stoper)
+                if (null === $issue) {
+                    $row['error'] = 'Niepoprawny numer ticketu (np. ABC-123).';
+                } elseif (null === $minutes) {
+                    $row['error'] = 'Niepoprawny czas – wpisz np. 1h 30m, 1.5, 90m albo 1:30.';
+                } else {
+                    $row['issue'] = $issue;
+                    $row['minutes'] = $minutes;
+                    $row['time'] = $minutes > 0 ? TimeFormat::format($minutes) : '';
+                }
+                if (null !== $row['error']) {
+                    $errors[] = 'Popraw zaznaczone wiersze.';
+                }
+            }
+            $rows[] = $row;
+        }
+
+        return [[
+            'start' => $start,
+            'end' => $end,
+            'break' => $breakRaw,
+            'breakMinutes' => $breakMinutes,
+            'lunchWorked' => $lunchWorked,
+            'rows' => $rows,
+            'dayErrors' => $dayErrors,
+        ], $errors];
+    }
+
+    /** @param string[] $errors */
+    private function clockField(string $raw, string $label, array &$errors): ?string
+    {
+        $raw = trim($raw);
+        if ('' === $raw) {
+            return null;
+        }
+        $n = TimeFormat::normalizeClock($raw);
+        if (null === $n) {
+            $errors[] = $label.': wpisz godzinę w formacie GG:MM.';
+        }
+
+        return $n;
+    }
+
+    private function parseDate(string $date): \DateTimeImmutable
+    {
+        $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if (false === $d || $d->format('Y-m-d') !== $date) {
+            throw new NotFoundHttpException('Niepoprawna data.');
+        }
+
+        return $d;
+    }
+}

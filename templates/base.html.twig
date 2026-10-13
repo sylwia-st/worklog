@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>{% block title %}Raport czasu{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e2e0da;
+            --accent: #2f5d50; --accent-ink: #fff; --ok: #2e7d4f; --warn: #a86a00; --err: #b3261e; --info: #3c5a8a;
+            --ok-bg: #e7f3ec; --warn-bg: #fbf1dc; --err-bg: #fbe7e5; --info-bg: #e8eef8;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #161716; --panel: #1f201f; --ink: #ecebe7; --muted: #a09f9a; --line: #343532;
+                --accent: #7fb8a5; --accent-ink: #10201b; --ok: #7fcf9d; --warn: #e8b552; --err: #f08b84; --info: #9db7e3;
+                --ok-bg: #1f3227; --warn-bg: #3a2f17; --err-bg: #3d2120; --info-bg: #1f2a3b;
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Ubuntu, sans-serif; }
+        a { color: var(--accent); }
+        header { background: var(--panel); border-bottom: 1px solid var(--line); }
+        header .wrap { display: flex; gap: 20px; align-items: center; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; }
+        header strong { font-size: 16px; margin-right: auto; }
+        header nav a { text-decoration: none; color: var(--muted); padding: 4px 2px; }
+        header nav a.active { color: var(--ink); border-bottom: 2px solid var(--accent); }
+        .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+        main { padding: 24px 0 64px; }
+        h1 { font-size: 22px; margin: 0 0 4px; }
+        h2 { font-size: 16px; margin: 0 0 12px; }
+        .sub { color: var(--muted); margin: 0 0 20px; }
+        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+        .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+        @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+        label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+        input[type=text], input[type=url], input[type=password], input[type=number], input[type=time], input[type=date], select, textarea {
+            width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit;
+        }
+        textarea { resize: vertical; min-height: 38px; }
+        textarea.mono, pre { font: 13px/1.5 ui-monospace, "Ubuntu Mono", monospace; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        .row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .row > div { flex: 1 1 120px; }
+        button, .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+            padding: 7px 14px; border-radius: 6px; font: inherit; cursor: pointer; text-decoration: none; }
+        button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        button.link { border: none; background: none; color: var(--accent); padding: 0; }
+        button:disabled { opacity: .5; cursor: default; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 6px; border-bottom: 1px solid var(--line); }
+        td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+        .entries td { border-bottom: none; padding: 4px 4px; }
+        .entries td.issue { width: 150px; } .entries td.time { width: 100px; } .entries td.st { width: 34px; text-align: center; padding-top: 10px; }
+        .entries td.del { width: 34px; text-align: center; padding-top: 10px; }
+        .entries tr.has-error input { border-color: var(--err); }
+        .rowerr { color: var(--err); font-size: 12px; }
+        .flash { padding: 9px 14px; border-radius: 8px; margin-bottom: 10px; }
+        .flash.success { background: var(--ok-bg); color: var(--ok); } .flash.error { background: var(--err-bg); color: var(--err); }
+        .flash.info { background: var(--info-bg); color: var(--info); } .flash.warning { background: var(--warn-bg); color: var(--warn); }
+        .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+        .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+        .badge.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+        .badge.err { background: var(--err-bg); color: var(--err); border-color: transparent; }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+        .dot.synced { background: var(--ok); } .dot.new { background: var(--line); border: 1px solid var(--muted); }
+        .dot.changed { background: var(--warn); } .dot.error { background: var(--err); }
+        dl.stats { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+        dl.stats dt { color: var(--muted); } dl.stats dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+        .big { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .over { color: var(--warn); } .under { color: var(--info); } .okc { color: var(--ok); }
+        .muted { color: var(--muted); } .small { font-size: 13px; }
+        .daynav { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+        .daynav input[type=date] { width: auto; }
+        .mailmeta { display: grid; grid-template-columns: 60px 1fr; gap: 2px 10px; font-size: 14px; margin-bottom: 10px; }
+        .mailmeta span:nth-child(odd) { color: var(--muted); }
+        pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin: 0; }
+        fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px 4px; margin: 0 0 18px; background: var(--panel); }
+        legend { font-weight: 600; padding: 0 6px; }
+        .field { margin-bottom: 14px; } .help { font-size: 12px; color: var(--muted); margin-top: 3px; }
+        tr.weekend td { color: var(--muted); }
+        .copied { color: var(--ok); font-size: 13px; }
+        .badge.err { background: var(--err-bg); color: var(--err); border-color: transparent; }
+        .entries td.tm { width: 40px; text-align: center; }
+        .tbtn { padding: 5px 9px; min-width: 34px; justify-content: center; }
+        tr.running .tbtn { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+        tr.running .f-time { background: var(--ok-bg); }
+        .live { color: var(--ok); font-variant-numeric: tabular-nums; margin-top: 2px; }
+        #timerbar { background: var(--ok-bg); color: var(--ok); border-bottom: 1px solid var(--line); }
+        #timerbar .wrap { display: flex; gap: 14px; align-items: center; padding-top: 7px; padding-bottom: 7px; flex-wrap: wrap; }
+        #timerbar b { color: var(--ink); } #tb-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+        #timerstale input { width: auto; margin: 0 6px; }
+    </style>
+</head>
+<body>
+<header>
+    <div class="wrap">
+        <strong>⏱ Raport czasu</strong>
+        {% set r = app.request.attributes.get('_route') %}
+        <nav>
+            <a href="{{ path('today') }}" class="{{ r in ['day', 'day_save'] ? 'active' }}">Dzień</a>
+            <a href="{{ path('dashboard') }}" class="{{ r == 'dashboard' ? 'active' }}">Przegląd</a>
+            <a href="{{ path('planned') }}" class="{{ r starts with 'planned' ? 'active' }}">Planowane zmiany</a>
+            <a href="{{ path('settings') }}" class="{{ r starts with 'settings' ? 'active' }}">Ustawienia</a>
+        </nav>
+    </div>
+</header>
+<div id="timerbar" hidden>
+    <div class="wrap">
+        <span>⏱ Stoper: <b id="tb-issue"></b> <span class="muted small" id="tb-date"></span></span>
+        <span id="tb-time"></span>
+        <button type="button" id="tb-stop">❚❚ Zatrzymaj</button>
+        <a id="tb-link" href="#">przejdź do dnia</a>
+    </div>
+</div>
+<main class="wrap">
+    <div id="timerstale" class="flash warning" hidden>
+        <p style="margin:0 0 8px"><strong id="ts-msg"></strong></p>
+        <label style="display:inline; color:inherit">O której go zatrzymać?</label>
+        <input type="datetime-local" id="ts-at">
+        <button type="button" id="ts-stop-at" class="primary">Zatrzymaj o tej godzinie</button>
+        <button type="button" id="ts-stop-now">Zatrzymaj teraz</button>
+        <button type="button" id="ts-keep">Pracuję dalej</button>
+    </div>
+    {% for type, messages in app.flashes %}
+        {% for m in messages %}<div class="flash {{ type }}">{{ m }}</div>{% endfor %}
+    {% endfor %}
+    {% block body %}{% endblock %}
+</main>
+<script>
+    // Kopiowanie do schowka: <button data-copy="#id" data-mark="/url">
+    document.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-copy]');
+        if (!btn) return;
+        const src = document.querySelector(btn.dataset.copy);
+        const text = src.value ?? src.textContent;
+        try { await navigator.clipboard.writeText(text); }
+        catch { src.select?.(); document.execCommand('copy'); }
+        const old = btn.textContent; btn.textContent = 'Skopiowano ✓';
+        setTimeout(() => btn.textContent = old, 1600);
+        if (btn.dataset.mark) markDone(btn.dataset.mark, btn.dataset.markLabel);
+    });
+    // Kliknięcie linku mailto z data-mark oznacza mail jako wysłany
+    document.addEventListener('click', (ev) => {
+        const a = ev.target.closest('a[data-mark]');
+        if (a) markDone(a.dataset.mark, a.dataset.markLabel);
+    });
+    function markDone(url, labelSel) {
+        fetch(url, { method: 'POST', credentials: 'same-origin' }).then(() => {
+            if (labelSel) document.querySelectorAll(labelSel).forEach(el => { el.textContent = '✓ oznaczono jako wysłane'; el.className = 'badge ok'; });
+        });
+    }
+</script>
+<script>
+    // Stoper – stan trzymany w bazie; tu tylko go pokazujemy i odświeżamy.
+    window.WorklogTimer = (() => {
+        const DAY_URL = '{{ path('day', {date: '0000-00-00'}) }}';
+        let state = {running: false}, fetchedAt = Date.now();
+        const $ = (id) => document.getElementById(id);
+        const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
+        const keepKey = (s) => 'worklog-timer-keep-' + s.startedAt;
+
+        async function call(url, body) {
+            const opts = body === undefined ? {credentials: 'same-origin'} :
+                {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)};
+            const res = await fetch(url, opts);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) { alert(json.error || 'Stoper: błąd ' + res.status); throw new Error(json.error); }
+            return json;
+        }
+        function render(s) {
+            state = s; fetchedAt = Date.now();
+            $('timerbar').hidden = !s.running;
+            if (s.running) {
+                $('tb-issue').textContent = s.issue;
+                $('tb-date').textContent = '(' + s.date.split('-').reverse().join('.') + ')';
+                $('tb-link').href = DAY_URL.replace('0000-00-00', s.date);
+            }
+            let keep = false; try { keep = s.running && sessionStorage.getItem(keepKey(s)) === '1'; } catch (e) {}
+            const stale = s.running && s.stale && !keep;
+            $('timerstale').hidden = !stale;
+            if (stale) { $('ts-msg').textContent = s.stale; $('ts-at').value = s.suggestedStop; }
+            tick();
+            document.dispatchEvent(new CustomEvent('timer:update', {detail: s}));
+        }
+        function tick() {
+            if (!state.running) return;
+            const elapsedNow = state.elapsedSeconds + Math.floor((Date.now() - fetchedAt) / 1000);
+            $('tb-time').textContent = clock(state.baseSeconds + elapsedNow);
+            document.dispatchEvent(new CustomEvent('timer:tick', {detail: {...state, elapsedNow}}));
+        }
+        const api = {
+            refresh: async () => render(await call('{{ path('timer_state') }}')),
+            start: async (entryId) => render(await call('{{ path('timer_start') }}', {entryId})),
+            stop: async (at) => render(await call('{{ path('timer_stop') }}', at ? {at} : {})),
+        };
+        $('tb-stop').onclick = () => api.stop();
+        $('ts-stop-now').onclick = () => api.stop();
+        $('ts-stop-at').onclick = () => api.stop($('ts-at').value);
+        $('ts-keep').onclick = () => { try { sessionStorage.setItem(keepKey(state), '1'); } catch (e) {} $('timerstale').hidden = true; };
+        setInterval(tick, 1000);
+        // po wybudzeniu komputera / powrocie do karty – świeży stan z bazy
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') api.refresh().catch(() => {}); });
+        setInterval(() => api.refresh().catch(() => {}), 60000);
+        api.refresh().catch(() => {});
+        return api;
+    })();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

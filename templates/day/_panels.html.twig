@@ -1,0 +1,63 @@
+{# Prawa kolumna dnia – renderowana w show.html.twig i odświeżana po autozapisie (GET /day/{date}/panels). #}
+<div class="panel">
+    <h2>Bilans</h2>
+    {% if summary is null or summary.kind == 'empty' %}
+        <p class="muted">Pojawi się po wpisaniu godzin albo czasu w ticketach.</p>
+    {% else %}
+        {% set diff = summary.difference %}
+        <div class="big {{ summary.kind == 'over' ? 'over' : (summary.kind == 'under' ? 'under' : 'okc') }}">
+            {{ diff == 0 ? '±0' : diff|signed_hm }}
+        </div>
+        <p class="muted small" style="margin:0 0 12px">
+            {{ summary.kind == 'over' ? 'Nadgodziny' : (summary.kind == 'under' ? 'Krótszy dzień' : 'W normie') }}
+            – liczone z {{ summary.basedOnPresence ? 'godzin obecności' : 'czasu w ticketach (brak godzin od–do)' }}
+        </p>
+        <dl class="stats">
+            <dt>Obecność</dt><dd>{{ summary.presenceMinutes|hm }}</dd>
+            {% if summary.basedOnPresence %}<dt>Odliczona przerwa{{ day.workedThroughFixedBreak ? ' (wzięta później)' }}</dt><dd>{{ summary.breakMinutes|hm }}</dd>{% endif %}
+            <dt>W ticketach</dt><dd>{{ summary.loggedMinutes|hm }}</dd>
+            <dt>Norma</dt><dd>{{ summary.normMinutes|hm }}</dd>
+        </dl>
+        {% set gap = summary.loggedVsPresence %}
+        {% if gap is not null and gap != 0 %}
+            <p class="flash warning small" style="margin:12px 0 0">
+                W ticketach jest {{ gap > 0 ? 'więcej' : 'mniej' }} niż czas obecności o {{ (gap|abs)|hm }}.
+            </p>
+        {% endif %}
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Slack</h2>
+    {% if slack is null %}
+        <p class="muted">Pojawi się, gdy wpisy będą miały czas.</p>
+    {% else %}
+        <textarea id="slack-text" class="mono" rows="{{ min(14, (slack|split("\n")|length) + 1) }}" readonly>{{ slack }}</textarea>
+        <div class="actions">
+            <button type="button" class="primary" data-copy="#slack-text" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'slack'}) }}" data-mark-label="#slack-status">Kopiuj na Slacka</button>
+            {% if day.slackDoneAt %}<span id="slack-status" class="badge ok">✓ skopiowano {{ day.slackDoneAt|date('H:i') }}</span>
+            {% else %}<span id="slack-status" class="badge">jeszcze nie</span>{% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{% if mail %}
+<div class="panel">
+    <h2>Mail: {{ summary.kind == 'over' ? 'nadgodziny' : 'krótszy dzień' }}</h2>
+    {% if not mail.hasRecipients %}
+        <p class="flash warning small">Brak adresatów – uzupełnij je w <a href="{{ path('settings') }}">Ustawieniach</a>.</p>
+    {% endif %}
+    <div class="mailmeta">
+        <span>Do</span><span>{{ mail.to|join(', ') ?: '—' }}</span>
+        {% if mail.cc %}<span>DW</span><span>{{ mail.cc|join(', ') }}</span>{% endif %}
+        <span>Temat</span><span id="mail-subject">{{ mail.subject }}</span>
+    </div>
+    <pre id="mail-body">{{ mail.body }}</pre>
+    <div class="actions">
+        <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
+        <button type="button" data-copy="#mail-body">Kopiuj treść</button>
+        {% if day.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ day.mailDoneAt|date('H:i') }}</span>
+        {% else %}<span id="mail-status" class="badge warn">do wysłania</span>{% endif %}
+    </div>
+</div>
+{% endif %}

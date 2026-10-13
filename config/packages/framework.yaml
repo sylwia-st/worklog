@@ -1,0 +1,13 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    default_locale: pl
+    session:
+        handler_id: session.handler.native_file
+        save_path: '%kernel.project_dir%/var/sessions/%kernel.environment%'
+        cookie_samesite: strict
+        cookie_secure: false
+    php_errors:
+        log: true
+    http_client:
+        default_options:
+            timeout: 20

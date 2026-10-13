@@ -1,0 +1,10 @@
+[Unit]
+Description=Kopia zapasowa raportu czasu pracy – co godzinę w dni robocze
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 07..20:55
+# po włączeniu komputera nadrabia przegapioną kopię
+Persistent=true
+
+[Install]
+WantedBy=timers.target

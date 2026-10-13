@@ -1,0 +1,25 @@
+services:
+  worklog:
+    build: .
+    image: worklog-tool:latest
+    container_name: worklog
+    init: true                      # poprawne zatrzymywanie (sygnały do php -S)
+    restart: unless-stopped         # startuje razem z Dockerem po restarcie komputera
+    ports:
+      # Tylko localhost – aplikacja nie jest dostępna z sieci.
+      - "127.0.0.1:${WORKLOG_PORT:-8765}:8080"
+    environment:
+      TZ: ${WORKLOG_TZ:-Europe/Warsaw}
+      APP_TIMEZONE: ${WORKLOG_TZ:-Europe/Warsaw}
+    volumes:
+      - worklog-data:/data          # baza SQLite, token Jiry, sekret aplikacji
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Jeśli Jira jest w sieci firmowej (VPN) i kontener jej nie widzi – patrz README, sekcja „VPN”.
+
+volumes:
+  worklog-data:
+    name: worklog-data

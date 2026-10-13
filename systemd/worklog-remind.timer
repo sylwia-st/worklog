@@ -1,0 +1,11 @@
+[Unit]
+Description=Przypomnienie o raporcie czasu pracy (pon–pt)
+
+[Timer]
+# Co minutę w dni robocze – godzinę przypomnienia ustawia się w aplikacji (Ustawienia → Przypomnienie).
+OnCalendar=Mon..Fri *-*-* 06..21:*:00
+AccuracySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

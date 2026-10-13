@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Skróty do obsługi kontenera. Użycie: ./worklog [up|down|restart|logs|status|update|backup|restore PLIK|remind|console ...]
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$DIR"
+[[ -f .env.compose ]] || printf 'WORKLOG_PORT=8765\nCOMPOSE_FILE=compose.yaml\n' > .env.compose
+set -a; source .env.compose; set +a
+
+dc() {
+    local args=()
+    IFS=':' read -ra files <<< "$COMPOSE_FILE"
+    for f in "${files[@]}"; do args+=(-f "$f"); done
+    docker compose --env-file .env.compose "${args[@]}" "$@"
+}
+
+case "${1:-help}" in
+    up)       dc up -d --build ;;
+    down)     dc down ;;
+    restart)  dc restart ;;
+    logs)     dc logs -f --tail=100 ;;
+    status)   dc ps; echo; echo "http://127.0.0.1:$WORKLOG_PORT" ;;
+    update)
+        # composer.lock przypina wersje – najpierw podnosimy je do najnowszych łatek w ramach composer.json
+        docker run --rm --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer -v "$DIR":/app -w /app \
+            composer:2 update --no-install --no-scripts --no-interaction
+        dc build --pull --no-cache && dc up -d
+        ;;
+    backup)
+        out="${2:-$HOME/worklog-backup-$(date +%Y%m%d-%H%M%S).db}"
+        umask 077
+        mkdir -p "$(dirname "$out")"
+        # VACUUM INTO daje spójną kopię także wtedy, gdy aplikacja akurat zapisuje; potem sprawdzamy jej integralność
+        docker exec worklog php -r '
+            @unlink("/data/.backup.db");
+            $db = new SQLite3("/data/worklog.db");
+            $db->busyTimeout(10000);
+            if (!$db->exec("VACUUM INTO \"/data/.backup.db\"")) { fwrite(STDERR, "VACUUM INTO nie powiodło się\n"); exit(1); }
+            $check = (new SQLite3("/data/.backup.db", SQLITE3_OPEN_READONLY))->querySingle("PRAGMA integrity_check");
+            if ($check !== "ok") { fwrite(STDERR, "Kopia uszkodzona: $check\n"); exit(1); }
+        '
+        docker exec worklog cat /data/.backup.db > "$out.part"
+        docker exec worklog rm -f /data/.backup.db
+        mv "$out.part" "$out"     # plik pojawia się dopiero, gdy jest kompletny
+        echo "Kopia zapisana: $out"
+        ;;
+    restore)
+        [[ -f "${2:-}" ]] || { echo "Użycie: ./worklog restore PLIK.db"; exit 1; }
+        read -rp "Nadpisać obecne dane kopią $2? [t/N] " ok
+        [[ "$ok" == "t" ]] || exit 1
+        safety="${WORKLOG_BACKUP_DIR:-$HOME/worklog-backups}/przed-przywroceniem-$(date +%Y%m%d-%H%M%S).db"
+        if ! "$0" backup "$safety" >/dev/null; then
+            echo "Nie udało się zrobić kopii obecnego stanu – przerywam, nic nie zmieniono."
+            exit 1
+        fi
+        echo "Obecny stan zapisano na wszelki wypadek: $safety"
+        docker exec -i worklog sh -c 'umask 077; cat > /data/.restore.db' < "$2"
+        # backup API SQLite – bezpieczne przy włączonym WAL i działającej aplikacji
+        docker exec worklog php -r '
+            $src = new SQLite3("/data/.restore.db", SQLITE3_OPEN_READONLY);
+            if ($src->querySingle("PRAGMA integrity_check") !== "ok") { fwrite(STDERR, "Plik kopii jest uszkodzony – nic nie zmieniono.\n"); exit(1); }
+            $dst = new SQLite3("/data/worklog.db");
+            $dst->busyTimeout(10000);
+            if (!$src->backup($dst)) { fwrite(STDERR, "Przywracanie nie powiodło się – nic nie zmieniono.\n"); exit(1); }
+        '
+        docker exec worklog rm -f /data/.restore.db
+        echo "Przywrócono."
+        ;;
+    remind)   docker exec worklog php bin/console app:remind -v ;;
+    console)  shift; docker exec -it worklog php bin/console "$@" ;;
+    *)
+        cat <<EOF
+./worklog up        – zbuduj i uruchom
+./worklog down      – zatrzymaj i usuń kontener (dane zostają w wolumenie)
+./worklog restart   – restart
+./worklog logs      – logi na żywo
+./worklog status    – stan kontenera
+./worklog update    – przebuduj obraz na najnowszych łatkach PHP/Symfony
+./worklog backup    – kopia bazy do ~/worklog-backup-*.db
+./worklog restore F – przywróć kopię
+./worklog remind    – co zostało do zrobienia dzisiaj
+EOF
+        ;;
+esac

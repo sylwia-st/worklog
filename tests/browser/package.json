@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "scripts": { "test": "node day.test.js" },
+  "devDependencies": { "jsdom": "^24" }
+}

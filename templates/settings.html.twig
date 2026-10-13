@@ -1,0 +1,44 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ustawienia – Raport czasu{% endblock %}
+
+{% block body %}
+<h1>Ustawienia</h1>
+<p class="sub">Wszystko zapisuje się lokalnie w wolumenie Dockera <code>worklog-data</code>. Jedyne połączenie wychodzące to Twoja Jira.</p>
+
+<div class="panel">
+    <h2>Połączenie z Jirą</h2>
+    <div class="actions" style="margin-top:0">
+        <form method="post" action="{{ path('settings_jira_test') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Sprawdź połączenie</button></form>
+        <form method="post" action="{{ path('settings_jira_issues') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Pobierz moje tickety do podpowiedzi</button></form>
+        <span class="muted small">{{ hasToken ? 'Token zapisany.' : 'Najpierw zapisz adres i token poniżej.' }} W podpowiedziach: {{ issueCount }} ticketów.</span>
+    </div>
+</div>
+
+<form method="post" action="{{ path('settings_save') }}">
+    {% for section, fields in form %}
+        <fieldset>
+            <legend>{{ section }}</legend>
+            {% for key, f in fields %}
+                {% set label = f[0] %}{% set type = f[1] %}{% set help = f[2] %}
+                <div class="field">
+                    <label for="{{ key }}">{{ label }}</label>
+                    {% if type == 'textarea' %}
+                        <textarea id="{{ key }}" name="{{ key }}" rows="{{ key ends with '_body' ? 7 : 2 }}" class="{{ key ends with '_body' ? 'mono' }}">{{ values[key] }}</textarea>
+                    {% elseif type == 'select' %}
+                        <select id="{{ key }}" name="{{ key }}">
+                            {% for value, name in options[key] %}<option value="{{ value }}" {{ values[key] == value ? 'selected' }}>{{ name }}</option>{% endfor %}
+                        </select>
+                    {% elseif type == 'password' %}
+                        <input type="password" id="{{ key }}" name="{{ key }}" value="" autocomplete="new-password" placeholder="{{ hasToken ? '•••••••• (zapisany)' : '' }}">
+                    {% else %}
+                        <input type="{{ type }}" id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"{% if type == 'number' %} min="0"{% endif %}>
+                    {% endif %}
+                    {% if help %}<div class="help">{{ help }}</div>{% endif %}
+                </div>
+            {% endfor %}
+        </fieldset>
+    {% endfor %}
+    <div class="actions"><button type="submit" class="primary">Zapisz ustawienia</button></div>
+</form>
+{% endblock %}

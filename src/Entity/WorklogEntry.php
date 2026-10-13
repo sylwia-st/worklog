@@ -1,0 +1,226 @@
+<?php
+
+namespace App\Entity;
+
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity(repositoryClass: \App\Repository\WorklogEntryRepository::class)]
+#[ORM\Table(name: 'worklog_entry')]
+class WorklogEntry
+{
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column]
+    private ?int $id = null;
+
+    #[ORM\ManyToOne(targetEntity: WorkDay::class, inversedBy: 'entries')]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    private WorkDay $day;
+
+    #[ORM\Column]
+    private int $position = 0;
+
+    #[ORM\Column(length: 50)]
+    private string $issueKey;
+
+    #[ORM\Column]
+    private int $minutes;
+
+    #[ORM\Column(type: Types::TEXT)]
+    private string $description = '';
+
+    /** Wpis usunięty lokalnie, który trzeba jeszcze skasować w Jirze. */
+    #[ORM\Column]
+    private bool $deleted = false;
+
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $jiraWorklogId = null;
+
+    /** Ticket, w którym worklog faktycznie istnieje w Jirze (może się różnić po edycji). */
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $jiraIssueKey = null;
+
+    #[ORM\Column(length: 40, nullable: true)]
+    private ?string $jiraSyncHash = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $jiraSyncedAt = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $jiraError = null;
+
+    /** Kiedy uruchomiono stoper przy tym wpisie (null = nie działa). Zapisywane od razu w bazie. */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $timerStartedAt = null;
+
+    /** Sekundy ze stopera, które nie złożyły się jeszcze w pełną minutę (0–59) – kolejne sesje je dopełniają. */
+    #[ORM\Column(options: ['default' => 0])]
+    private int $carrySeconds = 0;
+
+    public function __construct(WorkDay $day, string $issueKey, int $minutes, string $description, int $position)
+    {
+        $this->day = $day;
+        $this->issueKey = $issueKey;
+        $this->minutes = max(0, $minutes);
+        $this->description = $description;
+        $this->position = $position;
+        $day->addEntry($this);
+    }
+
+    public function getTimerStartedAt(): ?\DateTimeImmutable
+    {
+        return $this->timerStartedAt;
+    }
+
+    public function isTimerRunning(): bool
+    {
+        return null !== $this->timerStartedAt;
+    }
+
+    public function startTimer(\DateTimeImmutable $at): void
+    {
+        $this->timerStartedAt ??= $at;
+    }
+
+    /**
+     * Zatrzymuje stoper i dolicza zmierzony czas w pełnych minutach (bez zaokrąglania).
+     * Niepełna minuta zostaje w carrySeconds, więc np. 12m 30s + 17m 30s = 30m.
+     *
+     * @return int doliczone sekundy
+     */
+    public function stopTimer(\DateTimeImmutable $at): int
+    {
+        if (null === $this->timerStartedAt) {
+            return 0;
+        }
+        $elapsed = max(0, $at->getTimestamp() - $this->timerStartedAt->getTimestamp());
+        $this->timerStartedAt = null;
+        $this->addTrackedSeconds($elapsed);
+
+        return $elapsed;
+    }
+
+    public function addTrackedSeconds(int $seconds): void
+    {
+        $total = $this->minutes * 60 + $this->carrySeconds + max(0, $seconds);
+        $this->minutes = intdiv($total, 60);
+        $this->carrySeconds = $total % 60;
+    }
+
+    public function getCarrySeconds(): int
+    {
+        return $this->carrySeconds;
+    }
+
+    /** Ile sekund ma wpis w tej chwili – razem z działającym stoperem. */
+    public function liveSeconds(\DateTimeImmutable $now): int
+    {
+        $running = null !== $this->timerStartedAt ? max(0, $now->getTimestamp() - $this->timerStartedAt->getTimestamp()) : 0;
+
+        return $this->minutes * 60 + $this->carrySeconds + $running;
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getDay(): WorkDay
+    {
+        return $this->day;
+    }
+
+    public function getPosition(): int
+    {
+        return $this->position;
+    }
+
+    public function update(string $issueKey, int $minutes, string $description, int $position): void
+    {
+        if ($minutes !== $this->minutes) {
+            $this->carrySeconds = 0; // czas poprawiony ręcznie – to on jest teraz obowiązujący
+        }
+        $this->issueKey = $issueKey;
+        $this->minutes = max(0, $minutes);
+        $this->description = $description;
+        $this->position = $position;
+    }
+
+    public function getIssueKey(): string
+    {
+        return $this->issueKey;
+    }
+
+    public function getMinutes(): int
+    {
+        return $this->minutes;
+    }
+
+    public function getDescription(): string
+    {
+        return $this->description;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deleted;
+    }
+
+    public function markDeleted(): void
+    {
+        $this->deleted = true;
+    }
+
+    public function getJiraWorklogId(): ?string
+    {
+        return $this->jiraWorklogId;
+    }
+
+    public function getJiraIssueKey(): ?string
+    {
+        return $this->jiraIssueKey;
+    }
+
+    public function getJiraSyncHash(): ?string
+    {
+        return $this->jiraSyncHash;
+    }
+
+    public function getJiraSyncedAt(): ?\DateTimeImmutable
+    {
+        return $this->jiraSyncedAt;
+    }
+
+    public function isInJira(): bool
+    {
+        return null !== $this->jiraWorklogId;
+    }
+
+    public function markSynced(string $worklogId, string $hash): void
+    {
+        $this->jiraWorklogId = $worklogId;
+        $this->jiraIssueKey = $this->issueKey;
+        $this->jiraSyncHash = $hash;
+        $this->jiraSyncedAt = new \DateTimeImmutable();
+        $this->jiraError = null;
+    }
+
+    public function markRemovedFromJira(): void
+    {
+        $this->jiraWorklogId = null;
+        $this->jiraIssueKey = null;
+        $this->jiraSyncHash = null;
+        $this->jiraSyncedAt = null;
+    }
+
+    public function getJiraError(): ?string
+    {
+        return $this->jiraError;
+    }
+
+    public function setJiraError(?string $jiraError): void
+    {
+        $this->jiraError = $jiraError;
+    }
+}

@@ -1,0 +1,359 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ date|date('d.m.Y') }} – Raport czasu{% endblock %}
+
+{% block body %}
+<div class="daynav">
+    <a class="btn" href="{{ path('day', {date: prev|date('Y-m-d')}) }}">← {{ prev|date('d.m') }}</a>
+    <input type="date" value="{{ date|date('Y-m-d') }}" onchange="location.href='{{ path('day', {date: '0000-00-00'})|replace({'0000-00-00': ''}) }}' + this.value">
+    <a class="btn" href="{{ path('day', {date: next|date('Y-m-d')}) }}">{{ next|date('d.m') }} →</a>
+    {% if date != today %}<a href="{{ path('today') }}">dzisiaj</a>{% endif %}
+</div>
+
+<h1>{{ date|pl_day|capitalize }}, {{ date|date('d.m.Y') }}</h1>
+<p class="sub">Zmiany zapisują się same. Kropki przy wpisach pokazują stan w Jirze.</p>
+
+<div id="draft-banner" class="flash warning" hidden>
+    <span id="draft-msg"></span>
+    <button type="button" id="draft-restore" class="primary" style="margin-left:8px">Przywróć</button>
+    <button type="button" id="draft-discard">Odrzuć</button>
+</div>
+
+{% for p in planned %}
+    <div class="flash warning">
+        Zaplanowana zmiana: <strong>{{ p.typeLabel }}</strong>
+        {% if p.fromTime %} od {{ p.fromTime }}{% endif %}{% if p.toTime %} do {{ p.toTime }}{% endif %}
+        – <a href="{{ path('planned_show', {id: p.id}) }}">szczegóły</a>
+    </div>
+{% endfor %}
+
+<div class="grid">
+<div>
+    <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel" id="dayform">
+        <h2>Godziny w pracy</h2>
+        <div class="row">
+            <div><label for="start">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
+            <div><label for="end">Do</label><input type="time" id="end" name="end" value="{{ form.end }}"></div>
+            <div><label for="break" id="break-label">{{ lunch and form.lunchWorked ? 'Przerwa wzięta (łącznie)' : 'Dodatkowa przerwa' }}</label><input type="text" id="break" name="break" value="{{ form.break }}" placeholder="np. 30m · 20m + 40m · 13:30-13:50, 15:00-15:40"></div>
+        </div>
+        {% if lunch %}
+            {% set helpOn = 'Obiad nie jest odliczany automatycznie. W „Przerwa wzięta” wpisz, ile przerwy faktycznie ' ~ forma('wzięłaś', 'wziąłeś', 'było') ~ ' – samym czasem (20m + 40m) albo godzinami (13:30-13:50, 15:00-15:40). ' ~ forma('Jeśli nie wzięłaś wcale', 'Jeśli nie wziąłeś wcale', 'Jeśli nie było jej wcale') ~ ' – wpisz 0.' %}
+            {% set helpOff = 'Przerwa ' ~ lunch ~ ' odlicza się sama (' ~ forma('jeśli byłaś wtedy w pracy', 'jeśli byłeś wtedy w pracy', 'jeśli wypada w godzinach pracy') ~ '). „Dodatkowa przerwa” – tylko gdy była jeszcze jakaś inna.' %}
+            <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0 0; color:var(--ink); font-size:14px">
+                <input type="checkbox" id="lunch_worked" name="lunch_worked" value="1" {{ form.lunchWorked ? 'checked' }} data-lunch="{{ lunchLength }}" data-help-on="{{ helpOn }}" data-help-off="{{ helpOff }}" style="margin-top:4px">
+                <span>{{ forma('Pracowałam', 'Pracowałem', 'Praca') }} w przerwie obiadowej {{ lunch }} (awaria / pilna sprawa)</span>
+            </label>
+            <p class="muted small" id="lunch-help" style="margin:4px 0 0 24px">
+                {{ form.lunchWorked ? helpOn : helpOff }}
+            </p>
+        {% endif %}
+
+        <h2 style="margin-top:22px">Czas w ticketach</h2>
+        <table class="entries">
+            <thead><tr><th></th><th>Ticket</th><th title="Stoper">⏱</th><th>Czas</th><th>Opis (komentarz w Jirze i na Slacku)</th><th title="Zaznacz i kliknij Zapisz, żeby usunąć">✕</th></tr></thead>
+            <tbody id="rows">
+            {% for row in form.rows %}
+                {{ _self.entry_row(loop.index0, row) }}
+            {% endfor %}
+            </tbody>
+        </table>
+        <div class="actions" style="margin-top:8px">
+            <button type="button" id="addrow">+ Dodaj wiersz</button>
+            {% if form.rows is empty %}
+                <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
+            {% endif %}
+            <span class="muted small">Czas: 1h 30m · 1.5 · 90m · 1:30 – albo ▶ stoper</span>
+        </div>
+
+        {% if pendingDeletions is not empty %}
+            <div class="flash warning small" style="margin-top:14px">
+                Przy najbliższej wysyłce zostaną usunięte z Jiry:
+                {% for e in pendingDeletions %}<strong>{{ e.jiraIssueKey }}</strong> ({{ e.minutes|hm }}){{ not loop.last ? ', ' }}{% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="actions">
+            <button type="submit" name="action" value="save">Zapisz</button>
+            <button type="submit" name="action" value="sync" class="primary">Zapisz i wyślij do Jiry</button>
+            <span id="savestate" class="badge" aria-live="polite">{{ day ? 'zapisane' : 'nic jeszcze nie zapisano' }}</span>
+        </div>
+        <p class="muted small" style="margin:10px 0 0">
+            <span class="dot synced"></span> w Jirze &nbsp; <span class="dot changed"></span> zmieniony &nbsp;
+            <span class="dot new"></span> nowy &nbsp; <span class="dot error"></span> błąd.
+            Usunięcie wiersza (✕) zatwierdzasz przyciskiem „Zapisz”.
+        </p>
+    </form>
+</div>
+
+<div id="panels">
+    {{ include('day/_panels.html.twig') }}
+</div>
+</div>
+
+<datalist id="issues">
+    {% for key, title in issueOptions %}<option value="{{ key }}">{{ key }}{{ title ? ' – ' ~ title }}</option>{% endfor %}
+</datalist>
+
+<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', time: '', desc: '', status: null, error: null}) }}</template>
+{% endblock %}
+
+{% macro entry_row(i, row) %}
+    <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}" data-key="{{ i }}">
+        <td class="st">
+            {% set titles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
+            <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? titles[row.status] : '' }}"></span>
+        </td>
+        <td class="issue">
+            <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
+            <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
+            <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue">
+        </td>
+        <td class="tm"><button type="button" class="tbtn" title="Włącz stoper">▶</button></td>
+        <td class="time">
+            <input type="text" name="entries[{{ i }}][time]" value="{{ row.time }}" placeholder="1h 30m" class="f-time">
+            <div class="live small"></div>
+        </td>
+        <td>
+            <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc">{{ row.desc }}</textarea>
+            <div class="rowerr">{% if row.error %}{{ row.status == 'error' ? 'Jira: ' }}{{ row.error }}{% endif %}</div>
+        </td>
+        <td class="del"><input type="checkbox" name="entries[{{ i }}][delete]" value="1" class="f-del" title="Usuń wpis{{ row.status ? ' (także z Jiry)' }} – zatwierdź przyciskiem Zapisz"></td>
+    </tr>
+{% endmacro %}
+
+{% block scripts %}
+<script>
+(() => {
+    const DATE = '{{ date|date('Y-m-d') }}';
+    const AUTOSAVE_URL = '{{ path('day_autosave', {date: date|date('Y-m-d')}) }}';
+    const PANELS_URL = '{{ path('day_panels', {date: date|date('Y-m-d')}) }}';
+    const DRAFT_KEY = 'worklog-draft-' + DATE;
+    const form = document.getElementById('dayform');
+    const rows = document.getElementById('rows');
+    const tpl = document.getElementById('rowtpl').innerHTML;
+    const stateEl = document.getElementById('savestate');
+    let next = rows.children.length;
+
+    // ---------- wiersze ----------
+    const add = (focus = true) => {
+        rows.insertAdjacentHTML('beforeend', tpl.replaceAll('__i__', next++));
+        if (focus) rows.lastElementChild.querySelector('.f-issue').focus();
+        return rows.lastElementChild;
+    };
+    document.getElementById('addrow').addEventListener('click', () => add());
+    if (rows.children.length === 0) { add(false); add(false); add(false); }
+    rows.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && ev.target.closest('tr') === rows.lastElementChild) {
+            ev.preventDefault(); add();
+        }
+    });
+    const rowById = (id) => [...rows.children].find(tr => tr.querySelector('.f-id').value === String(id));
+    const rowByKey = (key) => rows.querySelector(`tr[data-key="${key}"]`);
+
+    // ---------- autozapis ----------
+    // dirty – licznik zmian, savedDirty – stan licznika przy ostatnim udanym zapisie
+    let dirty = 0, savedDirty = 0, saving = false, submitting = false, retryTimer = null, debounce = null;
+    const setState = (cls, text) => { stateEl.className = 'badge ' + cls; stateEl.textContent = text; };
+    const formData = () => { const fd = new FormData(form); fd.delete('action'); return fd; };
+
+    // treść formularza bez technicznych pól (id, orig) – do porównania szkicu z tym, co jest w bazie
+    const content = () => {
+        const fd = formData(), out = {day: [fd.get('start'), fd.get('end'), fd.get('break'), fd.get('lunch_worked') || ''], rows: []};
+        for (const tr of rows.children) {
+            if (tr.querySelector('.f-del').checked) continue;
+            const issue = tr.querySelector('.f-issue').value.trim(), time = tr.querySelector('.f-time').value.trim(), desc = tr.querySelector('.f-desc').value.trim();
+            if (issue || time || desc) out.rows.push([issue, time, desc]);
+        }
+        return JSON.stringify(out);
+    };
+    const serverContent = content();
+
+    const writeDraft = () => {
+        try { localStorage.setItem(DRAFT_KEY, JSON.stringify({at: Date.now(), content: content(), fields: [...formData().entries()]})); } catch (e) {}
+    };
+    const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} };
+
+    const changed = () => {
+        dirty++;
+        writeDraft();
+        setState('', 'zapisywanie…');
+        clearTimeout(debounce);
+        debounce = setTimeout(save, 900);
+    };
+    form.addEventListener('input', changed);
+    form.addEventListener('change', (ev) => { if (!ev.target.classList.contains('f-del')) changed(); });
+
+    async function save() {
+        clearTimeout(debounce); clearTimeout(retryTimer);
+        if (submitting) return;
+        if (saving) { debounce = setTimeout(save, 400); return; }
+        const sentAt = dirty;
+        saving = true;
+        try {
+            const res = await fetch(AUTOSAVE_URL, {method: 'POST', body: formData(), credentials: 'same-origin'});
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            applyResult(await res.json());
+            savedDirty = sentAt;
+            if (dirty === sentAt) { clearDraft(); } else if (!submitting) { writeDraft(); debounce = setTimeout(save, 400); }
+            refreshPanels();
+        } catch (e) {
+            setState('err', '⚠ nie udało się zapisać – zmiany są bezpieczne w przeglądarce, ponawiam…');
+            retryTimer = setTimeout(save, 10000);
+        } finally {
+            saving = false;
+        }
+        return true;
+    }
+    window.WorklogDay = {save, rowById};
+
+    function applyResult(r) {
+        for (const [key, id] of Object.entries(r.ids || {})) {
+            const tr = rowByKey(key); if (!tr) continue;
+            tr.querySelector('.f-id').value = id;
+            const time = tr.querySelector('.f-time');
+            const serverTime = fmt(r.minutes[key]);
+            if (document.activeElement !== time && !tr.classList.contains('running')) time.value = serverTime;
+            tr.querySelector('.f-orig').value = serverTime;
+        }
+        for (const tr of rows.children) {
+            const key = tr.dataset.key, err = (r.rowErrors || {})[key];
+            tr.classList.toggle('has-error', !!err);
+            const box = tr.querySelector('.rowerr');
+            if (err) box.textContent = err; else if (!box.textContent.startsWith('Jira:')) box.textContent = '';
+            const st = (r.statuses || {})[tr.querySelector('.f-id').value];
+            const dot = tr.querySelector('.dot');
+            if (st) dot.className = 'dot ' + st;
+        }
+        const errs = (r.dayErrors || []);
+        if (errs.length) setState('warn', '⚠ ' + errs.join(' '));
+        else if (Object.keys(r.rowErrors || {}).length) setState('warn', '⚠ zapisano, oprócz zaznaczonych wierszy (' + r.savedAt + ')');
+        else setState('ok', '✓ zapisano ' + r.savedAt);
+    }
+
+    async function refreshPanels() {
+        try {
+            const res = await fetch(PANELS_URL, {credentials: 'same-origin'});
+            if (res.ok) document.getElementById('panels').innerHTML = await res.text();
+        } catch (e) {}
+    }
+
+    // zamknięcie karty / przejście dalej – ostatnia próba zapisu
+    const flush = () => { if (dirty !== savedDirty && !saving && !submitting) navigator.sendBeacon(AUTOSAVE_URL, formData()); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+    // pełny zapis przyciskiem – szkic zostaje do czasu, aż strona wróci z serwera z tą samą treścią.
+    // Autozapis nie może biec równolegle: nowy wiersz (id=0) zapisałby się wtedy dwa razy (i trafił dwa razy do Jiry).
+    // Czekamy więc na trwający autozapis (jego id trafią do formularza), a potem blokujemy kolejne i beacon.
+    form.addEventListener('submit', async (ev) => {
+        if (submitting) return;
+        ev.preventDefault();
+        clearTimeout(debounce); clearTimeout(retryTimer);
+        while (saving) await new Promise(r => setTimeout(r, 50));
+        clearTimeout(debounce); clearTimeout(retryTimer);
+        submitting = true;
+        form.requestSubmit(ev.submitter);
+    });
+    document.addEventListener('keydown', (ev) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === 's') { ev.preventDefault(); save(); }
+    });
+
+    // ---------- szkic w przeglądarce ----------
+    (() => {
+        let draft = null;
+        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) {}
+        if (!draft) return;
+        if (draft.content === serverContent) { clearDraft(); return; }
+        const banner = document.getElementById('draft-banner');
+        const when = new Date(draft.at);
+        document.getElementById('draft-msg').textContent =
+            'W przeglądarce są zmiany z ' + when.toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) +
+            ', których nie ma w bazie (np. karta zamknęła się przed zapisem).';
+        banner.hidden = false;
+        document.getElementById('draft-discard').onclick = () => { clearDraft(); banner.hidden = true; };
+        document.getElementById('draft-restore').onclick = () => {
+            const byKey = {};
+            for (const [name, value] of draft.fields) {
+                const m = name.match(/^entries\[([^\]]+)\]\[(\w+)\]$/);
+                if (m) { (byKey[m[1]] ??= {})[m[2]] = value; continue; }
+                const el = form.elements[name];
+                if (el && el.type === 'checkbox') el.checked = true; else if (el) el.value = value;
+            }
+            if (!draft.fields.some(([n]) => n === 'lunch_worked') && form.elements['lunch_worked']) form.elements['lunch_worked'].checked = false;
+            rows.innerHTML = '';
+            next = 0;
+            for (const f of Object.values(byKey)) {
+                const tr = add(false);
+                tr.querySelector('.f-id').value = f.id || 0;
+                tr.querySelector('.f-orig').value = f.orig || '';
+                tr.querySelector('.f-issue').value = f.issue || '';
+                tr.querySelector('.f-time').value = f.time || '';
+                tr.querySelector('.f-desc').value = f.desc || '';
+            }
+            if (!rows.children.length) add(false);
+            banner.hidden = true;
+            changed();
+        };
+    })();
+
+    // ---------- stoper ----------
+    const fmt = (m) => { m = Number(m) || 0; if (!m) return ''; const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`; };
+    const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
+
+    rows.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('.tbtn'); if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tr.classList.contains('running')) { await window.WorklogTimer.stop(); return; }
+        if (!tr.querySelector('.f-issue').value.trim()) { alert('Najpierw wpisz numer ticketu.'); tr.querySelector('.f-issue').focus(); return; }
+        btn.disabled = true;
+        if (dirty || tr.querySelector('.f-id').value === '0') { await save(); }
+        btn.disabled = false;
+        const id = tr.querySelector('.f-id').value;
+        if (!id || id === '0') { alert('Nie udało się zapisać wiersza – sprawdź numer ticketu i czas.'); return; }
+        await window.WorklogTimer.start(Number(id));
+    });
+
+    document.addEventListener('timer:update', (ev) => {
+        const s = ev.detail;
+        for (const tr of rows.children) {
+            const on = s.running && s.date === DATE && tr.querySelector('.f-id').value === String(s.entryId);
+            tr.classList.toggle('running', on);
+            tr.querySelector('.tbtn').textContent = on ? '❚❚' : '▶';
+            tr.querySelector('.tbtn').title = on ? 'Zatrzymaj stoper' : 'Włącz stoper';
+            tr.querySelector('.f-time').readOnly = on;
+            if (!on) tr.querySelector('.live').textContent = '';
+        }
+        if (s.stopped && s.stopped.date === DATE) {
+            const tr = rowById(s.stopped.entryId);
+            if (tr) {
+                tr.querySelector('.f-time').value = fmt(s.stopped.minutes);
+                tr.querySelector('.f-orig').value = fmt(s.stopped.minutes);
+                refreshPanels();
+            }
+        }
+    });
+    document.addEventListener('timer:tick', (ev) => {
+        const s = ev.detail; if (!s.running || s.date !== DATE) return;
+        const tr = rowById(s.entryId);
+        if (tr) tr.querySelector('.live').textContent = '⏱ ' + clock(s.baseSeconds + s.elapsedNow);
+    });
+
+    // ---------- przerwa obiadowa ----------
+    const lw = document.getElementById('lunch_worked');
+    if (lw) {
+        const brk = document.getElementById('break'), lbl = document.getElementById('break-label'), help = document.getElementById('lunch-help');
+        lw.addEventListener('change', () => {
+            if (lw.checked) {
+                lbl.textContent = 'Przerwa wzięta (łącznie)';
+                if (brk.value.trim() === '') brk.value = lw.dataset.lunch;
+                help.textContent = lw.dataset.helpOn;
+                brk.focus(); brk.select();
+            } else {
+                lbl.textContent = 'Dodatkowa przerwa';
+                if (brk.value.trim() === lw.dataset.lunch) brk.value = '';
+                help.textContent = lw.dataset.helpOff;
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

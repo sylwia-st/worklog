@@ -1,0 +1,9 @@
+# Wariant dla Jiry dostępnej tylko przez VPN / firmowy DNS:
+#   docker compose -f compose.yaml -f compose.vpn.yaml up -d
+# Kontener korzysta wtedy bezpośrednio z sieci hosta, a serwer słucha wyłącznie na 127.0.0.1.
+services:
+  worklog:
+    network_mode: host
+    ports: !reset []
+    environment:
+      WORKLOG_LISTEN: 127.0.0.1:${WORKLOG_PORT:-8765}

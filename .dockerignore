@@ -1,0 +1,12 @@
+vendor/
+var/
+.env.local
+.env.*.local
+.env.compose
+.idea/
+docs/
+tests/browser/
+.git/
+*.tar.gz
+data/
+tests/browser/node_modules/

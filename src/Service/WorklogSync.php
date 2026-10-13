@@ -1,0 +1,182 @@
+<?php
+
+namespace App\Service;
+
+use App\Domain\DaySummary;
+use App\Domain\TimeFormat;
+use App\Entity\WorkDay;
+use App\Entity\WorklogEntry;
+
+/**
+ * Wysyła wpisy dnia do Jiry: tworzy nowe worklogi, aktualizuje zmienione, kasuje usunięte.
+ * Wpisy dostają kolejne godziny rozpoczęcia (od początku dnia), żeby nie nakładały się w Tempo/kalendarzu.
+ */
+final class WorklogSync
+{
+    public const STATUS_NEW = 'new';
+    public const STATUS_SYNCED = 'synced';
+    public const STATUS_CHANGED = 'changed';
+    public const STATUS_ERROR = 'error';
+    /** Wpis bez czasu (np. dopiero założony pod stoper) – nie jest wysyłany. */
+    public const STATUS_EMPTY = 'empty';
+
+    public function __construct(
+        private readonly JiraClient $jira,
+        private readonly Settings $settings,
+    ) {
+    }
+
+    /**
+     * @return array<int, array{type: string, message: string}> komunikaty do wyświetlenia
+     */
+    public function sync(WorkDay $day): array
+    {
+        $results = [];
+        $plan = $this->plan($day);
+
+        foreach ($day->getPendingDeletions() as $entry) {
+            try {
+                if ($entry->isInJira()) {
+                    $this->jira->deleteWorklog((string) $entry->getJiraIssueKey(), (string) $entry->getJiraWorklogId());
+                    $results[] = ['type' => 'success', 'message' => sprintf('%s: usunięto worklog z Jiry.', $entry->getJiraIssueKey())];
+                }
+                $day->removeEntry($entry);
+            } catch (JiraException $e) {
+                $entry->setJiraError($e->getMessage());
+                $results[] = ['type' => 'error', 'message' => sprintf('%s: nie udało się usunąć – %s', $entry->getJiraIssueKey(), $e->getMessage())];
+            }
+        }
+
+        foreach ($day->getActiveEntries() as $entry) {
+            $p = $plan[spl_object_id($entry)];
+            $key = $entry->getIssueKey();
+            $label = sprintf('%s (%s)', $key, TimeFormat::format($entry->getMinutes()));
+
+            if (0 === $entry->getMinutes()) {
+                $results[] = ['type' => 'warning', 'message' => $key.': pominięto – wpis nie ma jeszcze czasu.'];
+                continue;
+            }
+            if ($entry->isTimerRunning()) {
+                $results[] = ['type' => 'warning', 'message' => $label.': stoper nadal działa – wysłano czas zmierzony do chwili ostatniego zatrzymania.'];
+            }
+
+            try {
+                if (!$entry->isInJira()) {
+                    $id = $this->jira->addWorklog($key, $p['started'], $entry->getMinutes() * 60, $entry->getDescription());
+                    $entry->markSynced($id, $p['hash']);
+                    $results[] = ['type' => 'success', 'message' => $label.': dodano worklog.'];
+                } elseif ($entry->getJiraIssueKey() !== $key) {
+                    $this->jira->deleteWorklog((string) $entry->getJiraIssueKey(), (string) $entry->getJiraWorklogId());
+                    $entry->markRemovedFromJira();
+                    $id = $this->jira->addWorklog($key, $p['started'], $entry->getMinutes() * 60, $entry->getDescription());
+                    $entry->markSynced($id, $p['hash']);
+                    $results[] = ['type' => 'success', 'message' => $label.': przeniesiono worklog do innego ticketu.'];
+                } elseif ($entry->getJiraSyncHash() !== $p['hash']) {
+                    $this->jira->updateWorklog($key, (string) $entry->getJiraWorklogId(), $p['started'], $entry->getMinutes() * 60, $entry->getDescription());
+                    $entry->markSynced((string) $entry->getJiraWorklogId(), $p['hash']);
+                    $results[] = ['type' => 'success', 'message' => $label.': zaktualizowano worklog.'];
+                }
+            } catch (JiraException $e) {
+                $entry->setJiraError($e->getMessage());
+                $results[] = ['type' => 'error', 'message' => $label.': '.$e->getMessage()];
+            }
+        }
+
+        if ([] === $results) {
+            $results[] = ['type' => 'info', 'message' => 'Wszystko było już w Jirze – nic do wysłania.'];
+        }
+
+        return $results;
+    }
+
+    /** @return array<int, string> id wpisu → status */
+    public function statuses(WorkDay $day): array
+    {
+        $plan = $this->plan($day);
+        $out = [];
+        foreach ($day->getActiveEntries() as $entry) {
+            $out[(int) $entry->getId()] = match (true) {
+                0 === $entry->getMinutes() && !$entry->isInJira() => self::STATUS_EMPTY,
+                null !== $entry->getJiraError() => self::STATUS_ERROR,
+                !$entry->isInJira() => self::STATUS_NEW,
+                $entry->getJiraIssueKey() !== $entry->getIssueKey(),
+                $entry->getJiraSyncHash() !== $plan[spl_object_id($entry)]['hash'] => self::STATUS_CHANGED,
+                default => self::STATUS_SYNCED,
+            };
+        }
+
+        return $out;
+    }
+
+    public function isFullySynced(WorkDay $day): bool
+    {
+        if ([] !== $day->getPendingDeletions()) {
+            return false;
+        }
+        foreach ($this->statuses($day) as $status) {
+            if (self::STATUS_SYNCED !== $status && self::STATUS_EMPTY !== $status) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<int, array{started: \DateTimeImmutable, hash: string}> */
+    private function plan(WorkDay $day): array
+    {
+        $startClock = $day->getStartTime() ?? $this->settings->get('default_start');
+        $startMinutes = TimeFormat::clockToMinutes($startClock) ?? 8 * 60;
+        // Przerwy, które worklogi omijają: stały obiad (chyba że tego dnia była w nim praca)
+        // oraz przerwy wpisane godzinami, np. 13:30–13:50. Żaden worklog nie zaczyna się w przerwie,
+        // a wpis, na który przerwa wypada, „przeskakuje” ją – kolejne wpisy startują później.
+        $windows = $day->getBreakRanges();
+        $bf = TimeFormat::clockToMinutes($this->settings->get('lunch_from'));
+        $bt = TimeFormat::clockToMinutes($this->settings->get('lunch_to'));
+        if (null !== $bf && null !== $bt && $bt > $bf && !$day->hasWorkedThroughFixedBreak()) {
+            $windows[] = [$bf, $bt];
+        }
+        $windows = DaySummary::mergeRanges($windows);
+
+        $midnight = $day->getDate()->setTime(0, 0);
+        $cursor = $startMinutes;
+        $plan = [];
+        foreach ($day->getActiveEntries() as $entry) {
+            /** @var WorklogEntry $entry */
+            $cursor = self::skipBreaks($cursor, $windows);
+            $started = $midnight->modify(sprintf('+%d minutes', $cursor));
+            $plan[spl_object_id($entry)] = [
+                'started' => $started,
+                'hash' => sha1(implode("\0", [$entry->getIssueKey(), $entry->getMinutes(), $entry->getDescription(), $started->format(\DATE_ATOM)])),
+            ];
+
+            // przesuwamy kursor o czas pracy, przeskakując przerwy, które wypadają w trakcie wpisu
+            $remaining = $entry->getMinutes();
+            foreach ($windows as [$wf, $wt]) {
+                if ($wt <= $cursor) {
+                    continue;
+                }
+                if ($wf >= $cursor + $remaining) {
+                    break;
+                }
+                $remaining -= $wf - $cursor;
+                $cursor = $wt;
+            }
+            $cursor += $remaining;
+        }
+
+        return $plan;
+    }
+
+    /** @param list<array{0: int, 1: int}> $windows posortowane, scalone */
+    private static function skipBreaks(int $cursor, array $windows): int
+    {
+        foreach ($windows as [$wf, $wt]) {
+            if ($cursor >= $wf && $cursor < $wt) {
+                $cursor = $wt;
+            }
+        }
+
+        return $cursor;
+    }
+}
