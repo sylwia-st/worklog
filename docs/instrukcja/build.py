@@ -382,11 +382,12 @@ table(['Polecenie (w katalogu narzędzia)', 'Działanie'], [
     [M('./worklog restore PLIK.db'), 'przywrócenie kopii (pyta o potwierdzenie)'],
     [M('./worklog update'), 'aktualizacja do najnowszych poprawek PHP i Symfony'],
     [M('./worklog down'), 'zatrzymanie (dane zostają)'],
+    [M('./worklog uninstall'), 'usunięcie wszystkiego – najpierw robi ostatnią kopię bazy'],
 ], [70, 100], key_column=False)
 box('Prywatność',
     'Dane i token są tylko na Twoim komputerze. Aplikacja łączy się wyłącznie z Jirą; Slacka i maili nie wysyła sama.',
-    f'Usunięcie wszystkiego razem z danymi: {M("./worklog down &amp;&amp; docker volume rm worklog-data")} – potem '
-    f'unieważnij token w Jirze.')
+    f'Usunięcie wszystkiego razem z danymi: {M("./worklog uninstall")} (przedtem robi ostatnią kopię bazy; kopie '
+    f'zapasowe zostają) – potem unieważnij token w Jirze.')
 
 
 # ---------------------------------------------------------------- strona

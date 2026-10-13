@@ -99,12 +99,13 @@ Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, któr
 ./worklog update     # przebudowa obrazu na najnowszych łatkach PHP 8.5 / Symfony 8.1
 ./worklog remind     # co zostało do zrobienia dzisiaj
 ./worklog down       # zatrzymanie (dane zostają w wolumenie)
+./worklog uninstall  # usunięcie wszystkiego (kontener, dane, timery, skrót) – najpierw ostatnia kopia bazy
 ```
 
 Godzinę przypomnienia zmieniasz w aplikacji: **Ustawienia → Przypomnienie** (puste pole = bez przypomnienia).
 Zmiana portu: uruchom ponownie `./install.sh --port 8766` – dane zostają.
 
-Całkowite usunięcie razem z danymi: `./worklog down && docker volume rm worklog-data`.
+Całkowite usunięcie: `./worklog uninstall`. Usuwa kontener, obraz, wolumen z danymi, timery systemd i skrót w menu; przedtem robi ostatnią kopię bazy. Kopie zapasowe i katalog z kodem zostają. Potem unieważnij token w Jirze.
 
 ## Wersje
 

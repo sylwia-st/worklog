@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Skróty do obsługi kontenera. Użycie: ./worklog [up|down|restart|logs|status|update|backup|restore PLIK|remind|console ...]
+# Skróty do obsługi kontenera. Użycie: ./worklog [up|down|restart|logs|status|update|backup|restore PLIK|remind|uninstall|console ...]
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -66,6 +66,46 @@ case "${1:-help}" in
         docker exec worklog rm -f /data/.restore.db
         echo "Przywrócono."
         ;;
+    uninstall)
+        # Usuwa wszystko, co założył install.sh. Kopie zapasowe zostają – to Twoje dane.
+        backups="${WORKLOG_BACKUP_DIR:-$HOME/worklog-backups}"
+        if [[ "${2:-}" != "--tak" ]]; then
+            echo "Zostaną usunięte: kontener i obraz worklog, wolumen worklog-data (baza, token Jiry),"
+            echo "timery systemd (przypomnienie, kopie) i skrót „Raport czasu” w menu."
+            echo "Przedtem zrobię ostatnią kopię bazy do $backups. Kopie zapasowe i ten katalog zostają."
+            read -rp "Odinstalować? [t/N] " ok
+            [[ "$ok" == "t" ]] || exit 1
+        fi
+
+        if docker volume inspect worklog-data >/dev/null 2>&1; then
+            if ! docker inspect -f '{{.State.Running}}' worklog 2>/dev/null | grep -q true; then
+                echo "Kontener nie działa, więc nie zrobię ostatniej kopii. Uruchom go (./worklog up) i spróbuj ponownie."
+                exit 1
+            fi
+            last="$backups/przed-odinstalowaniem-$(date +%Y%m%d-%H%M%S).db"
+            if ! "$0" backup "$last" >/dev/null; then
+                echo "Nie udało się zrobić ostatniej kopii – przerywam, nic nie usunięto."
+                exit 1
+            fi
+            echo "Ostatnia kopia: $last"
+        fi
+
+        units="$HOME/.config/systemd/user"
+        systemctl --user disable --now worklog-remind.timer worklog-backup.timer >/dev/null 2>&1 || true
+        rm -f "$units"/worklog-{remind,backup}.{service,timer}
+        systemctl --user daemon-reload 2>/dev/null || true
+        rm -f "$HOME/.local/share/applications/worklog.desktop"
+
+        dc down --rmi local >/dev/null 2>&1 || true
+        docker rm -f worklog >/dev/null 2>&1 || true
+        docker volume rm worklog-data >/dev/null 2>&1 || true
+        docker image rm worklog-tool:latest >/dev/null 2>&1 || true
+        rm -f .env.compose
+
+        echo "Odinstalowano. Kopie zapasowe zostały w $backups."
+        echo "Pamiętaj o unieważnieniu tokenu w Jirze, jeśli nie będzie już potrzebny."
+        echo "Katalog z kodem ($DIR) możesz teraz usunąć ręcznie."
+        ;;
     remind)   docker exec worklog php bin/console app:remind -v ;;
     console)  shift; docker exec -it worklog php bin/console "$@" ;;
     *)
@@ -79,6 +119,7 @@ case "${1:-help}" in
 ./worklog backup    – kopia bazy do ~/worklog-backup-*.db
 ./worklog restore F – przywróć kopię
 ./worklog remind    – co zostało do zrobienia dzisiaj
+./worklog uninstall – usuń wszystko (najpierw robi ostatnią kopię bazy)
 EOF
         ;;
 esac

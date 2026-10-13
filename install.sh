@@ -90,7 +90,7 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable --now worklog-backup.timer >/dev/null
 mkdir -p "$BACKUP_DIR" && chmod 700 "$BACKUP_DIR"
-"$DIR/scripts/backup.sh" && echo "Kopie zapasowe: co godzinę w dni robocze → $BACKUP_DIR (30 dni wstecz). Pierwsza zrobiona."
+WORKLOG_BACKUP_DIR="$BACKUP_DIR" "$DIR/scripts/backup.sh" && echo "Kopie zapasowe: co godzinę w dni robocze → $BACKUP_DIR (30 dni wstecz). Pierwsza zrobiona."
 if (( WITH_REMIND )); then
     command -v notify-send >/dev/null || echo "Uwaga: brak notify-send – zainstaluj:  sudo apt install libnotify-bin"
     if [[ -n "$REMIND" ]]; then
