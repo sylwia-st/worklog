@@ -285,7 +285,9 @@ steps(
     f'Wejdź w {B("Planowane zmiany")}.',
     f'Wybierz dzień i rodzaj: {B("Późniejsze przyjście")} (podaj godzinę przyjścia), {B("Wcześniejsze wyjście")} '
     f'(godzina wyjścia) lub {B("Krótszy dzień pracy")} (obie godziny).',
-    f'Opcjonalnie wpisz powód i kliknij {G("Zapisz i przygotuj mail")}.',
+    f'Opcjonalnie wpisz powód i kliknij {G("Zapisz i przygotuj mail")}. Powód zostaje zapisany przy zmianie, ale do '
+    f'domyślnego maila nie trafia – pojawi się w nim tylko, jeśli w szablonie w Ustawieniach wpiszesz {{powod}} '
+    f'albo {{powod_linia}} (rozdział 11).',
     f'Na kolejnej stronie: {G("Otwórz w programie pocztowym")} → Wyślij.')
 bullets(
     'Mail ma domyślnie tylko datę (w temacie i treści) – dopisz resztę w programie pocztowym albo ustaw własny '
