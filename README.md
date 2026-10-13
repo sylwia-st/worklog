@@ -82,6 +82,8 @@ Teksty Slacka i maili edytujesz w Ustawieniach. Zmienne:
 - linia Slacka dodatkowo: `{ticket} {czas} {opis} {tytul}`
 - planowana zmiana: `{data} {dzien} {typ} {od} {do} {opis} {powod} {powod_linia} {podpis}`
 
+Mail o **planowanej zmianie** (późniejsze przyjście, wcześniejsze wyjście, krótszy dzień) ma domyślnie w temacie i treści samą datę – resztę dopisujesz przed wysłaniem albo ustawiasz własny szablon w Ustawieniach (np. z gotowym zdaniem `{opis}`).
+
 Nieznana zmienna zostaje w tekście dosłownie – łatwo wyłapać literówkę.
 Domyślnie: norma **7h**, praca 8:00–16:00, stała przerwa obiadowa **12:00–13:00** (zmienisz w Ustawieniach → Dzień pracy).
 Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, która wypada w godzinach pracy, minus ewentualna dodatkowa przerwa; gdy godzin nie podasz – z sumy czasu w ticketach.

@@ -119,8 +119,18 @@ namespace {
 
     $plan = new PlannedChange(new DateTimeImmutable('2026-10-15'), PlannedChange::TYPE_LATE, '10:00', null, '');
     $pm = $reports->plannedMail($plan);
-    check('plan subject', $pm->subject, 'Późniejsze przyjście – 15.10.2026');
-    check('plan body', $pm->body, "Dzień dobry,\n\nuprzejmie informuję, że w dniu 15.10.2026 (czwartek) przyjdę później, ok. godz. 10:00.\n\nPozdrawiam\nAnna");
+    // planowane zmiany: domyślnie temat i treść to sama data – dla każdego rodzaju
+    foreach ([[PlannedChange::TYPE_LATE, '10:00', null], [PlannedChange::TYPE_EARLY, null, '14:00'], [PlannedChange::TYPE_SHORT, '09:00', '13:00']] as [$type, $from, $to]) {
+        $pd = $reports->plannedMail(new PlannedChange(new DateTimeImmutable('2026-10-15'), $type, $from, $to, 'lekarz'));
+        check('plan '.$type.' – sama data', [$pd->subject, $pd->body, $pd->to], ['15.10.2026', '15.10.2026', ['szef@firma.pl']]);
+    }
+    // własny szablon ze zdaniem {opis} nadal działa
+    $cache = new ReflectionProperty(Settings::class, 'cache');
+    $saved = $cache->getValue($settings);
+    $cache->setValue($settings, ['mail_plan_subject' => '{typ} – {data}', 'mail_plan_body' => "w dniu {data} ({dzien}) {opis}.\n{powod_linia}"] + $saved);
+    $pm = $reports->plannedMail(new PlannedChange(new DateTimeImmutable('2026-10-15'), PlannedChange::TYPE_EARLY, null, '14:00', 'lekarz'));
+    check('plan własny szablon', [$pm->subject, $pm->body], ['Wcześniejsze wyjście – 15.10.2026', "w dniu 15.10.2026 (czwartek) wyjdę wcześniej, ok. godz. 14:00.\nPowód: lekarz"]);
+    $cache->setValue($settings, $saved);
     check('notice', round($reports->hoursOfNotice($plan, new DateTimeImmutable('2026-10-14 08:00')), 1), 24.0);
 
     // --- synchronizacja ---
@@ -269,6 +279,7 @@ namespace {
     check('pusty nie trafia na Slacka', str_contains($reports->slackText($eday), 'ABC-2'), false);
 
     check('norma 7h domyślnie', Settings::DEFAULTS['norm_minutes'], '420');
+    check('tolerancja 0 domyślnie', Settings::DEFAULTS['tolerance_minutes'], '0');
 
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);

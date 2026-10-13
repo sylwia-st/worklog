@@ -154,7 +154,7 @@ steps(
     f'{B("E-mail i token")} – patrz tabela niżej. Pole tokenu po zapisaniu pokazuje kropki; puste pole przy kolejnym '
     f'zapisie nie usuwa tokenu.',
     f'{B("Dzień pracy")} – domyślne godziny od–do (8:00–16:00), {B("stała przerwa obiadowa")} (12:00–13:00), norma '
-    f'({B("420 min = 7h")}) i tolerancja (np. 10 min bez maila). Te wartości są już wpisane – zmieniasz je tylko, '
+    f'({B("420 min = 7h")}) i tolerancja (0 – mail przy każdej różnicy względem normy). Te wartości są już wpisane – zmieniasz je tylko, '
     f'jeśli u Ciebie jest inaczej.',
     f'{B("Podpis")} oraz {B("adresaci")} trzech rodzajów maili (kilka adresów oddziel przecinkiem).',
     f'Kliknij {G("Zapisz ustawienia")}, potem {G("Sprawdź połączenie")} – powinno pokazać Twoje imię i nazwisko.',
@@ -288,6 +288,8 @@ steps(
     f'Opcjonalnie wpisz powód i kliknij {G("Zapisz i przygotuj mail")}.',
     f'Na kolejnej stronie: {G("Otwórz w programie pocztowym")} → Wyślij.')
 bullets(
+    'Mail ma domyślnie tylko datę (w temacie i treści) – dopisz resztę w programie pocztowym albo ustaw własny '
+    'szablon w Ustawieniach (np. z gotowym zdaniem {opis}).',
     'Jeśli zostało mniej czasu niż wymagane wyprzedzenie (domyślnie 24h), zobaczysz ostrzeżenie.',
     'Gdy otworzysz ten dzień w zakładce Dzień, godziny ze zgłoszenia podpowiedzą się same, a na górze będzie '
     'przypomnienie o zmianie.',

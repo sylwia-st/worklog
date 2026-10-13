@@ -44,7 +44,7 @@ final class Settings
         'lunch_to' => '13:00',
         'default_break' => '0',
         'norm_minutes' => '420',
-        'tolerance_minutes' => '10',
+        'tolerance_minutes' => '0',
         'signature' => '',
 
         // Przypomnienie (pon–pt); puste = wyłączone
@@ -71,8 +71,9 @@ final class Settings
         // Mail: zaplanowana zmiana (z wyprzedzeniem)
         'mail_plan_to' => '',
         'mail_plan_cc' => '',
-        'mail_plan_subject' => '{typ} – {data}',
-        'mail_plan_body' => "Dzień dobry,\n\nuprzejmie informuję, że w dniu {data} ({dzien}) {opis}.\n{powod_linia}\n\nPozdrawiam\n{podpis}",
+        // domyślnie sama data – resztę dopisuje się przed wysłaniem albo ustawia własny szablon
+        'mail_plan_subject' => '{data}',
+        'mail_plan_body' => '{data}',
         'plan_phrase_late' => 'przyjdę później, ok. godz. {od}',
         'plan_phrase_early' => 'wyjdę wcześniej, ok. godz. {do}',
         'plan_phrase_short' => 'będę w pracy krócej, w godzinach {od}–{do}',

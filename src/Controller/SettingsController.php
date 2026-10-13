@@ -36,7 +36,7 @@ final class SettingsController extends AbstractController
             'lunch_to' => ['Stała przerwa (obiad) – do', 'time', ''],
             'default_break' => ['Dodatkowa przerwa (minuty)', 'number', 'Domyślna wartość pola „Dodatkowa przerwa” w nowym dniu – zwykle 0.'],
             'norm_minutes' => ['Norma dzienna (minuty)', 'number', '420 = 7h, 480 = 8h'],
-            'tolerance_minutes' => ['Tolerancja (minuty)', 'number', 'Różnice do tylu minut nie wymagają maila.'],
+            'tolerance_minutes' => ['Tolerancja (minuty)', 'number', 'Różnice do tylu minut nie wymagają maila. 0 = mail przy każdej różnicy względem normy.'],
             'signature' => ['Podpis w mailach', 'textarea', 'np. imię i nazwisko'],
         ],
         'Przypomnienie' => [
@@ -62,9 +62,9 @@ final class SettingsController extends AbstractController
         'Mail – zaplanowana zmiana (z wyprzedzeniem)' => [
             'mail_plan_to' => ['Do', 'text', ''],
             'mail_plan_cc' => ['DW', 'text', ''],
-            'mail_plan_subject' => ['Temat', 'text', ''],
-            'mail_plan_body' => ['Treść', 'textarea', 'Zmienne: '.self::PLACEHOLDERS_PLAN],
-            'plan_phrase_late' => ['{opis} dla późniejszego przyjścia', 'text', ''],
+            'mail_plan_subject' => ['Temat', 'text', 'Domyślnie sama data – resztę dopisujesz w programie pocztowym.'],
+            'mail_plan_body' => ['Treść', 'textarea', 'Domyślnie sama data. Np. „Dzień dobry, w dniu {data} ({dzien}) {opis}. {powod_linia}”. Zmienne: '.self::PLACEHOLDERS_PLAN],
+            'plan_phrase_late' => ['{opis} dla późniejszego przyjścia', 'text', 'Zdania {opis} są używane tylko, jeśli wpiszesz {opis} w temat lub treść.'],
             'plan_phrase_early' => ['{opis} dla wcześniejszego wyjścia', 'text', ''],
             'plan_phrase_short' => ['{opis} dla krótszego dnia', 'text', ''],
             'plan_notice_hours' => ['Wymagane wyprzedzenie (godziny)', 'number', 'Ostrzeżenie, jeśli mail wysyłasz później.'],
