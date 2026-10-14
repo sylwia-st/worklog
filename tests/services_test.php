@@ -397,6 +397,43 @@ namespace {
     check('norma 7h domyślnie', Settings::DEFAULTS['norm_minutes'], '420');
     check('tolerancja 0 domyślnie', Settings::DEFAULTS['tolerance_minutes'], '0');
 
+    // --- podsumowanie miesiąca (listopad 2026: 1.11 niedziela, 11.11 środa, urlop 9–13.11, dziś 18.11) ---
+    $absenceRepo->items = [new App\Entity\Absence(new DateTimeImmutable('2026-11-09'), new DateTimeImmutable('2026-11-13'), 'urlop', 'Zakopane')];
+    $mcal = new App\Service\WorkCalendar($absenceRepo);
+    $months = new App\Service\MonthReport(new ReportBuilder($settings, $mcal), $mcal, $settings);
+    $mdays = [];
+    foreach (['2026-11-02' => [['ABC-1', 480, 'a']], '2026-11-03' => [['ABC-1', 300, '=SUM(A1)'], ['ABC-2', 60, '']],
+              '2026-11-04' => [['ABC-2', 420, 'b']], '2026-11-07' => [['OPS-1', 120, 'sobota']]] as $date => $list) {
+        $mdays[$date] = new WorkDay(new DateTimeImmutable($date));
+        foreach ($list as $i => [$k, $min, $desc]) {
+            new WorklogEntry($mdays[$date], $k, $min, $desc, $i);
+        }
+    }
+    $mdays['2026-11-05'] = new WorkDay(new DateTimeImmutable('2026-11-05')); // zapisany dzień bez wpisów = brak raportu
+    $m = $months->build(new DateTimeImmutable('2026-11-01'), $mdays, new DateTimeImmutable('2026-11-18'));
+    $mt = $m['totals'];
+    check('miesiąc: dni robocze i norma', [$mt['workingDays'], $mt['normMonth']], [16, 16 * 420]);
+    check('miesiąc: bilans, nadgodziny, krócej', [$mt['balance'], $mt['over'], $mt['under'], $mt['overDays'], $mt['underDays']], [120, 180, 60, 2, 1]);
+    check('miesiąc: czas pracy i norma dni z raportem', [$mt['worked'], $mt['logged'], $mt['normReported'], $mt['reported']], [1380, 1380, 1260, 4]);
+    check('miesiąc: brak raportu (bez dziś i przyszłości)', $mt['missing'], 4);
+    check('miesiąc: dni wolne w tygodniu', $m['offCounts'], ['Urlop' => 4, 'Święto' => 1]);
+    $mstatus = array_column(array_map(static fn (array $r) => [$r['date']->format('j'), $r['status']], $m['rows']), 1, 0);
+    check('miesiąc: wiersze', [count($m['rows']), $mstatus['7'], $mstatus['11'], $mstatus['18'], $mstatus['19'], isset($mstatus['8'])],
+        [22, 'reported', 'off', 'today', 'future', false]);
+    check('miesiąc: tickety od największego', array_map(static fn (array $t) => [$t['minutes'], $t['days']], $m['tickets']),
+        ['ABC-1' => [780, 2], 'ABC-2' => [480, 2], 'OPS-1' => [120, 1]]);
+    $dcsv = $months->daysCsv($m);
+    $dlines = explode("\r\n", rtrim($dcsv));
+    check('CSV dni: BOM i nagłówek', $dlines[0], "\u{FEFF}Data;Dzień;Od;Do;Przerwa;\"Czas pracy\";\"W ticketach\";Norma;Bilans;Uwagi");
+    check('CSV dni: wiersz', $dlines[1], '2026-11-02;poniedziałek;;;0:00;8:00;8:00;7:00;+1:00;');
+    check('CSV dni: urlop i brak raportu', [$dlines[4], $dlines[7]], ['2026-11-05;czwartek;;;;;;;;"brak raportu"', '2026-11-09;poniedziałek;;;;;;;;"Urlop – Zakopane"']);
+    check('CSV dni: razem', end($dlines), 'Razem;;;;;23:00;23:00;21:00;+2:00;"dni bez raportu: 4"');
+    $ecsv = explode("\r\n", rtrim($months->entriesCsv($m)));
+    check('CSV wpisy', [count($ecsv), $ecsv[2]], [6, "2026-11-03;ABC-1;;5:00;300;'=SUM(A1);nie"]);
+    check('miesiąc z „2026-13”', [App\Service\MonthReport::parseMonth('2026-13'), App\Service\MonthReport::parseMonth('2026-02')?->format('Y-m-d')], [null, '2026-02-01']);
+    check('nazwa miesiąca', App\Domain\Template::monthName(new DateTimeImmutable('2026-10-14')), 'październik 2026');
+    $absenceRepo->items = [];
+
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);
     check('mail w formie męskiej', str_contains(Settings::defaultsFor('m')['mail_under_body'], 'pracowałem krócej o {roznica}'), true);

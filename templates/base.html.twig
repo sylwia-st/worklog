@@ -101,6 +101,7 @@
         <nav>
             <a href="{{ path('today') }}" class="{{ r in ['day', 'day_save'] ? 'active' }}">Dzień</a>
             <a href="{{ path('dashboard') }}" class="{{ r == 'dashboard' ? 'active' }}">Przegląd</a>
+            <a href="{{ path('month_current') }}" class="{{ r starts with 'month' ? 'active' }}">Miesiąc</a>
             <a href="{{ path('planned') }}" class="{{ r starts with 'planned' ? 'active' }}">Planowane zmiany</a>
             <a href="{{ path('absences') }}" class="{{ r starts with 'absence' ? 'active' }}">Wolne</a>
             <a href="{{ path('settings') }}" class="{{ r starts with 'settings' ? 'active' }}">Ustawienia</a>

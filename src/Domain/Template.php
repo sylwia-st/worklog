@@ -5,6 +5,7 @@ namespace App\Domain;
 final class Template
 {
     private const DAYS = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+    private const MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 
     /**
      * Podstawia {zmienne}. Nieznane zostawia bez zmian, żeby literówka w szablonie była widoczna w podglądzie.
@@ -26,6 +27,12 @@ final class Template
     public static function dayName(\DateTimeInterface $date): string
     {
         return self::DAYS[(int) $date->format('w')];
+    }
+
+    /** „październik 2026” */
+    public static function monthName(\DateTimeInterface $date): string
+    {
+        return self::MONTHS[(int) $date->format('n') - 1].' '.$date->format('Y');
     }
 
     /** Liczba z rzeczownikiem w dobrej formie: plural(1, 'dzień', 'dni', 'dni') → „1 dzień”, 22 → „22 dni”. */

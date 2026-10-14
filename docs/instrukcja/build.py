@@ -136,6 +136,7 @@ box('Codziennie w 5 krokach',
 table(['Zakładka', 'Do czego służy'], [
     ['Dzień', 'Wpisywanie czasu, wysyłka do Jiry, tekst na Slacka, mail o nadgodzinach / krótszym dniu.'],
     ['Przegląd', 'Ostatnie 4 tygodnie: co jest wysłane, a czego brakuje. Nadchodzące planowane zmiany.'],
+    ['Miesiąc', 'Bilans miesiąca, nadgodziny i niedobory, czas per ticket, eksport do CSV.'],
     ['Planowane zmiany', 'Zgłoszenie późniejszego przyjścia, wcześniejszego wyjścia lub krótszego dnia.'],
     ['Wolne', 'Urlop, L4 i inne dni wolne; najbliższe święta.'],
     ['Ustawienia', 'Forma w tekstach, wygląd (motyw), połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
@@ -325,6 +326,16 @@ table(['Kolumna', 'Co znaczy'], [
 p(f'Domyślnie najnowsze dni są na górze. Kliknięcie nagłówka {B("Dzień ↓")} odwraca kolejność (najstarsze na górze, '
   f'{B("Dzień ↑")}); aplikacja zapamiętuje wybór.')
 p('Zaległy dzień: kliknij jego datę, uzupełnij i wyślij jak zwykle – trafi pod właściwą datę.')
+
+sub('Podsumowanie miesiąca')
+p(f'Zakładka {B("Miesiąc")} pokazuje wybrany miesiąc dzień po dniu, a obok sumy:')
+bullets(
+    f'{B("Bilans")} – nadgodziny minus „krócej”, liczone tylko z dni z raportem. Dni robocze bez raportu są wypisane '
+    'osobno („Bez raportu”), bo nie wiadomo, ile wtedy pracowano.',
+    f'{B("Czas pracy")} i {B("Norma za te dni")} – obecność (albo czas w ticketach, gdy nie ma godzin od–do) i norma tych samych dni.',
+    'Dni robocze w miesiącu (bez świąt i urlopów), dni urlopu, L4 i świąt oraz czas per ticket.')
+p(f'{G("CSV – dni")} zapisuje tabelę dzień po dniu z wierszem „Razem”, {G("CSV – wpisy")} – wszystkie wpisy (data, ticket, '
+  'czas, opis, czy są w Jirze). Pliki otwierają się w Excelu bez ustawiania kodowania i separatora.')
 
 sub('Urlopy, L4 i święta')
 p(f'Święta ustawowe aplikacja zna sama (także ruchome, np. Boże Ciało, i Wigilię). Urlop, L4 albo inny dzień wolny '

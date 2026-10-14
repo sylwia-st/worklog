@@ -1,0 +1,96 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ title|capitalize }} – Raport czasu{% endblock %}
+
+{% block body %}
+{% set t = report.totals %}
+<h1>{{ title|capitalize }}</h1>
+<p class="sub">Bilans liczy dni z raportem. Dni robocze bez raportu są wyliczone osobno, bo nie wiadomo, ile wtedy pracowano.</p>
+
+<form method="get" action="{{ path('month_current') }}" class="daynav">
+    <a class="btn" href="{{ path('month', {month: prev|date('Y-m')}) }}">← {{ prev|date('m.Y') }}</a>
+    <input type="month" name="m" value="{{ month|date('Y-m') }}" aria-label="Miesiąc">
+    <button type="submit">Pokaż</button>
+    <a class="btn" href="{{ path('month', {month: next|date('Y-m')}) }}">{{ next|date('m.Y') }} →</a>
+    {% if not isCurrent %}<a class="btn" href="{{ path('month_current') }}">Bieżący miesiąc</a>{% endif %}
+</form>
+
+<div class="grid">
+<div>
+    <div class="panel">
+        <h2>Dzień po dniu</h2>
+        <table>
+            <thead><tr><th>Dzień</th><th>Godziny</th><th>Czas pracy</th><th>W ticketach</th><th>Bilans</th></tr></thead>
+            <tbody>
+            {% for r in report.rows %}
+                {% set s = r.summary %}
+                {% set offLabel = r.off and r.off.kind != 'weekend' ? r.off.label : null %}
+                <tr class="{{ r.off ? 'weekend' }}">
+                    <td style="white-space:nowrap"><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a>
+                        <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="badge">dziś</span>{% endif %}
+                        {% if offLabel and s %} <span class="badge">{{ offLabel }}</span>{% endif %}</td>
+                    {% if s %}
+                        <td>{{ r.day.startTime and r.day.endTime ? r.day.startTime ~ '–' ~ r.day.endTime : '—' }}</td>
+                        <td>{{ s.basisMinutes|hm }}</td>
+                        <td>{{ s.loggedMinutes|hm }}</td>
+                        <td class="{{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</td>
+                    {% elseif r.status == 'missing' %}
+                        <td colspan="4"><span class="badge warn">brak raportu</span></td>
+                    {% else %}
+                        <td colspan="4" class="muted">{{ offLabel }}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div>
+    <div class="panel">
+        <h2>Podsumowanie</h2>
+        <dl class="stats">
+            <dt>Bilans</dt>
+            <dd class="{{ t.balance > 0 ? 'over' : (t.balance < 0 ? 'under' : 'okc') }}"><strong>{{ t.balance == 0 ? '±0' : t.balance|signed_hm }}</strong></dd>
+            <dt>Nadgodziny</dt>
+            <dd>{{ t.over|hm }}{% if t.overDays %} <span class="muted small">({{ plural(t.overDays, 'dzień', 'dni', 'dni') }})</span>{% endif %}</dd>
+            <dt>Krócej</dt>
+            <dd>{{ t.under|hm }}{% if t.underDays %} <span class="muted small">({{ plural(t.underDays, 'dzień', 'dni', 'dni') }})</span>{% endif %}</dd>
+            <dt>Czas pracy</dt><dd>{{ t.worked|hm }}</dd>
+            <dt>Norma za te dni</dt><dd>{{ t.normReported|hm }}</dd>
+            <dt>W ticketach</dt><dd>{{ t.logged|hm }}</dd>
+            <dt>Dni z raportem</dt><dd>{{ t.reported }}</dd>
+            {% if t.missing %}<dt>Bez raportu</dt><dd><span class="badge warn">{{ plural(t.missing, 'dzień', 'dni', 'dni') }}</span></dd>{% endif %}
+            <dt>Dni robocze</dt><dd>{{ t.workingDays }} <span class="muted small">(norma {{ t.normMonth|hm }})</span></dd>
+            {% for label, n in report.offCounts %}<dt>{{ label }}</dt><dd>{{ plural(n, 'dzień', 'dni', 'dni') }}</dd>{% endfor %}
+        </dl>
+        <p class="muted small" style="margin:12px 0 0">Nadgodziny i „krócej” to sumy z poszczególnych dni, bilans – ich różnica.
+            Dzień wolny ma normę 0, więc praca w weekend, święto czy urlop to w całości nadgodziny.</p>
+        <div class="actions" style="margin-top:12px">
+            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'dni'}) }}">CSV – dni</a>
+            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'wpisy'}) }}">CSV – wpisy</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Tickety</h2>
+        {% if report.tickets is empty %}
+            <p class="muted">Brak wpisów w tym miesiącu.</p>
+        {% else %}
+            <table>
+                <thead><tr><th>Ticket</th><th>Czas</th><th>Dni</th></tr></thead>
+                <tbody>
+                {% for key, tk in report.tickets %}
+                    <tr>
+                        <td><strong>{{ key }}</strong>{% if tk.title %}<br><span class="muted small">{{ tk.title }}</span>{% endif %}</td>
+                        <td style="white-space:nowrap">{{ tk.minutes|hm }}</td>
+                        <td>{{ tk.days }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+</div>
+</div>
+{% endblock %}
