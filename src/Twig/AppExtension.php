@@ -30,6 +30,8 @@ final class AppExtension extends AbstractExtension
         return [
             // tekst w formie wybranej przy instalacji: forma('Pracowałam', 'Pracowałem', 'Praca')
             new TwigFunction('forma', $this->settings->form(...)),
+            // „5 dni roboczych”: plural(n, 'dzień roboczy', 'dni robocze', 'dni roboczych')
+            new TwigFunction('plural', Template::plural(...)),
             // zmienne CSS wybranego motywu (kolory są sprawdzone: tylko #rrggbb)
             new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme'), $this->settings->get('theme_custom')), ['is_safe' => ['html']]),
         ];

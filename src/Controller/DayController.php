@@ -11,6 +11,7 @@ use App\Repository\PlannedChangeRepository;
 use App\Repository\WorkDayRepository;
 use App\Service\ReportBuilder;
 use App\Service\Settings;
+use App\Service\WorkCalendar;
 use App\Service\WorklogSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +29,7 @@ final class DayController extends AbstractController
         private readonly ReportBuilder $reports,
         private readonly WorklogSync $sync,
         private readonly Settings $settings,
+        private readonly WorkCalendar $calendar,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -270,6 +272,7 @@ final class DayController extends AbstractController
             'form' => $form,
             'pendingDeletions' => null !== $day ? $day->getPendingDeletions() : [],
             'confirmDelete' => $confirmDelete,
+            'dayOff' => $this->calendar->dayOff($d),
             'planned' => $this->planned->findForDate($d),
             'issueOptions' => $issueOptions,
             'norm' => $this->settings->int('norm_minutes'),
@@ -306,6 +309,10 @@ final class DayController extends AbstractController
     /** @return array<string, mixed> */
     private function emptyForm(\DateTimeImmutable $d): array
     {
+        if (null !== $this->calendar->dayOff($d)) {
+            // dzień wolny: bez podpowiadanych godzin – inaczej domyślne 8:00–16:00 wyszłyby jako nadgodziny
+            return ['start' => null, 'end' => null, 'break' => '', 'lunchWorked' => false, 'rows' => []];
+        }
         $start = $this->settings->get('default_start');
         $end = $this->settings->get('default_end');
         // zaplanowana zmiana na ten dzień → podpowiadamy jej godziny

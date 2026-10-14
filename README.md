@@ -7,7 +7,8 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 3. **Mail o nadgodzinach / krótszym dniu** – pojawia się sam, gdy bilans dnia wychodzi poza tolerancję; otwiera się w Twoim programie pocztowym z wypełnionymi adresatami, tematem i treścią.
 4. **Planowane zmiany** – późniejsze przyjście, wcześniejsze wyjście, krótszy dzień: zapisujesz → dostajesz gotowy mail (z ostrzeżeniem, jeśli wysyłasz za późno).
 5. **Stoper** – ▶ przy tickecie, nad którym pracujesz; przełączenie na inny ticket zatrzymuje poprzedni. Pełne minuty, bez zaokrąglania. „od…” pod ▶ włącza stoper od wcześniejszej godziny (zadanie zaczęło się, zanim kliknięto ▶) – nie wcześniej niż ostatnie zatrzymanie stopera, więc zmierzony czas się nie nakłada.
-6. **Przypomnienie** pon–pt o wybranej godzinie (domyślnie 15:45, zmiana w Ustawieniach) – powiadomienie na pulpicie, jeśli czegoś z dzisiejszego raportu brakuje. Gdy komputer był wtedy wyłączony, pojawi się po jego włączeniu.
+6. **Przypomnienie** w dni robocze o wybranej godzinie (domyślnie 15:45, zmiana w Ustawieniach) – powiadomienie na pulpicie, jeśli czegoś z dzisiejszego raportu brakuje. Gdy komputer był wtedy wyłączony, pojawi się po jego włączeniu.
+7. **Urlopy i święta** – polskie święta ustawowe są wbudowane (także ruchome i Wigilia), a urlop, L4 albo inny dzień wolny dodajesz w zakładce „Wolne” albo jednym kliknięciem na stronie dnia. W dzień wolny nie ma przypomnienia ani „brak raportu” na Przeglądzie, a praca tego dnia (także w weekend) liczy się w całości jako nadgodziny.
 
 ## Prywatność
 

@@ -7,6 +7,7 @@ use App\Domain\TimeFormat;
 use App\Repository\WorkDayRepository;
 use App\Service\ReportBuilder;
 use App\Service\Settings;
+use App\Service\WorkCalendar;
 use App\Service\WorklogSync;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -15,7 +16,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Wypisuje, czego brakuje w dzisiejszym raporcie – albo nic, gdy wszystko jest domknięte (i w weekend).
+ * Wypisuje, czego brakuje w dzisiejszym raporcie – albo nic, gdy wszystko jest domknięte (i w dzień wolny:
+ * weekend, święto, urlop).
  * Kontener nie ma dostępu do pulpitu, więc powiadomienie pokazuje skrypt po stronie hosta (scripts/remind.sh).
  *
  *  --scheduled     wywołanie z timera (co minutę): odpowiada tylko raz dziennie, o godzinie z Ustawień,
@@ -29,6 +31,7 @@ final class RemindCommand extends Command
         private readonly WorklogSync $sync,
         private readonly ReportBuilder $reports,
         private readonly Settings $settings,
+        private readonly WorkCalendar $calendar,
     ) {
         parent::__construct();
     }
@@ -67,7 +70,10 @@ final class RemindCommand extends Command
         }
 
         $today = $now->setTime(0, 0);
-        if ((int) $today->format('N') >= 6) {
+        $off = $this->calendar->dayOff($today);
+        if (null !== $off) {
+            $output->writeln('Dziś wolne ('.$off['label'].') – raport nie jest potrzebny.', OutputInterface::VERBOSITY_VERBOSE);
+
             return Command::SUCCESS;
         }
 

@@ -13,6 +13,24 @@
 <h1>{{ date|pl_day|capitalize }}, {{ date|date('d.m.Y') }}</h1>
 <p class="sub">Zmiany zapisują się same. Kropki przy wpisach pokazują stan w Jirze.</p>
 
+{% if dayOff and dayOff.kind != 'weekend' %}
+    <div class="flash info">
+        <strong>{{ dayOff.kind == 'holiday' ? 'Święto: ' }}{{ dayOff.label }}</strong>{% if dayOff.absence %} ({{ dayOff.absence.rangeLabel }}){% endif %}.
+        Raport nie jest potrzebny; praca w ten dzień liczy się w całości jako nadgodziny.
+        {% if dayOff.absence %}<a href="{{ path('absences') }}">Zmień na stronie Wolne</a>{% endif %}
+    </div>
+{% elseif not dayOff and form.rows is empty %}
+    {# jeden klik: ten dzień jako urlop / L4 / wolne – wraca tutaj #}
+    <form method="post" action="{{ path('absence_add') }}" class="muted small" style="margin:-12px 0 16px">
+        <input type="hidden" name="from" value="{{ date|date('Y-m-d') }}">
+        <input type="hidden" name="back" value="{{ path('day', {date: date|date('Y-m-d')}) }}">
+        Nie pracujesz tego dnia? Oznacz go jako
+        <button type="submit" name="type" value="urlop" class="link">urlop</button> ·
+        <button type="submit" name="type" value="l4" class="link">L4</button> ·
+        <button type="submit" name="type" value="wolne" class="link">dzień wolny</button>
+    </form>
+{% endif %}
+
 <div id="draft-banner" class="flash warning" hidden>
     <span id="draft-msg"></span>
     <button type="button" id="draft-restore" class="primary" style="margin-left:8px">Przywróć</button>

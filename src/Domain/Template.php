@@ -28,6 +28,18 @@ final class Template
         return self::DAYS[(int) $date->format('w')];
     }
 
+    /** Liczba z rzeczownikiem w dobrej formie: plural(1, 'dzień', 'dni', 'dni') → „1 dzień”, 22 → „22 dni”. */
+    public static function plural(int $n, string $one, string $few, string $many): string
+    {
+        $form = match (true) {
+            1 === $n => $one,
+            in_array($n % 10, [2, 3, 4], true) && !in_array($n % 100, [12, 13, 14], true) => $few,
+            default => $many,
+        };
+
+        return $n.' '.$form;
+    }
+
     /** @return string[] */
     public static function parseAddresses(string $raw): array
     {

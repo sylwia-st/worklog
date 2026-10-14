@@ -118,6 +118,8 @@ def cmd(text):
 B = lambda s: f'<b>{s}</b>'  # noqa: E731
 G = lambda s: f'<font color="#2e5e4e"><b>{s}</b></font>'  # noqa: E731
 M = lambda s: f'<font name="DV-M" size="8.5">{s}</font>'  # noqa: E731
+# kropka statusu w kolorze z aplikacji (jasny motyw); „nowy” jest tam jasnoszary z obwódką – tu pełny szary
+DOT = lambda color: f'<font color="{color}">●</font>'  # noqa: E731
 
 # ---------------------------------------------------------------- treść
 
@@ -135,6 +137,7 @@ table(['Zakładka', 'Do czego służy'], [
     ['Dzień', 'Wpisywanie czasu, wysyłka do Jiry, tekst na Slacka, mail o nadgodzinach / krótszym dniu.'],
     ['Przegląd', 'Ostatnie 4 tygodnie: co jest wysłane, a czego brakuje. Nadchodzące planowane zmiany.'],
     ['Planowane zmiany', 'Zgłoszenie późniejszego przyjścia, wcześniejszego wyjścia lub krótszego dnia.'],
+    ['Wolne', 'Urlop, L4 i inne dni wolne; najbliższe święta.'],
     ['Ustawienia', 'Forma w tekstach, wygląd (motyw), połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
 ], [40, 130])
 
@@ -243,10 +246,10 @@ h('4. Wysłanie do Jiry')
 p(f'Kliknij {G("Zapisz i wyślij do Jiry")}. Wszystkie zmiany dnia idą naraz: nowe wpisy są dodawane, poprawione '
   f'aktualizowane, a usunięte kasowane. Nad formularzem pojawi się wynik dla każdego wpisu.')
 table(['Kropka przy wierszu', 'Znaczenie', 'Co zrobić'], [
-    ['● zielona', 'Wpis jest w Jirze i się zgadza', 'Nic'],
-    ['● żółta', 'Poprawiony po wysłaniu', 'Zapisz i wyślij do Jiry'],
-    ['○ szara', 'Jeszcze nie wysłany', 'Zapisz i wyślij do Jiry'],
-    ['● czerwona', 'Jira zgłosiła błąd – treść pod wierszem i po najechaniu', 'Patrz rozdział 12'],
+    [f'{DOT("#2e7d4f")} zielona', 'Wpis jest w Jirze i się zgadza', 'Nic'],
+    [f'{DOT("#a86a00")} żółta', 'Poprawiony po wysłaniu', 'Zapisz i wyślij do Jiry'],
+    [f'{DOT("#a8a6a0")} szara', 'Jeszcze nie wysłany', 'Zapisz i wyślij do Jiry'],
+    [f'{DOT("#b3261e")} czerwona', 'Jira zgłosiła błąd – treść pod wierszem i po najechaniu', 'Patrz rozdział 12'],
 ], [40, 80, 50])
 p('Godziny rozpoczęcia worklogów w Jirze ustawiają się kolejno od początku dnia, według kolejności wierszy '
   '(np. 8:00–10:00, 10:00–12:00, 13:00–15:00…) i omijają przerwę 12:00–13:00. Jeśli wpis wypada w trakcie obiadu, '
@@ -322,8 +325,19 @@ p(f'Domyślnie najnowsze dni są na górze. Kliknięcie nagłówka {B("Dzień �
   f'{B("Dzień ↑")}); aplikacja zapamiętuje wybór.')
 p('Zaległy dzień: kliknij jego datę, uzupełnij i wyślij jak zwykle – trafi pod właściwą datę.')
 
+sub('Urlopy, L4 i święta')
+p(f'Święta ustawowe aplikacja zna sama (także ruchome, np. Boże Ciało, i Wigilię). Urlop, L4 albo inny dzień wolny '
+  f'dodajesz w zakładce {B("Wolne")} (zakres od–do) albo jednym kliknięciem na stronie dnia: „Nie pracujesz tego dnia? '
+  f'Oznacz go jako urlop · L4 · dzień wolny”.')
+bullets(
+    'W dzień wolny nie ma przypomnienia, a Przegląd pokazuje powód zamiast „brak raportu”.',
+    'Praca w dzień wolny (weekend, święto, urlop) liczy się w całości jako nadgodziny – norma tego dnia wynosi 0.',
+    'Za święto w sobotę pracodawca wyznacza inny dzień wolny – dodaj go jako „Dzień wolny”. Strona Wolne podpowiada, '
+    'których świąt to dotyczy.',
+    'Strona Wolne liczy dni robocze każdego wpisu i sumę w bieżącym roku – osobno urlop, L4 i dni wolne.')
+
 h('10. Przypomnienie')
-p(f'Od poniedziałku do piątku o wybranej godzinie (domyślnie 15:45) pojawia się powiadomienie na pulpicie, jeśli w '
+p(f'W dni robocze (bez świąt, urlopów i innych dni wolnych) o wybranej godzinie (domyślnie 15:45) pojawia się powiadomienie na pulpicie, jeśli w '
   f'dzisiejszym raporcie czegoś brakuje (wpisy, Jira, Slack, mail). Gdy wszystko jest zrobione – nic się nie '
   f'pokazuje. Jeśli komputer był wtedy wyłączony lub uśpiony, przypomnienie pojawi się po jego włączeniu '
   f'(tego samego dnia, do 22:00).')

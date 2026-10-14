@@ -107,7 +107,16 @@ namespace {
     }
     function setId(object $o, int $id): void { (new ReflectionProperty($o, 'id'))->setValue($o, $id); }
 
-    $reports = new ReportBuilder($settings);
+    // kalendarz dni wolnych na atrapie repozytorium – nieobecności ustawia się w $absenceRepo->items
+    $absenceRepo = new class extends App\Repository\AbsenceRepository {
+        public array $items = [];
+        public function __construct() {}
+        public function findOverlapping(\DateTimeImmutable $from, \DateTimeImmutable $to): array
+        {
+            return array_values(array_filter($this->items, fn ($a) => $a->getDateFrom() <= $to && $a->getDateTo() >= $from));
+        }
+    };
+    $reports = new ReportBuilder($settings, new App\Service\WorkCalendar($absenceRepo));
     $day = new WorkDay(new DateTimeImmutable('2026-10-13'));
     $day->setStartTime('08:00');
     $day->setEndTime('17:00');
@@ -264,6 +273,24 @@ namespace {
     $t->addTrackedSeconds(45);
     $t->update('TIM-1', 90, 'opis 2', 0);
     check('zmiana opisu nie kasuje sekund', $t->getCarrySeconds(), 45);
+
+    // --- dni wolne: święto > nieobecność > weekend; norma 0 ---
+    $absenceRepo->items = [new App\Entity\Absence(new DateTimeImmutable('2026-11-09'), new DateTimeImmutable('2026-11-13'), 'urlop', 'Zakopane')];
+    $cal = new App\Service\WorkCalendar($absenceRepo);
+    $kind = static fn (string $d) => ($cal->dayOff(new DateTimeImmutable($d)) ?? ['kind' => '-', 'label' => '-'])['kind'].': '.($cal->dayOff(new DateTimeImmutable($d)) ?? ['label' => '-'])['label'];
+    check('kalendarz: urlop', $kind('2026-11-10'), 'absence: Urlop – Zakopane');
+    check('kalendarz: święto w trakcie urlopu', $kind('2026-11-11'), 'holiday: Narodowe Święto Niepodległości');
+    check('kalendarz: weekend', $kind('2026-11-14'), 'weekend: Sobota');
+    check('kalendarz: dzień roboczy', $cal->dayOff(new DateTimeImmutable('2026-11-16')), null);
+    check('kalendarz: zakres – tylko dni wolne', array_keys($cal->daysOff(new DateTimeImmutable('2026-11-12'), new DateTimeImmutable('2026-11-16'))), ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']);
+    $holiday = new WorkDay(new DateTimeImmutable('2026-11-11'));
+    new WorklogEntry($holiday, 'OPS-9', 120, 'Awaria', 0);
+    $hs = $reports->summary($holiday);
+    check('święto: norma 0, praca = nadgodziny', [$hs->normMinutes, $hs->difference(), $hs->kind(), null !== $reports->presenceMail($holiday)], [0, 120, 'over', true]);
+    $normal = new WorkDay(new DateTimeImmutable('2026-11-16'));
+    new WorklogEntry($normal, 'OPS-9', 120, 'Awaria', 0);
+    check('dzień roboczy: norma z ustawień', [$reports->summary($normal)->normMinutes, $reports->summary($normal)->kind()], [420, 'under']);
+    $absenceRepo->items = [];
 
     // --- stoper od podanej godziny ---
     $runningRepo = new class extends App\Repository\WorklogEntryRepository {

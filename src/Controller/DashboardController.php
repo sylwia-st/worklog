@@ -6,6 +6,7 @@ use App\Repository\PlannedChangeRepository;
 use App\Repository\WorkDayRepository;
 use App\Service\ReportBuilder;
 use App\Service\Settings;
+use App\Service\WorkCalendar;
 use App\Service\WorklogSync;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -15,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class DashboardController extends AbstractController
 {
     #[Route('/', name: 'dashboard', methods: ['GET'])]
-    public function index(Request $request, WorkDayRepository $days, PlannedChangeRepository $planned, ReportBuilder $reports, WorklogSync $sync, Settings $settings): Response
+    public function index(Request $request, WorkDayRepository $days, PlannedChangeRepository $planned, ReportBuilder $reports, WorklogSync $sync, Settings $settings, WorkCalendar $calendar): Response
     {
         // kolejność dni: ?sort=asc|desc z nagłówka tabeli, zapamiętana na kolejne wejścia
         $sort = $request->query->getString('sort');
@@ -30,6 +31,7 @@ final class DashboardController extends AbstractController
         $today = new \DateTimeImmutable('today');
         $from = $today->modify('-27 days');
         $saved = $days->findBetween($from, $today);
+        $off = $calendar->daysOff($from, $today);
 
         $rows = [];
         for ($d = $today; $d >= $from; $d = $d->modify('-1 day')) {
@@ -40,7 +42,7 @@ final class DashboardController extends AbstractController
                 continue;
             }
 
-            $row = ['date' => $d, 'day' => $day, 'weekend' => $weekend];
+            $row = ['date' => $d, 'day' => $day, 'weekend' => $weekend, 'off' => $off[$key] ?? null];
             if (null !== $day && [] !== $day->getActiveEntries()) {
                 $summary = $reports->summary($day);
                 $statuses = $sync->statuses($day);

@@ -9,6 +9,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use App\Domain\DaySummary;
+use App\Domain\Holidays;
 use App\Domain\MailDraft;
 use App\Domain\ReminderSchedule;
 use App\Domain\Template;
@@ -104,6 +105,22 @@ check('przypomnienie: wyłączone', ReminderSchedule::isDue('', '', $tue('16:00'
 check('przypomnienie: weekend', ReminderSchedule::isDue('15:45', '', new DateTimeImmutable('2026-10-17 16:00')), false);
 check('przypomnienie: 8:05 = 08:05', ReminderSchedule::stamp('8:05', $tue('09:00')), '2026-10-13 08:05');
 check('przypomnienie: zakres timera', [ReminderSchedule::inTimerWindow('06:00'), ReminderSchedule::inTimerWindow('21:59'), ReminderSchedule::inTimerWindow('22:00'), ReminderSchedule::inTimerWindow('05:59')], [true, true, false, false]);
+
+// --- święta i dni robocze ---
+foreach (['1999-04-04', '2000-04-23', '2024-03-31', '2025-04-20', '2026-04-05', '2027-03-28', '2030-04-21', '2038-04-25'] as $e) {
+    check("Wielkanoc $e", Holidays::easter((int) substr($e, 0, 4))->format('Y-m-d'), $e);
+}
+$h26 = Holidays::forYear(2026);
+check('święta 2026: liczba (z Wigilią)', count($h26), 14);
+check('święta 2026: ruchome', [$h26['2026-04-06'] ?? null, $h26['2026-05-24'] ?? null, $h26['2026-06-04'] ?? null], ['Poniedziałek Wielkanocny', 'Zielone Świątki', 'Boże Ciało']);
+check('święta 2026: w kolejności dat', array_keys($h26) === array_values(array_unique(array_keys($h26))) && array_keys($h26)[0] === '2026-01-01' && array_key_last($h26) === '2026-12-26', true);
+check('Wigilia wolna dopiero od 2025', [isset(Holidays::forYear(2024)['2024-12-24']), isset(Holidays::forYear(2025)['2025-12-24'])], [false, true]);
+check('święto: nazwa', [Holidays::name(new DateTimeImmutable('2026-11-11')), Holidays::name(new DateTimeImmutable('2026-11-12'))], ['Narodowe Święto Niepodległości', null]);
+check('dni robocze: tydzień z 11 listopada', Holidays::workingDays(new DateTimeImmutable('2026-11-09'), new DateTimeImmutable('2026-11-13')), 4);
+check('dni robocze: przełom roku (Wigilia, święta, Nowy Rok)', Holidays::workingDays(new DateTimeImmutable('2026-12-21'), new DateTimeImmutable('2027-01-03')), 7);
+check('dni robocze: sam weekend', Holidays::workingDays(new DateTimeImmutable('2026-10-17'), new DateTimeImmutable('2026-10-18')), 0);
+check('odmiana', array_map(static fn (int $n) => Template::plural($n, 'dzień roboczy', 'dni robocze', 'dni roboczych'), [0, 1, 2, 5, 12, 22, 25]),
+    ['0 dni roboczych', '1 dzień roboczy', '2 dni robocze', '5 dni roboczych', '12 dni roboczych', '22 dni robocze', '25 dni roboczych']);
 
 // --- motywy ---
 check('motywy: lista', array_keys(Theme::choices()), ['auto', 'light', 'dark', 'sea', 'sepia', 'night', 'contrast', 'custom']);

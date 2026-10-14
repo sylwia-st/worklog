@@ -14,8 +14,10 @@ use App\Entity\WorkDay;
  */
 final class ReportBuilder
 {
-    public function __construct(private readonly Settings $settings)
-    {
+    public function __construct(
+        private readonly Settings $settings,
+        private readonly WorkCalendar $calendar,
+    ) {
     }
 
     public function summary(WorkDay $day): DaySummary
@@ -25,7 +27,8 @@ final class ReportBuilder
             $day->getStartTime(),
             $day->getEndTime(),
             $day->getBreakMinutes(),
-            $this->settings->int('norm_minutes'),
+            // weekend, święto, urlop: norma 0 – praca tego dnia to w całości nadgodziny
+            null !== $this->calendar->dayOff($day->getDate()) ? 0 : $this->settings->int('norm_minutes'),
             $this->settings->int('tolerance_minutes'),
             $day->hasWorkedThroughFixedBreak() ? null : ($this->settings->get('lunch_from') ?: null),
             $day->hasWorkedThroughFixedBreak() ? null : ($this->settings->get('lunch_to') ?: null),

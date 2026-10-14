@@ -32,8 +32,10 @@
         </th><th>W ticketach</th><th>Bilans</th><th>Jira</th><th>Slack</th><th>Mail</th></tr></thead>
         <tbody>
         {% for r in rows %}
-            <tr class="{{ r.weekend ? 'weekend' }}">
-                <td><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a> <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="badge">dziś</span>{% endif %}</td>
+            {% set offLabel = r.off and r.off.kind != 'weekend' ? r.off.label : null %}
+            <tr class="{{ r.weekend or offLabel ? 'weekend' }}">
+                <td><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a> <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="badge">dziś</span>{% endif %}
+                    {% if offLabel and r.summary is defined %} <span class="badge">{{ offLabel }}</span>{% endif %}</td>
                 {% if r.summary is defined %}
                     {% set s = r.summary %}
                     <td>{{ s.loggedMinutes|hm }}</td>
@@ -46,7 +48,7 @@
                         {% else %}<span class="badge warn">do wysłania</span>{% endif %}
                     </td>
                 {% else %}
-                    <td colspan="5" class="muted">{{ r.date > today ? '' : 'brak raportu' }}</td>
+                    <td colspan="5" class="muted">{{ offLabel ?: (r.date > today ? '' : 'brak raportu') }}</td>
                 {% endif %}
             </tr>
         {% endfor %}
