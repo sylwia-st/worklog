@@ -119,6 +119,7 @@ final class Settings
                     $stored[$s->getName()] = $s->getValue();
                 }
             }
+            $stored['jira_token'] = $this->loadToken($stored['jira_token'] ?? '');
             $form = $stored['forma'] ?? self::DEFAULTS['forma'];
             $this->cache = $stored + self::defaultsFor(isset(self::FORMS[$form]) ? $form : self::DEFAULTS['forma']);
         }
@@ -159,6 +160,11 @@ final class Settings
             }
         }
 
+        if (array_key_exists('jira_token', $values) && null !== $file = $this->tokenFile()) {
+            $this->writeToken($file, $values['jira_token']);
+            unset($values['jira_token']);
+        }
+
         $repo = $this->em->getRepository(Setting::class);
         foreach ($values as $name => $value) {
             if (!array_key_exists($name, self::DEFAULTS)) {
@@ -173,6 +179,50 @@ final class Settings
         }
         $this->em->flush();
         $this->cache = null;
+    }
+
+    /**
+     * Token Jiry leży w pliku obok bazy (/data/.jira_token, 600), a nie w bazie – kopie zapasowe go nie zawierają.
+     * Token z bazy (sprzed tej zmiany albo z przywróconej starej kopii) przechodzi do pliku, jeśli plik jest pusty;
+     * w bazie zostaje pusta wartość.
+     */
+    private function loadToken(string $fromDb): string
+    {
+        $file = $this->tokenFile();
+        if (null === $file) {
+            return $fromDb; // baza nie jest plikiem (np. w pamięci) – token zostaje w niej
+        }
+        $token = is_file($file) ? trim((string) file_get_contents($file)) : '';
+        if ('' !== $fromDb) {
+            if ('' === $token) {
+                $this->writeToken($file, $fromDb);
+                $token = $fromDb;
+            }
+            // DBAL zamiast flush() – flush w trakcie odczytu zapisałby też inne, jeszcze niezatwierdzone zmiany
+            $this->em->getConnection()->executeStatement("UPDATE setting SET value = '' WHERE name = 'jira_token'");
+        }
+
+        return $token;
+    }
+
+    private function writeToken(string $file, string $token): void
+    {
+        $umask = umask(0o077);
+        try {
+            $ok = false !== file_put_contents($file.'.tmp', trim($token)) && chmod($file.'.tmp', 0o600) && rename($file.'.tmp', $file);
+        } finally {
+            umask($umask);
+        }
+        if (!$ok) {
+            throw new \RuntimeException('Nie udało się zapisać tokenu Jiry do '.$file.'.');
+        }
+    }
+
+    private function tokenFile(): ?string
+    {
+        $path = $this->em->getConnection()->getParams()['path'] ?? null;
+
+        return is_string($path) && '' !== $path ? dirname($path).'/.jira_token' : null;
     }
 
     /** @return array<string, string> klucz → tytuł */

@@ -16,7 +16,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 - Port jest wystawiony tylko na `127.0.0.1` – aplikacja nie jest dostępna z sieci. Dodatkowo odrzuca żądania z obcym nagłówkiem `Host` i POST-y wysłane z innych stron.
 - Jedyne połączenie wychodzące z działającego kontenera to adres Twojej Jiry. Slack i maile nie są wysyłane przez aplikację – kopiujesz tekst / zatwierdzasz mail w swoim kliencie.
 - Strona nie ładuje nic z internetu (żadnych CDN, fontów, analityki).
-- Dane i token leżą w wolumenie Dockera `worklog-data` (pliki z uprawnieniami 600). Kontener działa jako zwykły użytkownik, bez uprawnień (`cap_drop: ALL`, `no-new-privileges`).
+- Dane i token leżą w wolumenie Dockera `worklog-data` (pliki z uprawnieniami 600). Token jest w osobnym pliku, nie w bazie, więc kopie zapasowe go nie zawierają – po przywróceniu kopii na nowym komputerze wpisz go ponownie w Ustawieniach. Kontener działa jako zwykły użytkownik, bez uprawnień (`cap_drop: ALL`, `no-new-privileges`).
 - Internet (Docker Hub, packagist.org) jest potrzebny tylko przy budowaniu obrazu.
 
 ## Bezpieczeństwo wpisów
@@ -24,7 +24,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 - **Autozapis** – każda zmiana trafia do bazy ok. 1 s po wpisaniu i przy zamykaniu karty; status „✓ zapisano 14:32” przy przyciskach.
 - **Kopia w przeglądarce** – gdy zapis do bazy się nie uda, zmiany zostają w przeglądarce i po ponownym otwarciu dnia można je przywrócić.
 - **Stoper w bazie** – czas startu jest na dysku, więc przeżywa zamknięcie przeglądarki i restart; stoper działający od innego dnia lub > 6h pyta, o której go zatrzymać.
-- **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
+- **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność, bez tokenu Jiry; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
 - **Kopia przed zmianą struktury bazy** – gdy nowa wersja zmienia tabele (start po `./worklog up`), kontener najpierw robi kopię do `/data/kopie` w wolumenie (10 ostatnich); bez udanej kopii nie startuje i niczego nie zmienia. Komunikat jest w `./worklog logs`. Przywrócenie: `docker cp worklog:/data/kopie/PLIK.db ~/` i `./worklog restore ~/PLIK.db`.
 - **Odporny zapis** – SQLite w trybie WAL z `synchronous=FULL`.
 - **Usuwanie z potwierdzeniem** – zaznaczenie ✕ niczego nie kasuje. Po „Zapisz” aplikacja pokazuje listę zaznaczonych wpisów i usuwa je dopiero po „Usuń zaznaczone” (także gdy formularz wyśle się Enterem); autozapis nigdy nie usuwa.

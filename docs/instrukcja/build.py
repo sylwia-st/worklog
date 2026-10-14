@@ -424,7 +424,8 @@ box('Warto wiedzieć',
     f'Przywrócenie kopii: {M("./worklog restore ~/worklog-backups/worklog-RRRRMMDD-GGMM.db")} – przed nadpisaniem '
     f'narzędzie samo robi kopię obecnego stanu (jeśli ta się nie uda, nic nie zmienia).',
     'Najlepiej, żeby katalog ~/worklog-backups był objęty Twoją zwykłą kopią zapasową (np. firmową) – wtedy '
-    'przetrwa nawet awarię dysku.')
+    'przetrwa nawet awarię dysku. Kopie nie zawierają tokenu Jiry: po przywróceniu kopii na nowym komputerze '
+    'wpisz go ponownie w Ustawieniach.')
 
 h('14. Obsługa i kopia zapasowa')
 table(['Polecenie (w katalogu narzędzia)', 'Działanie'], [

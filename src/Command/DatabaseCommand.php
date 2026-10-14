@@ -66,6 +66,7 @@ final class DatabaseCommand extends Command
                 unlink($target);
             }
             $this->open($this->databasePath())->exec("VACUUM INTO '".\SQLite3::escapeString($target)."'");
+            $this->removeToken($target);
             $check = $this->open($target, \SQLITE3_OPEN_READONLY)->querySingle('PRAGMA integrity_check');
         } catch (\Exception $e) {
             return 'Kopia się nie udała: '.$e->getMessage();
@@ -138,6 +139,21 @@ final class DatabaseCommand extends Command
             Template::plural(count($sql), 'polecenie SQL', 'polecenia SQL', 'poleceń SQL'), $file));
 
         return null;
+    }
+
+    /**
+     * Token Jiry nie trafia do kopii. Zwykle i tak go w bazie nie ma (leży w pliku obok – Settings::loadToken),
+     * ale po przywróceniu starej kopii zostaje w bazie, dopóki aplikacja go nie przeniesie.
+     * secure_delete nadpisuje zerami miejsce po starej wartości, więc nie da się jej odczytać z pliku.
+     */
+    private function removeToken(string $file): void
+    {
+        $db = $this->open($file);
+        if (null !== $db->querySingle("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'setting'")) {
+            $db->exec('PRAGMA secure_delete = ON');
+            $db->exec("UPDATE setting SET value = '' WHERE name = 'jira_token'");
+        }
+        $db->close();
     }
 
     private function open(string $path, int $flags = \SQLITE3_OPEN_READWRITE | \SQLITE3_OPEN_CREATE): \SQLite3
