@@ -86,7 +86,7 @@
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
             {% endif %}
-            <span class="muted small">Czas: 1h 30m · 1.5 · 90m · 1:30 – albo ▶ stoper</span>
+            <span class="muted small">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper</span>
         </div>
 
         {% if pendingDeletions is not empty %}

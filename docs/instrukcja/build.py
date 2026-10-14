@@ -193,7 +193,8 @@ table(['Wpisujesz', 'Oznacza'], [
     ['1h 30m · 1h30', '1 godzina 30 minut'], ['1.5 · 1,5h', 'półtorej godziny'], ['90m · 90 min', '90 minut'],
     ['1:30', '1 godzina 30 minut'], ['2h · 2 godz', '2 godziny'],
 ], [70, 100])
-box('Uwaga', 'Sama liczba bez jednostki to godziny (2 = 2h). Dla minut dopisz „m”, np. 45m.')
+box('Uwaga', 'Sama liczba bez jednostki to godziny (2 = 2h), ale najwyżej 12. Przy większej, np. 20, pod wierszem '
+           'pojawi się pytanie „minuty czy godziny?” – dopisz „m” albo „h” (20m, 20h).')
 
 sub('Praca w przerwie obiadowej (awaria)')
 steps(

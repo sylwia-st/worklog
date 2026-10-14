@@ -30,6 +30,8 @@ foreach ([
     '1h 30m' => 90, '1h30' => 90, '1h30m' => 90, '1.5' => 90, '1,5h' => 90, '90m' => 90, '90 min' => 90,
     '1:30' => 90, '2h' => 120, '2 godz' => 120, '0.25' => 15, '15m' => 15, ' 8 ' => 480,
     '' => null, 'abc' => null, '0' => null, '25h' => null, 'h' => null, '-1h' => null,
+    // sama liczba = godziny, ale najwyżej 12 – „20” to raczej minuty, więc trzeba dopisać jednostkę
+    '2' => 120, '12' => 720, '12.5' => 750, '13' => null, '20' => null, ' 15 ' => null, '45' => null, '20m' => 20, '20h' => 1200,
 ] as $in => $exp) {
     check("parse('$in')", TimeFormat::parse((string) $in), $exp);
 }
@@ -105,6 +107,8 @@ check('przypomnienie: wyłączone', ReminderSchedule::isDue('', '', $tue('16:00'
 check('przypomnienie: weekend', ReminderSchedule::isDue('15:45', '', new DateTimeImmutable('2026-10-17 16:00')), false);
 check('przypomnienie: 8:05 = 08:05', ReminderSchedule::stamp('8:05', $tue('09:00')), '2026-10-13 08:05');
 check('przypomnienie: zakres timera', [ReminderSchedule::inTimerWindow('06:00'), ReminderSchedule::inTimerWindow('21:59'), ReminderSchedule::inTimerWindow('22:00'), ReminderSchedule::inTimerWindow('05:59')], [true, true, false, false]);
+
+check('niejednoznaczna liczba', array_map([TimeFormat::class, 'ambiguousNumber'], ['20', ' 15 ', '12', '1.5', '15m', '']), [20, 15, null, null, null, null]);
 
 // --- święta i dni robocze ---
 foreach (['1999-04-04', '2000-04-23', '2024-03-31', '2025-04-20', '2026-04-05', '2027-03-28', '2030-04-21', '2038-04-25'] as $e) {

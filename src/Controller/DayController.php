@@ -385,7 +385,7 @@ final class DayController extends AbstractController
                 if (null === $issue) {
                     $row['error'] = 'Niepoprawny numer ticketu (np. ABC-123).';
                 } elseif (null === $minutes) {
-                    $row['error'] = 'Niepoprawny czas – wpisz np. 1h 30m, 1.5, 90m albo 1:30.';
+                    $row['error'] = self::timeError($row['time']);
                 } else {
                     $row['issue'] = $issue;
                     $row['minutes'] = $minutes;
@@ -407,6 +407,18 @@ final class DayController extends AbstractController
             'rows' => $rows,
             'dayErrors' => $dayErrors,
         ], $errors];
+    }
+
+    /** Komunikat o złym czasie; przy samej liczbie typu „20” pytamy, czy chodzi o minuty, czy o godziny. */
+    private static function timeError(string $raw): string
+    {
+        $n = TimeFormat::ambiguousNumber($raw);
+
+        return match (true) {
+            null === $n, $n > 24 * 60 => 'Niepoprawny czas – wpisz np. 1h 30m, 1.5, 90m albo 1:30.',
+            $n <= 24 => sprintf('„%1$d” – minuty czy godziny? Wpisz %1$dm albo %1$dh.', $n),
+            default => sprintf('„%1$d” – chodziło o minuty? Wpisz %1$dm.', $n),
+        };
     }
 
     /** @param string[] $errors */

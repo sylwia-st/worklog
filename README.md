@@ -98,7 +98,7 @@ Jeśli nie widzisz tej opcji, admin wyłączył tokeny – poproś go o Personal
 
 ## Codzienny przebieg
 
-1. **Dzień** → godziny od–do (domyślne są już wpisane) + wiersze: ticket, czas (`1h 30m`, `1.5`, `90m`, `1:30`), opis.
+1. **Dzień** → godziny od–do (domyślne są już wpisane) + wiersze: ticket, czas (`1h 30m`, `1.5`, `90m`, `1:30`; sama liczba to godziny, najwyżej 12 – przy `20` aplikacja zapyta, czy chodzi o minuty), opis.
    „Skopiuj tickety z poprzedniego dnia” przenosi same numery.
 2. **Zapisz i wyślij do Jiry.** Kropka przy wierszu: zielona = w Jirze, żółta = zmieniony po wysłaniu, czerwona = błąd (najedź, żeby zobaczyć treść).
 3. **Kopiuj na Slacka** → wklej w kanał.

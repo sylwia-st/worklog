@@ -7,6 +7,9 @@ namespace App\Domain;
  */
 final class TimeFormat
 {
+    /** Sama liczba bez jednostki to godziny – ale najwyżej tyle. „20” to raczej 20 minut niż 20 godzin, więc trzeba dopisać m albo h. */
+    public const MAX_BARE_HOURS = 12;
+
     public static function parse(string $raw): ?int
     {
         $s = mb_strtolower(trim(str_replace(',', '.', $raw)));
@@ -17,6 +20,9 @@ final class TimeFormat
         if (preg_match('/^(\d{1,2}):([0-5]\d)$/', $s, $m)) {
             $minutes = (int) $m[1] * 60 + (int) $m[2];
         } elseif (preg_match('/^\d+(\.\d+)?$/', $s)) {
+            if (null !== self::ambiguousNumber($s)) {
+                return null;
+            }
             $minutes = (int) round((float) $s * 60);
         } elseif (preg_match('/^(?:(\d+(?:\.\d+)?)\s*(?:h|g|godz\.?)\s*)?(?:(\d+)\s*(?:m|min\.?)?)?$/u', $s, $m)
             && (($m[1] ?? '') !== '' || ($m[2] ?? '') !== '')
@@ -30,6 +36,14 @@ final class TimeFormat
         }
 
         return $minutes > 0 && $minutes <= 24 * 60 ? $minutes : null;
+    }
+
+    /** Sama liczba całkowita powyżej MAX_BARE_HOURS (np. „20”) – nie wiadomo, minuty czy godziny. Zwraca ją, inaczej null. */
+    public static function ambiguousNumber(string $raw): ?int
+    {
+        $s = trim($raw);
+
+        return ctype_digit($s) && (int) $s > self::MAX_BARE_HOURS ? (int) $s : null;
     }
 
     /**
