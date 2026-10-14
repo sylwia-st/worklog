@@ -1,6 +1,9 @@
 services:
   worklog:
-    build: .
+    build:
+      context: .
+      args:
+        WORKLOG_VERSION: ${WORKLOG_VERSION:-}   # ustawia ./worklog up – widać ją w stopce strony
     image: worklog-tool:latest
     container_name: worklog
     init: true                      # poprawne zatrzymywanie (sygnały do php -S)

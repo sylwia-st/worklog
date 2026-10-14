@@ -34,6 +34,9 @@ RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
  && chmod +x /app/docker/entrypoint.sh /app/bin/console
 USER app
 RUN APP_SECRET=build-only php bin/console cache:warmup --no-interaction
+# wersja w stopce strony – podaje ją ./worklog up (commit i data); puste przy budowaniu bez gita
+ARG WORKLOG_VERSION=""
+ENV WORKLOG_VERSION=$WORKLOG_VERSION
 
 VOLUME ["/data"]
 EXPOSE 8080

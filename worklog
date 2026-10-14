@@ -14,6 +14,15 @@ dc() {
     docker compose --env-file .env.compose "${args[@]}" "$@"
 }
 
+# Wersja w stopce strony („b88a5fd z 14.10.2026”) – trafia do obrazu przy budowaniu (compose.yaml → Dockerfile).
+# „+ zmiany lokalne”, gdy w katalogu są niezacommitowane pliki; bez gita stopka pokaże „wersja nieznana”.
+export_version() {
+    local v
+    v="$(git -C "$DIR" log -1 --format='%h z %cd' --date=format:'%d.%m.%Y' 2>/dev/null)" || return 0
+    [[ -z "$(git -C "$DIR" status --porcelain 2>/dev/null)" ]] || v+=" + zmiany lokalne"
+    export WORKLOG_VERSION="$v"
+}
+
 # Kopię i przywracanie robi polecenie app:db w kontenerze (to samo co na Windowsie). Obraz zbudowany przed jego
 # dodaniem (bez ./worklog up po git pull) nie ma go – wtedy ten sam kod PHP podany w wierszu poleceń.
 has_db_command() { docker exec worklog php bin/console app:db --help >/dev/null 2>&1; }
@@ -40,15 +49,21 @@ legacy_restore() {
 }
 
 case "${1:-help}" in
-    up)       dc up -d --build ;;
+    up)       export_version; dc up -d --build ;;
     down)     dc down ;;
     restart)  dc restart ;;
     logs)     dc logs -f --tail=100 ;;
-    status)   dc ps; echo; echo "http://127.0.0.1:$WORKLOG_PORT" ;;
+    status)
+        dc ps; echo
+        echo "http://127.0.0.1:$WORKLOG_PORT"
+        v="$(docker exec worklog printenv WORKLOG_VERSION 2>/dev/null || true)"
+        echo "Wersja: ${v:-nieznana}"
+        ;;
     update)
         # composer.lock przypina wersje – najpierw podnosimy je do najnowszych łatek w ramach composer.json
         docker run --rm --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer -v "$DIR":/app -w /app \
             composer:2 update --no-install --no-scripts --no-interaction
+        export_version
         dc build --pull --no-cache && dc up -d
         ;;
     backup)

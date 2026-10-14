@@ -1,2 +1,5 @@
 twig:
     default_path: '%kernel.project_dir%/templates'
+    globals:
+        # „b88a5fd z 14.10.2026” – z obrazu (Dockerfile, ARG WORKLOG_VERSION); null poza kontenerem
+        app_version: '%env(default::WORKLOG_VERSION)%'

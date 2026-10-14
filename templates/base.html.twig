@@ -129,6 +129,9 @@
     {% endfor %}
     {% block body %}{% endblock %}
 </main>
+<footer class="wrap muted small" style="padding:0 0 24px">
+    {{ app_version ? 'Wersja ' ~ app_version : 'Wersja nieznana – obraz zbudowany bez ./worklog up' }}
+</footer>
 <script>
     // Kopiowanie do schowka: <button data-copy="#id" data-mark="/url">
     document.addEventListener('click', async (ev) => {

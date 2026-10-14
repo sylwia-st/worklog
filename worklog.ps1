@@ -62,9 +62,21 @@ function Invoke-Native([string]$Exe, [string[]]$Arguments) {
     return [pscustomobject]@{ Code = $LASTEXITCODE; Output = ($out -join "`n").Trim(); Errors = ($err -join "`n").Trim() }
 }
 
+# Wersja w stopce strony („b88a5fd z 14.10.2026”) – trafia do obrazu przy budowaniu (compose.yaml → Dockerfile).
+# „+ zmiany lokalne”, gdy w katalogu są niezacommitowane pliki; bez gita stopka pokaże „wersja nieznana”.
+function Set-VersionEnv {
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return }
+    $r = Invoke-Native git @('-C', $Dir, 'log', '-1', '--format=%h z %cd', '--date=format:%d.%m.%Y')
+    if ($r.Code -ne 0 -or -not $r.Output) { return }
+    $version = $r.Output
+    if ((Invoke-Native git @('-C', $Dir, 'status', '--porcelain')).Output) { $version += ' + zmiany lokalne' }
+    $env:WORKLOG_VERSION = $version
+}
+
 # docker compose z wynikiem wprost na ekran (postęp budowania, logi)
 function Invoke-Compose {
     if (-not (Test-Path -LiteralPath $EnvFile)) { Write-Config (Read-Config) }
+    if ($args -contains 'build' -or $args -contains '--build') { Set-VersionEnv }
     & docker compose --env-file $EnvFile -f $ComposeFile @args
 }
 
@@ -392,6 +404,8 @@ function Invoke-Worklog([string[]]$Arguments) {
             $script:ExitCode = $LASTEXITCODE
             Write-Host ''
             Write-Host ('http://127.0.0.1:{0}' -f (Read-Config).WORKLOG_PORT)
+            $version = (Invoke-Native docker @('exec', $Container, 'printenv', 'WORKLOG_VERSION')).Output
+            Write-Host ('Wersja: {0}' -f $(if ($version) { $version } else { 'nieznana' }))
         }
         'update'  { Update-App }
         'backup'  {
