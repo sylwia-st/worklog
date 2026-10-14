@@ -265,6 +265,7 @@ final class DayController extends AbstractController
             'jiraSynced' => count(array_filter($sendable, static fn (string $s) => WorklogSync::STATUS_SYNCED === $s)),
             'jiraErrors' => count(array_filter($sendable, static fn (string $s) => WorklogSync::STATUS_ERROR === $s)),
             'jiraDone' => $hasEntries && $this->sync->isFullySynced($day),
+            'jiraConfigured' => $this->settings->jiraConfigured(),
         ];
 
         // oś dnia: obiad (jeśli nie przepracowany) i przerwy podane godzinami

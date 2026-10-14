@@ -7,7 +7,9 @@
         <a class="step todo" href="#dayform"><span class="ic">1</span><span>Wpisy<small>wpisz czas w tickety</small></span></a>
     {% endif %}
 
-    {% if c.entries == 0 %}
+    {% if not c.jiraConfigured %}
+        <a class="step idle" href="{{ path('settings') }}"><span class="ic">–</span><span>Jira<small>nie skonfigurowana</small></span></a>
+    {% elseif c.entries == 0 %}
         <span class="step idle"><span class="ic">2</span><span>Jira<small>po wpisach</small></span></span>
     {% elseif c.jiraDone %}
         <a class="step done" href="#dayform"><span class="ic">✓</span><span>Jira<small>wysłane</small></span></a>

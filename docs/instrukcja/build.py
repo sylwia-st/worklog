@@ -118,8 +118,8 @@ def cmd(text):
 B = lambda s: f'<b>{s}</b>'  # noqa: E731
 G = lambda s: f'<font color="#2e5e4e"><b>{s}</b></font>'  # noqa: E731
 M = lambda s: f'<font name="DV-M" size="8.5">{s}</font>'  # noqa: E731
-# kropka statusu w kolorze z aplikacji (jasny motyw); „nowy” jest tam jasnoszary z obwódką – tu pełny szary
-DOT = lambda color: f'<font color="{color}">●</font>'  # noqa: E731
+# pasek stanu przy wierszu w kolorze z aplikacji (jasny motyw)
+DOT = lambda color: f'<font color="{color}">▌</font>'  # noqa: E731
 
 # ---------------------------------------------------------------- treść
 
@@ -247,11 +247,11 @@ bullets(
 h('4. Wysłanie do Jiry')
 p(f'Kliknij {G("Zapisz i wyślij do Jiry")}. Wszystkie zmiany dnia idą naraz: nowe wpisy są dodawane, poprawione '
   f'aktualizowane, a usunięte kasowane. Nad formularzem pojawi się wynik dla każdego wpisu.')
-table(['Kropka przy wierszu', 'Znaczenie', 'Co zrobić'], [
-    [f'{DOT("#2e7d4f")} zielona', 'Wpis jest w Jirze i się zgadza', 'Nic'],
-    [f'{DOT("#a86a00")} żółta', 'Poprawiony po wysłaniu', 'Zapisz i wyślij do Jiry'],
-    [f'{DOT("#a8a6a0")} szara', 'Jeszcze nie wysłany', 'Zapisz i wyślij do Jiry'],
-    [f'{DOT("#b3261e")} czerwona', 'Jira zgłosiła błąd – treść pod wierszem i po najechaniu', 'Patrz rozdział 12'],
+table(['Pasek przy wierszu', 'Znaczenie', 'Co zrobić'], [
+    [f'{DOT("#2e7d4f")} zielony', 'Wpis jest w Jirze i się zgadza', 'Nic'],
+    [f'{DOT("#a86a00")} żółty', 'Poprawiony po wysłaniu', 'Zapisz i wyślij do Jiry'],
+    [f'{DOT("#a8a6a0")} szary', 'Jeszcze nie wysłany', 'Zapisz i wyślij do Jiry'],
+    [f'{DOT("#b3261e")} czerwony', 'Jira zgłosiła błąd – treść pod wierszem i po najechaniu', 'Patrz rozdział 12'],
 ], [40, 80, 50])
 p('Godziny rozpoczęcia worklogów w Jirze ustawiają się kolejno od początku dnia, według kolejności wierszy '
   '(np. 8:00–10:00, 10:00–12:00, 13:00–15:00…) i omijają przerwę 12:00–13:00. Jeśli wpis wypada w trakcie obiadu, '

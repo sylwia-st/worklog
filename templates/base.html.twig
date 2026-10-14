@@ -44,7 +44,7 @@
         @keyframes pulse { 50% { opacity: .35; } }
         @media (prefers-reduced-motion: reduce) { #timerbar .pulse { animation: none; } }
 
-        main { padding: 24px 0 64px; }
+        main.wrap { padding-top: 24px; padding-bottom: 64px; }
         h1 { font-size: clamp(24px, 3.4vw, 30px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 4px; text-wrap: balance; }
         h1 .soft { color: var(--muted); font-weight: 500; }
         h2 { font-size: 15px; font-weight: 650; margin: 0 0 12px; }
@@ -133,7 +133,7 @@
         .mailmeta span:nth-child(odd) { color: var(--muted); }
         pre { white-space: pre-wrap; background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0; }
         .mailmeta + pre { border-radius: 0 0 10px 10px; background: var(--panel); font-family: var(--sans); font-size: 13px; }
-        textarea[readonly] { background: var(--sunk); }
+        textarea[readonly] { background: var(--sunk); field-sizing: content; max-height: 340px; resize: none; }
 
         /* ustawienia: kolory motywu */
         .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
@@ -180,7 +180,7 @@
 
         .hours { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; }
         .hfield label { margin-bottom: 3px; }
-        .hfield input { width: 116px; font-size: 16px; font-weight: 600; }
+        .hfield input { width: 136px; font-size: 16px; font-weight: 600; }
         .hfield.wide { flex: 1 1 220px; } .hfield.wide input { width: 100%; font-size: 14px; font-weight: 400; padding-block: 9px; }
         .lunchchk { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; color: var(--ink); font-size: 14px; }
         .lunchchk input { margin-top: 4px; }
@@ -203,9 +203,9 @@
         .entries :is(.f-issue, .f-time, .f-desc) { background: transparent; border-color: transparent; }
         .entries :is(.f-issue, .f-time, .f-desc):hover { border-color: var(--line); }
         .entries :is(.f-issue, .f-time, .f-desc):focus { background: var(--panel); border-color: var(--accent); }
-        .f-issue { font: 650 14px var(--mono); }
-        .f-time { font-size: 16px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
-        .f-desc { resize: none; field-sizing: content; min-height: 36px; line-height: 1.4; }
+        .entries .f-issue { font: 650 14px var(--mono); }
+        .entries .f-time { font-size: 16px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+        .entries .f-desc { resize: none; field-sizing: content; min-height: 36px; line-height: 1.4; }
         .ititle { display: block; padding-left: 11px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
         .ititle:empty { display: none; }
         .rowerr { color: var(--err); font-size: 12px; padding-left: 10px; }

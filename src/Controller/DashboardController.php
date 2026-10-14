@@ -65,6 +65,7 @@ final class DashboardController extends AbstractController
             'sort' => $sort,
             'upcoming' => $planned->findFrom($today, 10),
             'today' => $today,
+            'jiraConfigured' => $settings->jiraConfigured(),
         ]);
     }
 }

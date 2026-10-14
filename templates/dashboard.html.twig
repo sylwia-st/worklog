@@ -41,7 +41,7 @@
                     {% set s = r.summary %}
                     <td>{{ s.loggedMinutes|hm }}</td>
                     <td class="{{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</td>
-                    <td>{% if r.jiraDone %}<span class="badge ok">✓ {{ r.entries }}</span>{% else %}<span class="badge warn">{{ r.inJira }}/{{ r.entries }}</span>{% endif %}</td>
+                    <td>{% if not jiraConfigured %}<span class="muted small">—</span>{% elseif r.jiraDone %}<span class="badge ok">✓ {{ r.entries }}</span>{% else %}<span class="badge warn">{{ r.inJira }}/{{ r.entries }}</span>{% endif %}</td>
                     <td>{% if r.day.slackDoneAt %}<span class="badge ok">✓</span>{% else %}<span class="badge warn">—</span>{% endif %}</td>
                     <td>
                         {% if not r.mailNeeded %}<span class="muted small">niepotrzebny</span>

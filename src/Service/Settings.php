@@ -225,6 +225,12 @@ final class Settings
         return is_string($path) && '' !== $path ? dirname($path).'/.jira_token' : null;
     }
 
+    /** Adres i token Jiry są wpisane – bez nich nie pokazujemy „do wysłania do Jiry”, bo nie da się tego zrobić. */
+    public function jiraConfigured(): bool
+    {
+        return '' !== trim($this->get('jira_url')) && '' !== trim($this->get('jira_token'));
+    }
+
     /** @return array<string, string> klucz → tytuł */
     public function issueCache(): array
     {

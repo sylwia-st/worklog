@@ -88,7 +88,7 @@ final class RemindCommand extends Command
             if (null !== $gap && $gap < 0) {
                 $todo[] = 'w ticketach brakuje '.TimeFormat::format(-$gap).' względem czasu w pracy';
             }
-            if (!$this->sync->isFullySynced($day)) {
+            if ($this->settings->jiraConfigured() && !$this->sync->isFullySynced($day)) {
                 $todo[] = 'wyślij worklogi do Jiry';
             }
             if (null === $day->getSlackDoneAt()) {
