@@ -295,7 +295,11 @@ steps(
     'W panelu maila sprawdź adresatów, temat i treść.',
     f'Kliknij {G("Otwórz w programie pocztowym")} – Thunderbird (lub inny domyślny program) otworzy gotową '
     f'wiadomość. Wyślij ją jak zwykle.',
-    f'Jeśli program pocztowy się nie otworzy: {B("Kopiuj treść")} i wklej do nowej wiadomości.')
+    f'Jeśli program pocztowy się nie otworzy: {B("Kopiuj treść")}, wklej do nowej wiadomości, a po wysłaniu kliknij '
+    f'{B("Wysłany")} obok „do wysłania” – inaczej przypomnienie będzie o mailu wspominać.')
+p('Na Windowsie długi mail (np. z długą listą ticketów) nie zmieści się w linku do programu pocztowego – otworzy się '
+  'z adresatami i tematem, a treść aplikacja skopiuje do schowka: wklej ją Ctrl+V. Pod przyciskiem pojawi się '
+  'podpowiedź. To samo dotyczy maila o planowanej zmianie.')
 box('Wskazówka', 'Jeśli czas w ticketach różni się od czasu obecności (np. obecność 7h, a w ticketach jest 6h 30m), '
                  'panel Bilans pokaże żółte ostrzeżenie, a przypomnienie wspomni o brakującym czasie.')
 
@@ -314,6 +318,8 @@ bullets(
     'Jeśli zostało mniej czasu niż wymagane wyprzedzenie (domyślnie 24h), zobaczysz ostrzeżenie.',
     'Gdy otworzysz ten dzień w zakładce Dzień, godziny ze zgłoszenia podpowiedzą się same, a na górze będzie '
     'przypomnienie o zmianie.',
+    'Dopóki mail nie jest wysłany, przypomnienie o nim wspomina, a dzisiejsza strona dnia pokazuje go na górze '
+    '(rozdział 10).',
     f'Pomyłkę usuwasz linkiem {B("Usuń tę zmianę")} na stronie zgłoszenia (to nie wysyła żadnego maila).')
 
 h('9. Przegląd i zaległe dni')
@@ -391,13 +397,17 @@ table(['Objaw / komunikat', 'Co zrobić'], [
     ['„Popraw zaznaczone wiersze”', 'Wiersz z czerwoną ramką ma zły numer ticketu (np. ABC-123) albo czas.'],
     ['Program pocztowy się nie otwiera', 'Ustaw domyślny program pocztowy (Ubuntu: Ustawienia → Aplikacje domyślne; '
      'Windows: Ustawienia → Aplikacje → Aplikacje domyślne) albo użyj Kopiuj treść.'],
+    ['Windows: mail otwiera się bez treści', 'Mail jest za długi na link – treść jest w schowku, wklej ją Ctrl+V '
+     '(rozdział 7).'],
+    ['Nie wiadomo, czy działa nowa wersja', f'Wersję (skrót commita i data) widać na dole każdej strony i w '
+     f'{M("./worklog status")}. „+ zmiany lokalne” – w katalogu są niezacommitowane zmiany.'],
     ['Brak powiadomień', f'Sprawdź godzinę w Ustawieniach → Przypomnienie. Ubuntu: zainstaluj libnotify-bin; sprawdź '
      f'{M("systemctl --user status worklog-remind.timer")}. Windows: włącz powiadomienia dla „Windows PowerShell” '
      f'(Ustawienia → System → Powiadomienia); błędy agenta są w pliku .agent.log w katalogu kopii.'],
 ], [58, 112], key_column=False)
 
 h('13. Bezpieczeństwo danych')
-p('Żeby wpisy z dnia nie przepadły przed wysłaniem do Jiry, działa pięć zabezpieczeń:')
+p('Żeby wpisy z dnia nie przepadły przed wysłaniem do Jiry, działa sześć zabezpieczeń:')
 table(['Zabezpieczenie', 'Co daje'], [
     ['Autozapis', 'Każda zmiana trafia do bazy ok. 1 s po ostatnim wpisanym znaku oraz przy zamykaniu karty. Status '
      'widać przy przyciskach.'],
@@ -406,6 +416,8 @@ table(['Zabezpieczenie', 'Co daje'], [
     ['Stoper w bazie', 'Czas startu jest zapisany na dysku – przeżywa zamknięcie przeglądarki i restart komputera.'],
     ['Kopie co godzinę', 'W dni robocze 7:55–20:55 do katalogu ~/worklog-backups, z ostatnich 30 dni. Gdy kopia się '
      'nie uda – powiadomienie na pulpicie.'],
+    ['Kopia przed zmianą bazy', 'Gdy nowa wersja zmienia tabele w bazie, kontener przy starcie najpierw robi kopię '
+     '(10 ostatnich, w wolumenie w /data/kopie). Bez udanej kopii nie startuje i niczego nie zmienia.'],
     ['Odporny zapis bazy', 'Nagłe wyłączenie prądu nie psuje wcześniej zapisanych danych; „zapisano” oznacza, że dane '
      'są fizycznie na dysku.'],
 ], [45, 125])
@@ -422,14 +434,16 @@ box('Warto wiedzieć',
     'Usunięcie wiersza (✕) nie dzieje się automatycznie – zatwierdzasz je przyciskiem Zapisz. Przypadkowe '
     'kliknięcie ✕ niczego nie skasuje.',
     f'Przywrócenie kopii: {M("./worklog restore ~/worklog-backups/worklog-RRRRMMDD-GGMM.db")} – przed nadpisaniem '
-    f'narzędzie samo robi kopię obecnego stanu (jeśli ta się nie uda, nic nie zmienia).',
+    f'narzędzie samo robi kopię obecnego stanu (jeśli ta się nie uda, nic nie zmienia). Plik, który nie jest kopią '
+    f'raportu, zostanie odrzucony; starsza kopia działa od razu, bez restartu.',
     'Najlepiej, żeby katalog ~/worklog-backups był objęty Twoją zwykłą kopią zapasową (np. firmową) – wtedy '
     'przetrwa nawet awarię dysku. Kopie nie zawierają tokenu Jiry: po przywróceniu kopii na nowym komputerze '
     'wpisz go ponownie w Ustawieniach.')
 
 h('14. Obsługa i kopia zapasowa')
 table(['Polecenie (w katalogu narzędzia)', 'Działanie'], [
-    [M('./worklog status'), 'czy aplikacja działa'],
+    [M('./worklog up'), 'zbudowanie i uruchomienie nowej wersji (np. po git pull); dane zostają'],
+    [M('./worklog status'), 'czy aplikacja działa i jaka wersja (ta sama jest na dole każdej strony)'],
     [M('./worklog logs'), 'logi na żywo (Ctrl+C kończy)'],
     [M('./worklog restart'), 'ponowne uruchomienie'],
     [M('./worklog backup'), 'kopia bazy do ~/worklog-backup-DATA.db'],

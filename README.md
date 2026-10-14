@@ -134,6 +134,7 @@ W **Ustawieniach → Wygląd** wybierasz motyw: Automatyczny (domyślny – jasn
 Na Windowsie te same polecenia: `.\worklog.cmd status`, `.\worklog.cmd backup` itd.
 
 ```bash
+./worklog up         # zbudowanie i uruchomienie nowej wersji (np. po git pull) – dane zostają
 ./worklog status     # stan kontenera i wersja (ta sama jest w stopce strony, np. „fd55a4a z 14.10.2026”)
 ./worklog logs       # logi na żywo
 ./worklog restart
