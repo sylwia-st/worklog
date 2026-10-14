@@ -29,6 +29,19 @@ final class Template
         return self::DAYS[(int) $date->format('w')];
     }
 
+    /** „dziś”, „jutro”, dalej „piątek 16.10” */
+    public static function relativeDay(\DateTimeInterface $date, \DateTimeInterface $today): string
+    {
+        $days = (int) \DateTimeImmutable::createFromInterface($today)->setTime(0, 0)
+            ->diff(\DateTimeImmutable::createFromInterface($date)->setTime(0, 0))->format('%r%a');
+
+        return match ($days) {
+            0 => 'dziś',
+            1 => 'jutro',
+            default => self::dayName($date).' '.$date->format('d.m'),
+        };
+    }
+
     /** „październik 2026” */
     public static function monthName(\DateTimeInterface $date): string
     {

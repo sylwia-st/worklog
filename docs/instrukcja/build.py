@@ -350,9 +350,13 @@ bullets(
 
 h('10. Przypomnienie')
 p(f'W dni robocze (bez świąt, urlopów i innych dni wolnych) o wybranej godzinie (domyślnie 15:45) pojawia się powiadomienie na pulpicie, jeśli w '
-  f'dzisiejszym raporcie czegoś brakuje (wpisy, Jira, Slack, mail). Gdy wszystko jest zrobione – nic się nie '
+  f'dzisiejszym raporcie czegoś brakuje (wpisy, Jira, Slack, mail) albo czeka niewysłany mail o planowanej zmianie '
+  f'(dziś lub później). Gdy wszystko jest zrobione – nic się nie '
   f'pokazuje. Jeśli komputer był wtedy wyłączony lub uśpiony, przypomnienie pojawi się po jego włączeniu '
   f'(tego samego dnia, do 22:00).')
+p(f'Mail liczy się jako wysłany po kliknięciu {G("Otwórz w programie pocztowym")}. Jeśli poszedł inaczej '
+  f'(np. przez {G("Kopiuj treść")}), kliknij {B("Wysłany")} obok „do wysłania” – inaczej przypomnienie będzie o nim wspominać. '
+  'Niewysłane maile o kolejnych dniach widać też na górze dzisiejszej strony dnia.')
 p(f'Godzinę zmieniasz w {B("Ustawienia → Przypomnienie")} (między 06:00 a 22:00); puste pole wyłącza przypomnienie.')
 cmd('./worklog remind                 # sprawdź teraz w terminalu\n'
     './install.sh --no-remind         # wyłączenie razem z timerem systemd')

@@ -274,6 +274,10 @@ final class DayController extends AbstractController
             'confirmDelete' => $confirmDelete,
             'dayOff' => $this->calendar->dayOff($d),
             'planned' => $this->planned->findForDate($d),
+            // na dzisiejszej stronie: maile o zmianach w kolejnych dniach, które jeszcze czekają (te z dziś są w banerze wyżej)
+            'unsentPlanned' => $d == new \DateTimeImmutable('today')
+                ? $this->planned->findUnsentFrom($d->modify('+1 day'))
+                : [],
             'issueOptions' => $issueOptions,
             'norm' => $this->settings->int('norm_minutes'),
             'lunch' => '' !== $this->settings->get('lunch_from') && '' !== $this->settings->get('lunch_to')

@@ -34,6 +34,21 @@ final class ReminderSchedule
     }
 
     /** Znacznik zapisywany po przypomnieniu: dzień + godzina, dla której je pokazano. */
+    /**
+     * „wyślij mail o planowanej zmianie (jutro: późniejsze przyjście)” – null, gdy nic nie czeka.
+     *
+     * @param \App\Entity\PlannedChange[] $unsent
+     */
+    public static function plannedTodo(array $unsent, \DateTimeImmutable $today): ?string
+    {
+        if ([] === $unsent) {
+            return null;
+        }
+        $items = array_map(static fn ($p) => Template::relativeDay($p->getDate(), $today).': '.mb_strtolower($p->getTypeLabel()), $unsent);
+
+        return (1 === count($unsent) ? 'wyślij mail o planowanej zmianie' : 'wyślij maile o planowanych zmianach').' ('.implode('; ', $items).')';
+    }
+
     public static function stamp(string $remindTime, \DateTimeImmutable $now): string
     {
         return $now->format('Y-m-d').' '.(TimeFormat::normalizeClock($remindTime) ?? '');

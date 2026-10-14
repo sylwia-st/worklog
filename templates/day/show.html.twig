@@ -41,9 +41,18 @@
     <div class="flash warning">
         Zaplanowana zmiana: <strong>{{ p.typeLabel }}</strong>
         {% if p.fromTime %} od {{ p.fromTime }}{% endif %}{% if p.toTime %} do {{ p.toTime }}{% endif %}
-        – <a href="{{ path('planned_show', {id: p.id}) }}">szczegóły</a>
+        – <a href="{{ path('planned_show', {id: p.id}) }}">{{ p.mailDoneAt ? 'szczegóły' : 'mail jeszcze niewysłany – otwórz' }}</a>
     </div>
 {% endfor %}
+{% if unsentPlanned is not empty %}
+    <div class="flash warning">
+        {{ unsentPlanned|length == 1 ? 'Czeka mail o planowanej zmianie:' : 'Czekają maile o planowanych zmianach:' }}
+        {% for p in unsentPlanned %}
+            <a href="{{ path('planned_show', {id: p.id}) }}"><strong>{{ rel_day(p.date) }}</strong> – {{ p.typeLabel|lower }}</a>{{ not loop.last ? ' · ' }}
+        {% endfor %}
+        <span class="muted small">(kliknij, żeby otworzyć mail; wysłany inaczej oznacz tam przyciskiem „Wysłany”)</span>
+    </div>
+{% endif %}
 
 <div class="grid">
 <div>

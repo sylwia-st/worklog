@@ -146,10 +146,13 @@
         setTimeout(() => btn.textContent = old, 1600);
         if (btn.dataset.mark) markDone(btn.dataset.mark, btn.dataset.markLabel);
     });
-    // Kliknięcie linku mailto z data-mark oznacza mail jako wysłany
+    // Kliknięcie linku mailto z data-mark (albo przycisku „Wysłany”) oznacza mail jako wysłany
     document.addEventListener('click', (ev) => {
-        const a = ev.target.closest('a[data-mark]');
-        if (a) markDone(a.dataset.mark, a.dataset.markLabel);
+        const el = ev.target.closest('a[data-mark], button[data-mark]:not([data-copy])');
+        if (!el) return;
+        markDone(el.dataset.mark, el.dataset.markLabel);
+        // po oznaczeniu przycisk „Wysłany” jest zbędny (także gdy oznaczył link do programu pocztowego)
+        document.querySelectorAll('[data-mark-hide]').forEach(b => { if (b.dataset.mark === el.dataset.mark) b.hidden = true; });
     });
     function markDone(url, labelSel) {
         fetch(url, { method: 'POST', credentials: 'same-origin' }).then(() => {

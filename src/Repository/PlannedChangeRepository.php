@@ -27,6 +27,22 @@ class PlannedChangeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Zmiany od $from, których mail nie jest oznaczony jako wysłany – do przypomnienia i banera na stronie dnia.
+     *
+     * @return PlannedChange[]
+     */
+    public function findUnsentFrom(\DateTimeImmutable $from): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.date >= :from')
+            ->andWhere('p.mailDoneAt IS NULL')
+            ->setParameter('from', $from->setTime(0, 0), Types::DATE_IMMUTABLE)
+            ->orderBy('p.date', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return PlannedChange[] */
     public function findPast(\DateTimeImmutable $before, int $limit = 20): array
     {

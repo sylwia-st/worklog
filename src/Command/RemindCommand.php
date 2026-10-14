@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Domain\ReminderSchedule;
 use App\Domain\TimeFormat;
+use App\Repository\PlannedChangeRepository;
 use App\Repository\WorkDayRepository;
 use App\Service\ReportBuilder;
 use App\Service\Settings;
@@ -16,8 +17,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Wypisuje, czego brakuje w dzisiejszym raporcie – albo nic, gdy wszystko jest domknięte (i w dzień wolny:
- * weekend, święto, urlop).
+ * Wypisuje, czego brakuje w dzisiejszym raporcie i czy czeka mail o planowanej zmianie (dziś lub później) – albo nic,
+ * gdy wszystko jest domknięte (i w dzień wolny: weekend, święto, urlop).
  * Kontener nie ma dostępu do pulpitu, więc powiadomienie pokazuje skrypt po stronie hosta (scripts/remind.sh).
  *
  *  --scheduled     wywołanie z timera (co minutę): odpowiada tylko raz dziennie, o godzinie z Ustawień,
@@ -32,6 +33,7 @@ final class RemindCommand extends Command
         private readonly ReportBuilder $reports,
         private readonly Settings $settings,
         private readonly WorkCalendar $calendar,
+        private readonly PlannedChangeRepository $planned,
     ) {
         parent::__construct();
     }
@@ -95,6 +97,10 @@ final class RemindCommand extends Command
             if (null !== $this->reports->presenceMail($day) && null === $day->getMailDoneAt()) {
                 $todo[] = 'wyślij mail o '.('over' === $this->reports->summary($day)->kind() ? 'nadgodzinach' : 'krótszym dniu');
             }
+        }
+
+        if (null !== $mail = ReminderSchedule::plannedTodo($this->planned->findUnsentFrom($today), $today)) {
+            $todo[] = $mail;
         }
 
         if ([] === $todo) {

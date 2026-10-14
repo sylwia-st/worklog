@@ -32,7 +32,9 @@
         <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mark="{{ path('planned_mark', {id: change.id}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
         <button type="button" data-copy="#mail-body">Kopiuj treść</button>
         {% if change.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ change.mailDoneAt|date('d.m H:i') }}</span>
-        {% else %}<span id="mail-status" class="badge warn">do wysłania</span>{% endif %}
+        {% else %}<span id="mail-status" class="badge warn">do wysłania</span>
+            <button type="button" class="link" data-mark="{{ path('planned_mark', {id: change.id}) }}" data-mark-label="#mail-status" data-mark-hide
+                title="Gdy mail poszedł inaczej, np. przez „Kopiuj treść” – przestanie się pojawiać w przypomnieniu">Wysłany</button>{% endif %}
     </div>
 </div>
 

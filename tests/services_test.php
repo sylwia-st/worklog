@@ -434,6 +434,17 @@ namespace {
     check('nazwa miesiąca', App\Domain\Template::monthName(new DateTimeImmutable('2026-10-14')), 'październik 2026');
     $absenceRepo->items = [];
 
+    // --- przypomnienie o niewysłanym mailu o planowanej zmianie ---
+    $rtoday = new DateTimeImmutable('2026-10-14 15:45');
+    check('dzień względny', array_map(static fn (string $d) => App\Domain\Template::relativeDay(new DateTimeImmutable($d), $rtoday), ['2026-10-14', '2026-10-15', '2026-10-16', '2026-10-13']),
+        ['dziś', 'jutro', 'piątek 16.10', 'wtorek 13.10']);
+    check('bez maili do wysłania', App\Domain\ReminderSchedule::plannedTodo([], $rtoday), null);
+    $late = new PlannedChange(new DateTimeImmutable('2026-10-15'), PlannedChange::TYPE_LATE, '10:00', null, '');
+    check('jeden mail', App\Domain\ReminderSchedule::plannedTodo([$late], $rtoday), 'wyślij mail o planowanej zmianie (jutro: późniejsze przyjście)');
+    $early = new PlannedChange(new DateTimeImmutable('2026-10-16'), PlannedChange::TYPE_EARLY, null, '14:00', '');
+    check('dwa maile', App\Domain\ReminderSchedule::plannedTodo([$late, $early], $rtoday),
+        'wyślij maile o planowanych zmianach (jutro: późniejsze przyjście; piątek 16.10: wcześniejsze wyjście)');
+
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);
     check('mail w formie męskiej', str_contains(Settings::defaultsFor('m')['mail_under_body'], 'pracowałem krócej o {roznica}'), true);

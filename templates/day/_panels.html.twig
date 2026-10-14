@@ -57,7 +57,9 @@
         <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
         <button type="button" data-copy="#mail-body">Kopiuj treść</button>
         {% if day.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ day.mailDoneAt|date('H:i') }}</span>
-        {% else %}<span id="mail-status" class="badge warn">do wysłania</span>{% endif %}
+        {% else %}<span id="mail-status" class="badge warn">do wysłania</span>
+            <button type="button" class="link" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status" data-mark-hide
+                title="Gdy mail poszedł inaczej, np. przez „Kopiuj treść” – przestanie się pojawiać w przypomnieniu">Wysłany</button>{% endif %}
     </div>
 </div>
 {% endif %}
