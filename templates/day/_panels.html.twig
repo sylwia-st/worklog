@@ -54,7 +54,7 @@
     </div>
     <pre id="mail-body">{{ mail.body }}</pre>
     <div class="actions">
-        <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
+        <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mailto-short="{{ mail.mailtoUrl(false) }}" data-mail-body="#mail-body" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
         <button type="button" data-copy="#mail-body">Kopiuj treść</button>
         {% if day.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ day.mailDoneAt|date('H:i') }}</span>
         {% else %}<span id="mail-status" class="badge warn">do wysłania</span>

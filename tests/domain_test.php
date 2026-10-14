@@ -95,6 +95,7 @@ check('key none', Template::extractIssueKey('123'), null);
 
 $m = new MailDraft(['a@x.pl', 'b@x.pl'], ['c@x.pl'], 'Nadgodziny – 13.10', "Linia 1\nZażółć & ?");
 check('mailto', $m->mailtoUrl(), 'mailto:a@x.pl,b@x.pl?cc=c@x.pl&subject=Nadgodziny%20%E2%80%93%2013.10&body=Linia%201%0D%0AZa%C5%BC%C3%B3%C5%82%C4%87%20%26%20%3F');
+check('mailto bez treści (długi mail na Windowsie)', $m->mailtoUrl(false), 'mailto:a@x.pl,b@x.pl?cc=c@x.pl&subject=Nadgodziny%20%E2%80%93%2013.10');
 
 // przypomnienie: raz dziennie, o godzinie z Ustawień albo przy pierwszym sprawdzeniu po niej
 $tue = static fn (string $hm) => new DateTimeImmutable('2026-10-13 '.$hm); // wtorek

@@ -138,10 +138,7 @@
     document.addEventListener('click', async (ev) => {
         const btn = ev.target.closest('[data-copy]');
         if (!btn) return;
-        const src = document.querySelector(btn.dataset.copy);
-        const text = src.value ?? src.textContent;
-        try { await navigator.clipboard.writeText(text); }
-        catch { src.select?.(); document.execCommand('copy'); }
+        await copyText(document.querySelector(btn.dataset.copy));
         const old = btn.textContent; btn.textContent = 'Skopiowano ✓';
         setTimeout(() => btn.textContent = old, 1600);
         if (btn.dataset.mark) markDone(btn.dataset.mark, btn.dataset.markLabel);
@@ -154,6 +151,35 @@
         // po oznaczeniu przycisk „Wysłany” jest zbędny (także gdy oznaczył link do programu pocztowego)
         document.querySelectorAll('[data-mark-hide]').forEach(b => { if (b.dataset.mark === el.dataset.mark) b.hidden = true; });
     });
+    // Windows przekazuje link mailto: programowi pocztowemu z limitem długości – przy ok. 2000 znaków (polska litera
+    // to 6 znaków linku) Outlook i inne programy obcinają treść albo w ogóle się nie otwierają. Dłuższy mail otwieramy
+    // bez treści, a treść trafia do schowka.
+    const MAILTO_MAX = 2000;
+    document.addEventListener('click', (ev) => {
+        const a = ev.target.closest('a[data-mailto-short]');
+        if (!a || a.href.length <= MAILTO_MAX || !/Windows/.test(navigator.userAgent)) return;
+        const full = a.href, src = document.querySelector(a.dataset.mailBody);
+        copyText(src);
+        a.href = a.dataset.mailtoShort; // przeglądarka otworzy krótki link (domyślna akcja kliknięcia)
+        setTimeout(() => { a.href = full; }, 0);
+        let note = a.closest('.actions').parentNode.querySelector('.mail-long');
+        if (!note) {
+            note = document.createElement('p');
+            note.className = 'flash warning small mail-long';
+            a.closest('.actions').after(note);
+        }
+        note.textContent = 'Mail jest za długi, żeby Windows przekazał go programowi pocztowemu w całości – otworzy się '
+            + 'z adresatami i tematem, a treść jest w schowku: wklej ją w mailu (Ctrl+V).';
+    });
+    async function copyText(src) {
+        try { await navigator.clipboard.writeText(src.value ?? src.textContent); }
+        catch {
+            // bez Clipboard API – zaznaczenie i stare „kopiuj”
+            if (src.select) src.select();
+            else { const r = document.createRange(); r.selectNodeContents(src); getSelection().removeAllRanges(); getSelection().addRange(r); }
+            document.execCommand('copy');
+        }
+    }
     function markDone(url, labelSel) {
         fetch(url, { method: 'POST', credentials: 'same-origin' }).then(() => {
             if (labelSel) document.querySelectorAll(labelSel).forEach(el => { el.textContent = '✓ oznaczono jako wysłane'; el.className = 'badge ok'; });

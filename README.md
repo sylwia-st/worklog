@@ -86,6 +86,7 @@ W menu Start pojawia się skrót „Raport czasu”. Polecenia `./worklog …` w
 - **VPN:** opcja `--vpn` nie jest potrzebna – Docker Desktop wysyła ruch kontenera przez Windows, więc także przez VPN i firmowy DNS.
 - **Skrypty zablokowane:** `install.cmd` i `worklog.cmd` uruchamiają PowerShella z `-ExecutionPolicy Bypass`. Jeśli zasady firmy (GPO) mimo to blokują skrypty, potrzebna jest zgoda działu IT.
 - **Brak powiadomień:** Ustawienia → System → Powiadomienia → włącz dla „Windows PowerShell” (tryb „Nie przeszkadzać” je wycisza). Błędy agenta, np. nieudane kopie, trafiają też do pliku `.agent.log` w katalogu kopii.
+- **Długi mail:** Windows przekazuje programowi pocztowemu najwyżej ok. 2000 znaków linku. Dłuższy mail (np. długa lista ticketów) otwiera się z adresatami i tematem, a treść aplikacja kopiuje do schowka – wklej ją Ctrl+V.
 
 ## Jira – token
 

@@ -280,6 +280,33 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     await sleep(100);
     check('bez ✕ zapis bez pytania', w12.submits.map(s => [s.action, s.confirm_delete]), [['sync', undefined]]);
 
+    // 13. długi mail na Windowsie: link bez treści, treść w schowku, podpowiedź; krótki albo na Linuksie – bez zmian
+    const mailCase = async (ua, bodyLen) => {
+        const w = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+        Object.defineProperty(w.navigator, 'userAgent', {value: ua, configurable: true});
+        Object.defineProperty(w.navigator, 'clipboard', {value: {writeText: async (t) => { w.copied = t; }}, configurable: true});
+        const body = 'Zażółć gęślą jaźń. '.repeat(bodyLen);
+        w.document.getElementById('panels').innerHTML = `<div class="panel"><pre id="mail-body">${body}</pre><div class="actions">
+            <a id="mailto" href="mailto:szef@firma.pl?subject=Nadgodziny&body=${encodeURIComponent(body)}" data-mailto-short="mailto:szef@firma.pl?subject=Nadgodziny"
+               data-mail-body="#mail-body" data-mark="/day/2026-10-20/mark/mail">Otwórz</a></div></div>`;
+        const a = w.document.getElementById('mailto');
+        let opened = null;
+        // nasłuch na window – po obsłudze kliknięcia przez stronę; zapamiętuje, co przeglądarka by otworzyła
+        w.addEventListener('click', (ev) => { opened = a.href; ev.preventDefault(); });
+        a.click();
+        await sleep(20);
+        return {opened, copied: w.copied ?? null, note: !!w.document.querySelector('.mail-long'), hrefAfter: a.href.length > 100,
+            marked: w.calls.some(c => c.url === '/day/2026-10-20/mark/mail')};
+    };
+    const WIN = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130', LINUX = 'Mozilla/5.0 (X11; Linux x86_64) Firefox/131';
+    const longWin = await mailCase(WIN, 30);
+    check('długi mail na Windowsie', [longWin.opened, longWin.copied?.length, longWin.note, longWin.hrefAfter, longWin.marked],
+        ['mailto:szef@firma.pl?subject=Nadgodziny', 'Zażółć gęślą jaźń. '.length * 30, true, true, true]);
+    const longLinux = await mailCase(LINUX, 30);
+    check('długi mail na Linuksie bez zmian', [longLinux.opened.length > 2000, longLinux.copied, longLinux.note], [true, null, false]);
+    const shortWin = await mailCase(WIN, 3);
+    check('krótki mail na Windowsie bez zmian', [shortWin.opened.includes('body='), shortWin.copied, shortWin.note], [true, null, false]);
+
     console.log(fails ? `\n${fails} błędów` : 'OK – wszystkie testy przeglądarkowe przeszły');
     process.exit(fails ? 1 : 0);
 })();
