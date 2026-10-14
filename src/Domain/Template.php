@@ -5,6 +5,7 @@ namespace App\Domain;
 final class Template
 {
     private const DAYS = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+    private const MONTHS_OF = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
     private const MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 
     /**
@@ -40,6 +41,14 @@ final class Template
             1 => 'jutro',
             default => self::dayName($date).' '.$date->format('d.m'),
         };
+    }
+
+    /** „14 października”, z rokiem, gdy inny niż bieżący: „30 grudnia 2025” */
+    public static function longDate(\DateTimeInterface $date, \DateTimeInterface $today): string
+    {
+        $out = $date->format('j').' '.self::MONTHS_OF[(int) $date->format('n') - 1];
+
+        return $date->format('Y') === $today->format('Y') ? $out : $out.' '.$date->format('Y');
     }
 
     /** „październik 2026” */

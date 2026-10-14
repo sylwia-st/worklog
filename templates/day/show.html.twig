@@ -3,15 +3,18 @@
 {% block title %}{{ date|date('d.m.Y') }} – Raport czasu{% endblock %}
 
 {% block body %}
-<div class="daynav">
-    <a class="btn" href="{{ path('day', {date: prev|date('Y-m-d')}) }}">← {{ prev|date('d.m') }}</a>
-    <input type="date" value="{{ date|date('Y-m-d') }}" onchange="location.href='{{ path('day', {date: '0000-00-00'})|replace({'0000-00-00': ''}) }}' + this.value">
-    <a class="btn" href="{{ path('day', {date: next|date('Y-m-d')}) }}">{{ next|date('d.m') }} →</a>
-    {% if date != today %}<a href="{{ path('today') }}">dzisiaj</a>{% endif %}
+<div class="dayhead">
+    <div>
+        <div class="daynav">
+            <a class="btn iconbtn" href="{{ path('day', {date: prev|date('Y-m-d')}) }}" title="{{ prev|pl_day|capitalize }} {{ prev|date('d.m') }}" aria-label="Poprzedni dzień"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></a>
+            <input type="date" value="{{ date|date('Y-m-d') }}" aria-label="Wybierz dzień" onchange="location.href='{{ path('day', {date: '0000-00-00'})|replace({'0000-00-00': ''}) }}' + this.value">
+            <a class="btn iconbtn" href="{{ path('day', {date: next|date('Y-m-d')}) }}" title="{{ next|pl_day|capitalize }} {{ next|date('d.m') }}" aria-label="Następny dzień"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></a>
+            {% if date == today %}<span class="pill-today">dziś</span>{% else %}<a class="pill-today" href="{{ path('today') }}">wróć do dziś</a>{% endif %}
+        </div>
+        <h1>{{ date|pl_day|capitalize }} <span class="soft">{{ date|pl_date }}</span></h1>
+    </div>
+    {{ include('day/_closing.html.twig') }}
 </div>
-
-<h1>{{ date|pl_day|capitalize }}, {{ date|date('d.m.Y') }}</h1>
-<p class="sub">Zmiany zapisują się same. Kropki przy wpisach pokazują stan w Jirze.</p>
 
 {% if dayOff and dayOff.kind != 'weekend' %}
     <div class="flash info">
@@ -21,7 +24,7 @@
     </div>
 {% elseif not dayOff and form.rows is empty %}
     {# jeden klik: ten dzień jako urlop / L4 / wolne – wraca tutaj #}
-    <form method="post" action="{{ path('absence_add') }}" class="muted small" style="margin:-12px 0 16px">
+    <form method="post" action="{{ path('absence_add') }}" class="muted small" style="margin:0 0 16px">
         <input type="hidden" name="from" value="{{ date|date('Y-m-d') }}">
         <input type="hidden" name="back" value="{{ path('day', {date: date|date('Y-m-d')}) }}">
         Nie pracujesz tego dnia? Oznacz go jako
@@ -54,48 +57,49 @@
     </div>
 {% endif %}
 
+{{ include('day/_axis.html.twig') }}
+
 <div class="grid">
 <div>
-    <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel" id="dayform">
-        <h2>Godziny w pracy</h2>
-        <div class="row">
-            <div><label for="start">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
-            <div><label for="end">Do</label><input type="time" id="end" name="end" value="{{ form.end }}"></div>
-            <div><label for="break" id="break-label">{{ lunch and form.lunchWorked ? 'Przerwa wzięta (łącznie)' : 'Dodatkowa przerwa' }}</label><input type="text" id="break" name="break" value="{{ form.break }}" placeholder="np. 30m · 20m + 40m · 13:30-13:50, 15:00-15:40"></div>
+    <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel dayform" id="dayform">
+        <div class="hours">
+            <div class="hfield"><label for="start" class="lbl">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
+            <div class="hfield"><label for="end" class="lbl">Do</label><input type="time" id="end" name="end" value="{{ form.end }}"></div>
+            <div class="hfield wide"><label for="break" id="break-label" class="lbl">{{ lunch and form.lunchWorked ? 'Przerwa wzięta (łącznie)' : 'Dodatkowa przerwa' }}</label><input type="text" id="break" name="break" value="{{ form.break }}" placeholder="np. 30m · 20m + 40m · 13:30-13:50"></div>
         </div>
         {% if lunch %}
             {% set helpOn = 'Obiad nie jest odliczany automatycznie. W „Przerwa wzięta” wpisz, ile przerwy faktycznie ' ~ forma('wzięłaś', 'wziąłeś', 'było') ~ ' – samym czasem (20m + 40m) albo godzinami (13:30-13:50, 15:00-15:40). ' ~ forma('Jeśli nie wzięłaś wcale', 'Jeśli nie wziąłeś wcale', 'Jeśli nie było jej wcale') ~ ' – wpisz 0.' %}
             {% set helpOff = 'Przerwa ' ~ lunch ~ ' odlicza się sama (' ~ forma('jeśli byłaś wtedy w pracy', 'jeśli byłeś wtedy w pracy', 'jeśli wypada w godzinach pracy') ~ '). „Dodatkowa przerwa” – tylko gdy była jeszcze jakaś inna.' %}
-            <label style="display:flex; gap:8px; align-items:flex-start; margin:10px 0 0; color:var(--ink); font-size:14px">
+            <label class="lunchchk">
                 <input type="checkbox" id="lunch_worked" name="lunch_worked" value="1" {{ form.lunchWorked ? 'checked' }} data-lunch="{{ lunchLength }}" data-help-on="{{ helpOn }}" data-help-off="{{ helpOff }}" style="margin-top:4px">
                 <span>{{ forma('Pracowałam', 'Pracowałem', 'Praca') }} w przerwie obiadowej {{ lunch }} (awaria / pilna sprawa)</span>
             </label>
-            <p class="muted small" id="lunch-help" style="margin:4px 0 0 24px">
+            <p class="muted small" id="lunch-help">
                 {{ form.lunchWorked ? helpOn : helpOff }}
             </p>
         {% endif %}
 
-        <h2 style="margin-top:22px">Czas w ticketach</h2>
+        <div class="panel-h entries-h"><h2>Czas w ticketach</h2></div>
         <table class="entries">
-            <thead><tr><th></th><th>Ticket</th><th title="Stoper">⏱</th><th>Czas</th><th>Opis (komentarz w Jirze i na Slacku)</th><th title="Zaznacz i kliknij Zapisz, żeby usunąć">✕</th></tr></thead>
+            <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th>Opis – komentarz w Jirze i na Slacku</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
             <tbody id="rows">
             {% for row in form.rows %}
-                {{ _self.entry_row(loop.index0, row) }}
+                {{ _self.entry_row(loop.index0, row, issueOptions) }}
             {% endfor %}
             </tbody>
         </table>
-        <div id="startat" class="flash" hidden style="margin-top:8px">
+        <div id="startat" class="flash info" hidden style="margin-top:8px">
             <label for="startat-time" style="display:inline; color:inherit">Stoper dla <b id="startat-issue"></b> od godziny</label>
             <input type="time" id="startat-time">
             <button type="button" id="startat-go" class="primary">Włącz od tej godziny</button>
             <button type="button" id="startat-cancel">Anuluj</button>
         </div>
-        <div class="actions" style="margin-top:8px">
-            <button type="button" id="addrow">+ Dodaj wiersz</button>
+        <div class="addrow">
+            <button type="button" id="addrow" class="link"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 2v10M2 7h10"/></svg>Dodaj wpis</button>
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
             {% endif %}
-            <span class="muted small">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper</span>
+            <span class="hint">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper</span>
         </div>
 
         {% if pendingDeletions is not empty %}
@@ -105,10 +109,16 @@
             </div>
         {% endif %}
 
-        <div class="actions">
-            <button type="submit" name="action" value="save">Zapisz</button>
-            <button type="submit" name="action" value="sync" class="primary">Zapisz i wyślij do Jiry</button>
+        <p class="legend">
+            <span><i class="dot synced"></i>w Jirze</span><span><i class="dot changed"></i>zmieniony – wyślij ponownie</span>
+            <span><i class="dot new"></i>nowy</span><span><i class="dot error"></i>błąd</span>
+            <span>Usunięcie (✕) trzeba potwierdzić po kliknięciu „Zapisz”.</span>
+        </p>
+
+        <div class="savebar">
             <span id="savestate" class="badge" aria-live="polite">{{ day ? 'zapisane' : 'nic jeszcze nie zapisano' }}</span>
+            <button type="submit" name="action" value="save">Zapisz</button>
+            <button type="submit" name="action" value="sync" class="primary" id="syncbtn">Zapisz i wyślij do Jiry</button>
         </div>
         {# Za przyciskami „Zapisz” – żeby Enter w polu (domyślny przycisk formularza) nigdy nie potwierdzał usunięcia. #}
         <div id="delconfirm" class="flash warning" {{ confirmDelete ? '' : 'hidden' }} style="margin-top:12px">
@@ -119,11 +129,6 @@
             <button type="submit" name="confirm_delete" value="{{ confirmDelete ? confirmDelete.action : 'save' }}" id="delconfirm-go" class="danger">Usuń zaznaczone</button>
             <button type="button" id="delconfirm-cancel">Anuluj</button>
         </div>
-        <p class="muted small" style="margin:10px 0 0">
-            <span class="dot synced"></span> w Jirze &nbsp; <span class="dot changed"></span> zmieniony &nbsp;
-            <span class="dot new"></span> nowy &nbsp; <span class="dot error"></span> błąd.
-            Usunięcie wiersza (✕) trzeba potwierdzić – aplikacja zapyta o to po kliknięciu „Zapisz”.
-        </p>
     </form>
 </div>
 
@@ -136,30 +141,36 @@
     {% for key, title in issueOptions %}<option value="{{ key }}">{{ key }}{{ title ? ' – ' ~ title }}</option>{% endfor %}
 </datalist>
 
-<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', time: '', desc: '', status: null, error: null}) }}</template>
+<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
 {% endblock %}
 
-{% macro entry_row(i, row) %}
+{% macro entry_row(i, row, titles) %}
     <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}{{ row.delete|default(false) ? ' marked-delete' }}" data-key="{{ i }}">
         <td class="st">
-            {% set titles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
-            <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? titles[row.status] : '' }}"></span>
+            {% set stTitles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
+            <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? stTitles[row.status] : '' }}"></span>
         </td>
         <td class="issue">
             <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
             <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
-            <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue">
+            <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue" aria-label="Ticket">
+            <small class="ititle">{{ titles[row.issue]|default('') }}</small>
         </td>
-        <td class="tm"><button type="button" class="tbtn" title="Włącz stoper">▶</button><button type="button" class="tfrom" title="Włącz stoper od wcześniejszej godziny">od…</button></td>
-        <td class="time">
-            <input type="text" name="entries[{{ i }}][time]" value="{{ row.time }}" placeholder="1h 30m" class="f-time">
-            <div class="live small"></div>
-        </td>
-        <td>
-            <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc">{{ row.desc }}</textarea>
+        <td class="desc">
+            <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc" aria-label="Opis">{{ row.desc }}</textarea>
             <div class="rowerr">{% if row.error %}{{ row.status == 'error' ? 'Jira: ' }}{{ row.error }}{% endif %}</div>
         </td>
-        <td class="del"><input type="checkbox" name="entries[{{ i }}][delete]" value="1" class="f-del" {{ row.delete|default(false) ? 'checked' }} title="Usuń wpis{{ row.status ? ' (także z Jiry)' }} – po kliknięciu Zapisz aplikacja poprosi o potwierdzenie"></td>
+        <td class="time">
+            <input type="text" name="entries[{{ i }}][time]" value="{{ row.time }}" placeholder="1h 30m" class="f-time" aria-label="Czas">
+            <div class="live"></div>
+        </td>
+        <td class="tm"><button type="button" class="tbtn" title="Włącz stoper">▶</button><button type="button" class="tfrom" title="Włącz stoper od wcześniejszej godziny">od…</button></td>
+        <td class="del">
+            <label class="delbox" title="Usuń wpis{{ row.status ? ' (także z Jiry)' }} – po kliknięciu Zapisz aplikacja poprosi o potwierdzenie">
+                <input type="checkbox" name="entries[{{ i }}][delete]" value="1" class="f-del" {{ row.delete|default(false) ? 'checked' }} aria-label="Usuń wpis">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m3.5 3.5 7 7m0-7-7 7"/></svg>
+            </label>
+        </td>
     </tr>
 {% endmacro %}
 
@@ -275,7 +286,14 @@
     async function refreshPanels() {
         try {
             const res = await fetch(PANELS_URL, {credentials: 'same-origin'});
-            if (res.ok) document.getElementById('panels').innerHTML = await res.text();
+            if (!res.ok) return;
+            const t = document.createElement('template');
+            t.innerHTML = await res.text();
+            for (const part of t.content.querySelectorAll('[data-part]')) {
+                const old = document.getElementById(part.id);
+                if (old) old.replaceWith(part); else part.remove();
+            }
+            document.getElementById('panels').replaceChildren(t.content);
         } catch (e) {}
     }
 
@@ -430,6 +448,14 @@
         const s = ev.detail; if (!s.running || s.date !== DATE) return;
         const tr = rowById(s.entryId);
         if (tr) tr.querySelector('.live').textContent = '⏱ ' + clock(s.baseSeconds + s.elapsedNow);
+    });
+
+    // ---------- tytuł ticketu pod numerem (z podpowiedzi: pamięć tytułów z Jiry) ----------
+    const titles = Object.fromEntries([...document.querySelectorAll('#issues option')].map(o => [o.value, o.textContent.split(' – ').slice(1).join(' – ')]));
+    rows.addEventListener('input', (ev) => {
+        if (!ev.target.classList.contains('f-issue')) return;
+        const box = ev.target.closest('tr').querySelector('.ititle');
+        if (box) box.textContent = titles[ev.target.value.trim().toUpperCase()] || '';
     });
 
     // ---------- przerwa obiadowa ----------

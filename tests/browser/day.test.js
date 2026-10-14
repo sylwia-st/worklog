@@ -62,7 +62,7 @@ function page(rows, storage) {
             }
             json = {ok: true, savedAt: '10:00:00', ids, minutes, statuses: {}, rowErrors: {}, dayErrors: []};
         } else if (url.includes('panels')) {
-            return {ok: true, text: async () => '<p>panels</p>'};
+            return {ok: true, text: async () => w.panelsHtml || '<p>panels</p>'};
         } else if (url.includes('/timer/start')) {
             w.timer = {running: true, entryId: body.entryId, issue: 'ABC-1', date: '2026-10-20', baseSeconds: 3600, elapsedSeconds: 0, stale: null, startedAt: 'x', startedLabel: body.at ? '20.10 ' + body.at.slice(11) : '20.10 12:00'};
             json = w.timer;
@@ -279,6 +279,18 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     d12.getElementById('dayform').requestSubmit(d12.getElementById('syncbtn'));
     await sleep(100);
     check('bez ✕ zapis bez pytania', w12.submits.map(s => [s.action, s.confirm_delete]), [['sync', undefined]]);
+
+    // 13a. po autozapisie pasek domknięcia i oś dnia podmieniają się po id, reszta trafia do prawej kolumny
+    const w13 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    w13.document.body.insertAdjacentHTML('afterbegin', '<nav id="dayclosing" data-part>stary pasek</nav><section id="dayaxis" data-part>stara oś</section>');
+    w13.panelsHtml = '<nav id="dayclosing" data-part>Jira: wysłano 1 z 1</nav><section id="dayaxis" data-part>nowa oś</section><div id="nieznana" data-part>x</div><p>Bilans +1h</p>';
+    await sleep(30);
+    const f13 = w13.document.querySelector('[data-key="0"] .f-time');
+    f13.value = '2h'; fire(w13, f13, 'input');
+    await sleep(1100);
+    check('odświeżenie części dnia', [w13.document.getElementById('dayclosing').textContent, w13.document.getElementById('dayaxis').textContent,
+        w13.document.getElementById('panels').textContent, w13.document.querySelectorAll('#dayclosing').length, !!w13.document.getElementById('nieznana')],
+        ['Jira: wysłano 1 z 1', 'nowa oś', 'Bilans +1h', 1, false]);
 
     // 13. długi mail na Windowsie: link bez treści, treść w schowku, podpowiedź; krótki albo na Linuksie – bez zmian
     const mailCase = async (ua, bodyLen) => {

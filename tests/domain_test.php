@@ -8,6 +8,7 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+use App\Domain\DayAxis;
 use App\Domain\DaySummary;
 use App\Domain\Holidays;
 use App\Domain\MailDraft;
@@ -166,6 +167,20 @@ check('css własny: kolory z ustawień, reszta z jasnego', [str_contains($own, '
 check('własny: śmieci zamiast koloru → jasny', Theme::custom((string) json_encode(['bg' => 'red; } body { display:none', 'line' => '#12345'])), Theme::palettes()['light']);
 check('własny: pusty zapis → jasny', Theme::custom(''), Theme::palettes()['light']);
 check('kolor: format', [Theme::isColor('#a1B2c3'), Theme::isColor('#123'), Theme::isColor('#12345g'), Theme::isColor('a1b2c3')], [true, false, false, false]);
+
+// --- oś dnia ---
+$ax = DayAxis::build('08:00', '16:30', [[720, 780]], [['ABC-1', 150], ['ABC-2', 60], ['OPS-8', 45], ['ABC-3', 165]], 420, 450);
+check('oś: godziny w pracy', $ax['track']['presence'], ['left' => 10.0, 'width' => 85.0, 'label' => '7h 30m']);
+check('oś: obiad', $ax['track']['breaks'], [['left' => 50.0, 'width' => 10.0, 'label' => '12:00–13:00']]);
+check('oś: podziałka co 2h od 7:00', array_column($ax['track']['ticks'], 'label'), ['7:00', '9:00', '11:00', '13:00', '15:00']);
+check('oś: skala ticketów do pełnej godziny', $ax['stack']['scale'], 480);
+check('oś: tickety', array_column($ax['stack']['segments'], 'width'), [31.25, 12.5, 9.38, 34.38]);
+check('oś: norma i obecność', $ax['stack']['markers'], [['left' => 87.5, 'label' => 'norma 7h', 'kind' => 'norm'], ['left' => 93.75, 'label' => 'obecność 7h 30m', 'kind' => 'presence']]);
+check('oś: bez godzin – tylko tickety', [DayAxis::build(null, null, [], [['A-1', 60]], 420, null)['track'], count(DayAxis::build(null, null, [], [['A-1', 60]], 420, null)['stack']['markers'])], [null, 1]);
+check('oś: praca po północy bez paska zegara', DayAxis::build('22:00', '06:00', [], [], 420, 480)['track'], null);
+check('oś: przerwa poza godzinami pracy pominięta', DayAxis::build('13:30', '17:00', [[720, 780]], [], 420, 210)['track']['breaks'], []);
+check('data długa', [Template::longDate(new DateTimeImmutable('2026-10-14'), new DateTimeImmutable('2026-10-14')), Template::longDate(new DateTimeImmutable('2025-12-30'), new DateTimeImmutable('2026-01-02'))],
+    ['14 października', '30 grudnia 2025']);
 
 echo $fail ? "\n$fail błędów\n" : "OK – wszystkie testy przeszły\n";
 exit($fail ? 1 : 0);

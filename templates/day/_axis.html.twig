@@ -1,0 +1,30 @@
+{# Oś dnia (App\Domain\DayAxis): godziny w pracy na skali zegara i czas w ticketach względem normy. Odświeżana po autozapisie. #}
+{% set t = axis.track %}
+{% set st = axis.stack %}
+<section id="dayaxis" data-part class="panel axis" aria-label="Oś dnia" {{ t is null and st.segments is empty ? 'hidden' }}>
+    {% if t %}
+        <div class="axis-row">
+            <span class="lbl">W pracy</span>
+            <div>
+                <div class="track">
+                    <div class="inwork" style="left:{{ t.presence.left }}%; width:{{ t.presence.width }}%"><span>{{ t.presence.label }}</span></div>
+                    {% for b in t.breaks %}<div class="brk" style="left:{{ b.left }}%; width:{{ b.width }}%" title="Przerwa {{ b.label }}"></div>{% endfor %}
+                </div>
+                <div class="ticks" aria-hidden="true">
+                    {% for k in t.ticks %}<span style="left:{{ k.left }}%">{{ k.label }}</span>{% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    {% if st.segments is not empty %}
+        <div class="axis-row">
+            <span class="lbl">W ticketach</span>
+            <div class="stack">
+                {% for s in st.segments %}
+                    <div class="seg c{{ loop.index0 % 4 }}" style="width:{{ s.width }}%" title="{{ s.key }} – {{ s.minutes|hm }}">{{ s.width >= 16 ? s.key ~ ' · ' ~ s.minutes|hm : (s.width >= 8 ? s.key) }}</div>
+                {% endfor %}
+                {% for m in st.markers %}<div class="marker {{ m.kind }}{{ m.left > 75 ? ' end' }}" style="left:{{ m.left }}%"><span>{{ m.label }}</span></div>{% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</section>

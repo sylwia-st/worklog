@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Domain\DayAxis;
 use App\Domain\Template;
 use App\Domain\TimeFormat;
 use App\Entity\PlannedChange;
@@ -163,7 +164,7 @@ final class DayController extends AbstractController
         $d = $this->parseDate($date);
         $day = $this->days->findByDate($d);
 
-        return $this->render('day/_panels.html.twig', $this->panelVars($d, $day));
+        return $this->render('day/_live.html.twig', $this->panelVars($d, $day));
     }
 
     /**
@@ -244,13 +245,47 @@ final class DayController extends AbstractController
     private function panelVars(\DateTimeImmutable $d, ?WorkDay $day): array
     {
         $hasEntries = null !== $day && [] !== $day->getActiveEntries();
+        $summary = null !== $day ? $this->reports->summary($day) : null;
+        $mail = null !== $day ? $this->reports->presenceMail($day) : null;
+
+        // pasek domknięcia dnia: wpisy → Jira → Slack → mail
+        $tickets = [];
+        $count = 0;
+        foreach ($hasEntries ? $day->getActiveEntries() : [] as $e) {
+            if ($e->getMinutes() > 0) {
+                ++$count;
+                $tickets[$e->getIssueKey()] = ($tickets[$e->getIssueKey()] ?? 0) + $e->getMinutes();
+            }
+        }
+        $sendable = array_filter($hasEntries ? $this->sync->statuses($day) : [], static fn (string $s) => WorklogSync::STATUS_EMPTY !== $s);
+        $closing = [
+            'entries' => $count,
+            'logged' => $summary?->loggedMinutes ?? 0,
+            'jiraTotal' => count($sendable),
+            'jiraSynced' => count(array_filter($sendable, static fn (string $s) => WorklogSync::STATUS_SYNCED === $s)),
+            'jiraErrors' => count(array_filter($sendable, static fn (string $s) => WorklogSync::STATUS_ERROR === $s)),
+            'jiraDone' => $hasEntries && $this->sync->isFullySynced($day),
+        ];
+
+        // oś dnia: obiad (jeśli nie przepracowany) i przerwy podane godzinami
+        $breaks = $day?->getBreakRanges() ?? [];
+        $lf = TimeFormat::clockToMinutes($this->settings->get('lunch_from') ?: '');
+        $lt = TimeFormat::clockToMinutes($this->settings->get('lunch_to') ?: '');
+        if (null !== $lf && null !== $lt && $lt > $lf && !($day?->hasWorkedThroughFixedBreak() ?? false)) {
+            $breaks[] = [$lf, $lt];
+        }
+        $axis = DayAxis::build($day?->getStartTime(), $day?->getEndTime(), $breaks,
+            array_map(null, array_keys($tickets), array_values($tickets)),
+            $summary?->normMinutes ?? $this->settings->int('norm_minutes'), $summary?->presenceMinutes);
 
         return [
             'date' => $d,
             'day' => $day,
-            'summary' => null !== $day ? $this->reports->summary($day) : null,
+            'summary' => $summary,
             'slack' => $hasEntries ? $this->reports->slackText($day) : null,
-            'mail' => null !== $day ? $this->reports->presenceMail($day) : null,
+            'mail' => $mail,
+            'closing' => $closing,
+            'axis' => $axis,
         ];
     }
 

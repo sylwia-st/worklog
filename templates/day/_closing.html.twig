@@ -1,0 +1,35 @@
+{# Pasek domknięcia dnia: wpisy → Jira → Slack → mail. Odświeżany po autozapisie razem z panelami (data-part). #}
+{% set c = closing %}
+<nav id="dayclosing" data-part class="closing" aria-label="Domknięcie dnia">
+    {% if c.entries > 0 %}
+        <a class="step done" href="#dayform"><span class="ic">✓</span><span>Wpisy<small>{{ plural(c.entries, 'wpis', 'wpisy', 'wpisów') }} · {{ c.logged|hm }}</small></span></a>
+    {% else %}
+        <a class="step todo" href="#dayform"><span class="ic">1</span><span>Wpisy<small>wpisz czas w tickety</small></span></a>
+    {% endif %}
+
+    {% if c.entries == 0 %}
+        <span class="step idle"><span class="ic">2</span><span>Jira<small>po wpisach</small></span></span>
+    {% elseif c.jiraDone %}
+        <a class="step done" href="#dayform"><span class="ic">✓</span><span>Jira<small>wysłane</small></span></a>
+    {% elseif c.jiraErrors > 0 %}
+        <a class="step err" href="#dayform"><span class="ic">!</span><span>Jira<small>{{ plural(c.jiraErrors, 'błąd', 'błędy', 'błędów') }} – zobacz wiersze</small></span></a>
+    {% else %}
+        <a class="step todo" href="#syncbtn"><span class="ic">2</span><span>Jira<small>{{ c.jiraSynced ? 'wysłano ' ~ c.jiraSynced ~ ' z ' ~ c.jiraTotal : 'do wysłania' }}</small></span></a>
+    {% endif %}
+
+    {% if not slack %}
+        <span class="step idle"><span class="ic">3</span><span>Slack<small>po wpisach</small></span></span>
+    {% elseif day.slackDoneAt %}
+        <a class="step done" href="#slack-panel"><span class="ic">✓</span><span>Slack<small>skopiowano {{ day.slackDoneAt|date('H:i') }}</small></span></a>
+    {% else %}
+        <a class="step todo" href="#slack-panel"><span class="ic">3</span><span>Slack<small>do skopiowania</small></span></a>
+    {% endif %}
+
+    {% if not mail %}
+        <span class="step idle"><span class="ic">–</span><span>Mail<small>{{ summary and summary.kind == 'ok' ? 'niepotrzebny – w normie' : 'gdy bilans poza normą' }}</small></span></span>
+    {% elseif day.mailDoneAt %}
+        <a class="step done" href="#mail-panel"><span class="ic">✓</span><span>Mail<small>wysłany</small></span></a>
+    {% else %}
+        <a class="step todo" href="#mail-panel"><span class="ic">4</span><span>Mail<small>{{ summary.kind == 'over' ? 'nadgodziny' : 'krótszy dzień' }} – do wysłania</small></span></a>
+    {% endif %}
+</nav>

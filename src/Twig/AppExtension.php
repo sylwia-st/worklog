@@ -22,6 +22,8 @@ final class AppExtension extends AbstractExtension
             new TwigFilter('hm', static fn (?int $m) => null === $m ? '—' : TimeFormat::format($m)),
             new TwigFilter('signed_hm', static fn (int $m) => ($m > 0 ? '+' : '').TimeFormat::format($m)),
             new TwigFilter('pl_day', static fn (\DateTimeInterface $d) => Template::dayName($d)),
+            // „14 października” (rok tylko, gdy inny niż bieżący)
+            new TwigFilter('pl_date', static fn (\DateTimeInterface $d) => Template::longDate($d, new \DateTimeImmutable('today'))),
         ];
     }
 
