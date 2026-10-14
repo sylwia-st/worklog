@@ -10,7 +10,12 @@ APP_SECRET="$(cat /data/.app_secret)"
 export APP_SECRET
 
 # Tworzy/aktualizuje schemat bazy. Uwaga: Doctrine ORM 3 synchronizuje schemat w pełni – kolumna lub tabela
-# usunięta/przemianowana w encjach zostanie skasowana razem z danymi. Przy takich zmianach najpierw ./worklog backup.
+# usunięta/przemianowana w encjach zostanie skasowana razem z danymi. Dlatego gdy coś się zmieni, najpierw kopia
+# do /data/kopie (10 ostatnich); jeśli się nie uda, kontener nie startuje, a baza zostaje nietknięta.
+if ! php bin/console app:db schema-backup /data/kopie; then
+    echo "Kopia przed zmianą struktury bazy się nie udała – przerywam start, baza nie została zmieniona." >&2
+    exit 1
+fi
 php bin/console doctrine:schema:update --force --no-interaction --quiet
 
 if [ "$#" -gt 0 ]; then

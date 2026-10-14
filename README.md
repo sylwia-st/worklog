@@ -24,6 +24,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 - **Kopia w przeglądarce** – gdy zapis do bazy się nie uda, zmiany zostają w przeglądarce i po ponownym otwarciu dnia można je przywrócić.
 - **Stoper w bazie** – czas startu jest na dysku, więc przeżywa zamknięcie przeglądarki i restart; stoper działający od innego dnia lub > 6h pyta, o której go zatrzymać.
 - **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
+- **Kopia przed zmianą struktury bazy** – gdy nowa wersja zmienia tabele (start po `./worklog up`), kontener najpierw robi kopię do `/data/kopie` w wolumenie (10 ostatnich); bez udanej kopii nie startuje i niczego nie zmienia. Komunikat jest w `./worklog logs`. Przywrócenie: `docker cp worklog:/data/kopie/PLIK.db ~/` i `./worklog restore ~/PLIK.db`.
 - **Odporny zapis** – SQLite w trybie WAL z `synchronous=FULL`.
 - **Usuwanie z potwierdzeniem** – zaznaczenie ✕ niczego nie kasuje. Po „Zapisz” aplikacja pokazuje listę zaznaczonych wpisów i usuwa je dopiero po „Usuń zaznaczone” (także gdy formularz wyśle się Enterem); autozapis nigdy nie usuwa.
 

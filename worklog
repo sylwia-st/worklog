@@ -14,6 +14,31 @@ dc() {
     docker compose --env-file .env.compose "${args[@]}" "$@"
 }
 
+# Kopię i przywracanie robi polecenie app:db w kontenerze (to samo co na Windowsie). Obraz zbudowany przed jego
+# dodaniem (bez ./worklog up po git pull) nie ma go – wtedy ten sam kod PHP podany w wierszu poleceń.
+has_db_command() { docker exec worklog php bin/console app:db --help >/dev/null 2>&1; }
+
+legacy_backup() {
+    docker exec worklog php -r '
+        @unlink("/data/.backup.db");
+        $db = new SQLite3("/data/worklog.db");
+        $db->busyTimeout(10000);
+        if (!$db->exec("VACUUM INTO \"/data/.backup.db\"")) { fwrite(STDERR, "VACUUM INTO nie powiodło się\n"); exit(1); }
+        $check = (new SQLite3("/data/.backup.db", SQLITE3_OPEN_READONLY))->querySingle("PRAGMA integrity_check");
+        if ($check !== "ok") { fwrite(STDERR, "Kopia uszkodzona: $check\n"); exit(1); }
+    '
+}
+
+legacy_restore() {
+    docker exec worklog php -r '
+        $src = new SQLite3("/data/.restore.db", SQLITE3_OPEN_READONLY);
+        if ($src->querySingle("PRAGMA integrity_check") !== "ok") { fwrite(STDERR, "Plik kopii jest uszkodzony – nic nie zmieniono.\n"); exit(1); }
+        $dst = new SQLite3("/data/worklog.db");
+        $dst->busyTimeout(10000);
+        if (!$src->backup($dst)) { fwrite(STDERR, "Przywracanie nie powiodło się – nic nie zmieniono.\n"); exit(1); }
+    '
+}
+
 case "${1:-help}" in
     up)       dc up -d --build ;;
     down)     dc down ;;
@@ -31,14 +56,11 @@ case "${1:-help}" in
         umask 077
         mkdir -p "$(dirname "$out")"
         # VACUUM INTO daje spójną kopię także wtedy, gdy aplikacja akurat zapisuje; potem sprawdzamy jej integralność
-        docker exec worklog php -r '
-            @unlink("/data/.backup.db");
-            $db = new SQLite3("/data/worklog.db");
-            $db->busyTimeout(10000);
-            if (!$db->exec("VACUUM INTO \"/data/.backup.db\"")) { fwrite(STDERR, "VACUUM INTO nie powiodło się\n"); exit(1); }
-            $check = (new SQLite3("/data/.backup.db", SQLITE3_OPEN_READONLY))->querySingle("PRAGMA integrity_check");
-            if ($check !== "ok") { fwrite(STDERR, "Kopia uszkodzona: $check\n"); exit(1); }
-        '
+        if has_db_command; then
+            docker exec worklog php bin/console app:db backup /data/.backup.db
+        else
+            legacy_backup
+        fi
         docker exec worklog cat /data/.backup.db > "$out.part"
         docker exec worklog rm -f /data/.backup.db
         mv "$out.part" "$out"     # plik pojawia się dopiero, gdy jest kompletny
@@ -56,14 +78,16 @@ case "${1:-help}" in
         echo "Obecny stan zapisano na wszelki wypadek: $safety"
         docker exec -i worklog sh -c 'umask 077; cat > /data/.restore.db' < "$2"
         # backup API SQLite – bezpieczne przy włączonym WAL i działającej aplikacji
-        docker exec worklog php -r '
-            $src = new SQLite3("/data/.restore.db", SQLITE3_OPEN_READONLY);
-            if ($src->querySingle("PRAGMA integrity_check") !== "ok") { fwrite(STDERR, "Plik kopii jest uszkodzony – nic nie zmieniono.\n"); exit(1); }
-            $dst = new SQLite3("/data/worklog.db");
-            $dst->busyTimeout(10000);
-            if (!$src->backup($dst)) { fwrite(STDERR, "Przywracanie nie powiodło się – nic nie zmieniono.\n"); exit(1); }
-        '
+        status=0
+        if has_db_command; then
+            docker exec worklog php bin/console app:db restore /data/.restore.db || status=$?
+        else
+            legacy_restore || status=$?
+        fi
         docker exec worklog rm -f /data/.restore.db
+        [[ $status -eq 0 ]] || exit 1
+        # kopia sprzed zmian w bazie (np. bez tabeli urlopów): brakujące tabele i kolumny dochodzą od razu, nie po restarcie
+        docker exec worklog php bin/console doctrine:schema:update --force --no-interaction --quiet
         echo "Przywrócono."
         ;;
     uninstall)

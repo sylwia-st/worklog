@@ -26,3 +26,5 @@ if [[ -n "$prev" ]] && cmp -s "$new" "$prev"; then
 fi
 
 find "$DEST" -maxdepth 1 -name 'worklog-*.db' -mtime +"$KEEP_DAYS" -delete
+# pozostałości po przerwanej kopii
+find "$DEST" -maxdepth 1 -name '*.part' -mmin +60 -delete
