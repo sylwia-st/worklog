@@ -66,6 +66,9 @@ final class DayController extends AbstractController
         $day = $this->days->findByDate($d);
 
         [$form, $errors] = $this->formFromRequest($request);
+        // „Usuń zaznaczone” wysyła confirm_delete=save|sync zamiast action
+        $confirmed = in_array($request->request->get('confirm_delete'), ['save', 'sync'], true);
+        $action = (string) $request->request->get($confirmed ? 'confirm_delete' : 'action', 'save');
         if ([] !== $errors) {
             foreach (array_unique($errors) as $e) {
                 $this->addFlash('error', $e);
@@ -74,9 +77,31 @@ final class DayController extends AbstractController
             return $this->renderDay($d, $day, $form, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Usunięcie zapisanego wiersza nigdy nie dzieje się samo (Enter w polu, stara karta, wyłączony JS):
+        // bez potwierdzenia zapisujemy resztę zmian, a zaznaczone wiersze czekają na „Usuń zaznaczone”.
+        $active = null !== $day ? array_map(static fn (WorklogEntry $e): int => (int) $e->getId(), $day->getActiveEntries()) : [];
+        $marked = [];
+        foreach ($form['rows'] as $row) {
+            if ($row['delete'] && in_array($row['id'], $active, true)) {
+                $marked[] = $row['id'];
+            }
+        }
+        if ([] !== $marked && !$confirmed) {
+            $day = $this->applyForm($d, $day, $form, partial: true)['day'];
+            $form = $this->formFromDay($day);
+            foreach ($form['rows'] as $i => $row) {
+                $form['rows'][$i]['delete'] = in_array($row['id'], $marked, true);
+            }
+
+            return $this->renderDay($d, $day, $form, confirmDelete: [
+                'action' => $action,
+                'rows' => array_values(array_filter($form['rows'], static fn (array $row): bool => $row['delete'])),
+            ]);
+        }
+
         $day = $this->applyForm($d, $day, $form)['day'];
 
-        if ('sync' === $request->request->get('action')) {
+        if ('sync' === $action) {
             foreach ($this->sync->sync($day) as $result) {
                 $this->addFlash($result['type'], $result['message']);
             }
@@ -227,8 +252,11 @@ final class DayController extends AbstractController
         ];
     }
 
-    /** @param array<string, mixed> $form */
-    private function renderDay(\DateTimeImmutable $d, ?WorkDay $day, array $form, int $status = 200): Response
+    /**
+     * @param array<string, mixed> $form
+     * @param array{action: string, rows: list<array<string, mixed>>}|null $confirmDelete wiersze czekające na potwierdzenie usunięcia
+     */
+    private function renderDay(\DateTimeImmutable $d, ?WorkDay $day, array $form, int $status = 200, ?array $confirmDelete = null): Response
     {
         $issueOptions = $this->settings->issueCache();
         foreach ($this->days->recentIssueKeys($d->modify('-60 days')) as $key) {
@@ -241,6 +269,7 @@ final class DayController extends AbstractController
             'today' => new \DateTimeImmutable('today'),
             'form' => $form,
             'pendingDeletions' => null !== $day ? $day->getPendingDeletions() : [],
+            'confirmDelete' => $confirmDelete,
             'planned' => $this->planned->findForDate($d),
             'issueOptions' => $issueOptions,
             'norm' => $this->settings->int('norm_minutes'),

@@ -12,6 +12,7 @@ use App\Domain\DaySummary;
 use App\Domain\MailDraft;
 use App\Domain\ReminderSchedule;
 use App\Domain\Template;
+use App\Domain\Theme;
 use App\Domain\TimeFormat;
 
 $fail = 0;
@@ -103,6 +104,42 @@ check('przypomnienie: wyłączone', ReminderSchedule::isDue('', '', $tue('16:00'
 check('przypomnienie: weekend', ReminderSchedule::isDue('15:45', '', new DateTimeImmutable('2026-10-17 16:00')), false);
 check('przypomnienie: 8:05 = 08:05', ReminderSchedule::stamp('8:05', $tue('09:00')), '2026-10-13 08:05');
 check('przypomnienie: zakres timera', [ReminderSchedule::inTimerWindow('06:00'), ReminderSchedule::inTimerWindow('21:59'), ReminderSchedule::inTimerWindow('22:00'), ReminderSchedule::inTimerWindow('05:59')], [true, true, false, false]);
+
+// --- motywy ---
+check('motywy: lista', array_keys(Theme::choices()), ['auto', 'light', 'dark', 'sea', 'sepia', 'night', 'contrast', 'custom']);
+$contrast = static function (string $a, string $b): float {
+    [$hi, $lo] = [max(Theme::luminance($a), Theme::luminance($b)), min(Theme::luminance($a), Theme::luminance($b))];
+
+    return ($hi + 0.05) / ($lo + 0.05);
+};
+foreach (Theme::palettes() as $id => $c) {
+    $keys = array_keys($c);
+    sort($keys);
+    $expected = array_keys(Theme::VARS);
+    sort($expected);
+    check("motyw $id: komplet kolorów", $keys, $expected);
+    check("motyw $id: same #rrggbb", array_filter($c, static fn (string $v) => !Theme::isColor($v)), []);
+    // czytelność wg WCAG: tekst 4.5:1 (główny 7:1), komunikaty co najmniej jak elementy interfejsu 3:1
+    $low = [];
+    foreach ([['ink', 'bg', 7], ['ink', 'panel', 7], ['muted', 'panel', 4.5], ['muted', 'bg', 4.5], ['accent', 'panel', 4.5], ['accent-ink', 'accent', 4.5],
+              ['ok', 'ok-bg', 3], ['warn', 'warn-bg', 3], ['err', 'err-bg', 3], ['info', 'info-bg', 3]] as [$fg, $bg, $min]) {
+        if ($contrast($c[$fg], $c[$bg]) < $min) {
+            $low[] = sprintf('%s/%s %.2f', $fg, $bg, $contrast($c[$fg], $c[$bg]));
+        }
+    }
+    check("motyw $id: kontrast", $low, []);
+}
+$auto = Theme::css('auto', '');
+check('css auto: jasny + ciemny wg systemu', [str_contains($auto, '--bg: #f6f5f2;'), str_contains($auto, '@media (prefers-color-scheme: dark) { :root { --bg: #161716;')], [true, true]);
+$night = Theme::css('night', '');
+check('css nocny: kolory i ciemne kontrolki', [str_contains($night, '--bg: #0f1724;'), str_contains($night, 'color-scheme: dark;'), str_contains($night, '@media')], [true, true, false]);
+check('css sepia: jasne kontrolki', str_contains(Theme::css('sepia', ''), 'color-scheme: light;'), true);
+check('css nieznany motyw = automatyczny', Theme::css('xyz', ''), $auto);
+$own = Theme::css('custom', (string) json_encode(['bg' => '#000000', 'ink' => '#FFFFFF']));
+check('css własny: kolory z ustawień, reszta z jasnego', [str_contains($own, '--bg: #000000;'), str_contains($own, '--ink: #ffffff;'), str_contains($own, '--accent: #2f5d50;'), str_contains($own, 'color-scheme: dark;')], [true, true, true, true]);
+check('własny: śmieci zamiast koloru → jasny', Theme::custom((string) json_encode(['bg' => 'red; } body { display:none', 'line' => '#12345'])), Theme::palettes()['light']);
+check('własny: pusty zapis → jasny', Theme::custom(''), Theme::palettes()['light']);
+check('kolor: format', [Theme::isColor('#a1B2c3'), Theme::isColor('#123'), Theme::isColor('#12345g'), Theme::isColor('a1b2c3')], [true, false, false, false]);
 
 echo $fail ? "\n$fail błędów\n" : "OK – wszystkie testy przeszły\n";
 exit($fail ? 1 : 0);

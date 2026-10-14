@@ -78,6 +78,13 @@ final class Settings
         'plan_phrase_early' => 'wyjdę wcześniej, ok. godz. {do}',
         'plan_phrase_short' => 'będę w pracy krócej, w godzinach {od}–{do}',
         'plan_notice_hours' => '24',
+
+        // Przegląd: kolejność dni (desc = najnowsze na górze, asc = najstarsze) – zapamiętana po kliknięciu nagłówka
+        'dashboard_sort' => 'desc',
+
+        // Wygląd: motyw (auto = jasny/ciemny jak system, patrz App\Domain\Theme) i kolory motywu własnego (JSON)
+        'theme' => 'auto',
+        'theme_custom' => '',
     ];
 
     /** @var array<string, string>|null */

@@ -6,7 +6,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 2. **Slack** – gotowe podsumowanie per ticket do skopiowania jednym kliknięciem.
 3. **Mail o nadgodzinach / krótszym dniu** – pojawia się sam, gdy bilans dnia wychodzi poza tolerancję; otwiera się w Twoim programie pocztowym z wypełnionymi adresatami, tematem i treścią.
 4. **Planowane zmiany** – późniejsze przyjście, wcześniejsze wyjście, krótszy dzień: zapisujesz → dostajesz gotowy mail (z ostrzeżeniem, jeśli wysyłasz za późno).
-5. **Stoper** – ▶ przy tickecie, nad którym pracujesz; przełączenie na inny ticket zatrzymuje poprzedni. Pełne minuty, bez zaokrąglania.
+5. **Stoper** – ▶ przy tickecie, nad którym pracujesz; przełączenie na inny ticket zatrzymuje poprzedni. Pełne minuty, bez zaokrąglania. „od…” pod ▶ włącza stoper od wcześniejszej godziny (zadanie zaczęło się, zanim kliknięto ▶) – nie wcześniej niż ostatnie zatrzymanie stopera, więc zmierzony czas się nie nakłada.
 6. **Przypomnienie** pon–pt o wybranej godzinie (domyślnie 15:45, zmiana w Ustawieniach) – powiadomienie na pulpicie, jeśli czegoś z dzisiejszego raportu brakuje. Gdy komputer był wtedy wyłączony, pojawi się po jego włączeniu.
 
 ## Prywatność
@@ -24,7 +24,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 - **Stoper w bazie** – czas startu jest na dysku, więc przeżywa zamknięcie przeglądarki i restart; stoper działający od innego dnia lub > 6h pyta, o której go zatrzymać.
 - **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
 - **Odporny zapis** – SQLite w trybie WAL z `synchronous=FULL`.
-- Usunięcie wiersza (✕) zatwierdza się przyciskiem „Zapisz” – autozapis niczego nie kasuje.
+- **Usuwanie z potwierdzeniem** – zaznaczenie ✕ niczego nie kasuje. Po „Zapisz” aplikacja pokazuje listę zaznaczonych wpisów i usuwa je dopiero po „Usuń zaznaczone” (także gdy formularz wyśle się Enterem); autozapis nigdy nie usuwa.
 
 ## Instalacja (Ubuntu)
 
@@ -53,7 +53,38 @@ Jeśli „Sprawdź połączenie” zgłasza brak połączenia, a Jira działa w 
 
 Kontener użyje wtedy sieci hosta, a serwer będzie słuchał wyłącznie na `127.0.0.1`.
 
-### Jira – token
+## Instalacja (Windows)
+
+Potrzebny [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) z domyślnymi ustawieniami (WSL 2, kontenery Linux). W firmach od 250 pracowników albo od 10 mln USD rocznego przychodu Docker Desktop wymaga płatnej licencji.
+
+1. Rozpakuj archiwum albo zrób `git clone` (plik `.gitattributes` pilnuje końców linii, więc Git na Windowsie niczego nie zepsuje).
+2. Uruchom Docker Desktop i poczekaj, aż wystartuje.
+3. Kliknij dwukrotnie `install.cmd`. Z opcjami – w PowerShellu albo cmd, w katalogu z narzędziem:
+
+```powershell
+.\install.cmd                      # opcje: -Port 8765  -Remind 16:00  -NoRemind  -BackupDir D:\kopie  -Forma f|m|n
+```
+
+Instalator robi to samo co na Ubuntu (obraz, kontener, forma w tekstach, pierwsza kopia), a zamiast timerów systemd uruchamia **agenta w tle**: ukryty proces PowerShella, który startuje przy logowaniu (skrót „Raport czasu (w tle)” w Autostarcie – widać go w Menedżerze zadań → Aplikacje autostartu). Agent:
+
+- co minutę w dni robocze pyta aplikację o przypomnienie i pokazuje je jako powiadomienie Windows (nadawca: „Windows PowerShell”; kliknięcie otwiera raport),
+- w dni robocze co godzinę robi kopię bazy do `%USERPROFILE%\worklog-backups` (30 dni wstecz, bez duplikatów); kopię przegapioną, bo komputer był wyłączony, robi po jego włączeniu.
+
+W menu Start pojawia się skrót „Raport czasu”. Polecenia `./worklog …` wpisujesz jako `.\worklog.cmd …`:
+
+```powershell
+.\worklog.cmd status
+.\worklog.cmd backup              # albo: backup D:\kopie\raport.db
+.\worklog.cmd restore ~\worklog-backups\worklog-RRRRMMDD-GGMM.db
+.\worklog.cmd update
+.\worklog.cmd uninstall           # usuwa też agenta i skróty; kopie zapasowe zostają
+```
+
+- **VPN:** opcja `--vpn` nie jest potrzebna – Docker Desktop wysyła ruch kontenera przez Windows, więc także przez VPN i firmowy DNS.
+- **Skrypty zablokowane:** `install.cmd` i `worklog.cmd` uruchamiają PowerShella z `-ExecutionPolicy Bypass`. Jeśli zasady firmy (GPO) mimo to blokują skrypty, potrzebna jest zgoda działu IT.
+- **Brak powiadomień:** Ustawienia → System → Powiadomienia → włącz dla „Windows PowerShell” (tryb „Nie przeszkadzać” je wycisza). Błędy agenta, np. nieudane kopie, trafiają też do pliku `.agent.log` w katalogu kopii.
+
+## Jira – token
 
 Token generujesz sam, z uprawnieniami swojego konta:
 
@@ -90,7 +121,13 @@ Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, któr
 
 **Awaria w porze obiadu:** zaznacz w dniu pole pracy w przerwie obiadowej i wpisz przerwę, która faktycznie była – czasem (`1h`, `20m + 40m`) albo godzinami (`13:30-13:50, 15:00-15:40`). Obiad nie odliczy się wtedy automatycznie, a worklogi w Jirze ominą wpisane godziny przerw.
 
+## Wygląd
+
+W **Ustawieniach → Wygląd** wybierasz motyw: Automatyczny (domyślny – jasny albo ciemny jak w systemie), Jasny, Ciemny, Morski, Sepia, Nocny albo Wysoki kontrast. Motyw **Własny** pozwala ustawić 15 kolorów (tła, tekst, akcent, kolory komunikatów); „Wczytaj kolory z motywu” daje punkt wyjścia. Zmianę widać od razu na stronie Ustawień, a po zapisie – na wszystkich stronach.
+
 ## Obsługa
+
+Na Windowsie te same polecenia: `.\worklog.cmd status`, `.\worklog.cmd backup` itd.
 
 ```bash
 ./worklog status     # stan kontenera
@@ -129,7 +166,7 @@ Jeśli wolisz rzadsze aktualizacje, możesz zamiast tego użyć LTS: `7.4.*` (ws
 ```bash
 docker exec worklog php tests/domain_test.php
 docker exec worklog php tests/services_test.php
-cd tests/browser && npm install && npm test     # autozapis, szkic, stoper – w symulowanej przeglądarce
+cd tests/browser && npm install && npm test     # autozapis, szkic, stoper, usuwanie, podgląd motywu – w symulowanej przeglądarce
 ```
 
 ## Instrukcja PDF
@@ -140,4 +177,3 @@ cd tests/browser && npm install && npm test     # autozapis, szkic, stoper – w
 docker run --rm -v "$PWD":/w -v /usr/share/fonts/truetype/dejavu:/fonts:ro -w /w python:3.12-slim \
     sh -c "pip install -q reportlab && python docs/instrukcja/build.py /fonts"
 ```
-# worklog

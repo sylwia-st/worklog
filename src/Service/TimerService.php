@@ -28,27 +28,53 @@ final class TimerService
         return $this->entries->findRunning()[0] ?? null;
     }
 
-    public function start(WorklogEntry $entry, \DateTimeImmutable $now = new \DateTimeImmutable()): void
+    /**
+     * Włącza stoper od podanej godziny (domyślnie teraz) – np. gdy praca zaczęła się wcześniej, a ▶ zostało kliknięte później.
+     * Poprzedni stoper zatrzymuje się o tej samej godzinie, więc czas się nie dubluje.
+     *
+     * @throws \InvalidArgumentException godzina w przyszłości, przed zatrzymaniem poprzedniego stopera albo nie późniejsza niż start działającego
+     */
+    public function start(WorklogEntry $entry, ?\DateTimeImmutable $at = null, \DateTimeImmutable $now = new \DateTimeImmutable()): void
     {
-        foreach ($this->entries->findRunning() as $other) {
-            if ($other !== $entry) {
-                $other->stopTimer($now);
+        if (null !== $at && $at > $now) {
+            throw new \InvalidArgumentException('Stoper nie może zacząć się w przyszłości.');
+        }
+        // czas zmierzony wcześniej stoperem nie może się nakładać z nowym
+        $last = null !== $at ? $this->entries->findLastStopped() : null;
+        if (null !== $last && $at < $last->getTimerStoppedAt()) {
+            throw new \InvalidArgumentException(sprintf('Stoper %s był włączony do %s – nowy może zacząć się najwcześniej o %s, żeby czas się nie nakładał.', $last->getIssueKey(), self::clock($last->getTimerStoppedAt()), self::ceilMinute($last->getTimerStoppedAt())->format('H:i')));
+        }
+        $running = array_filter($this->entries->findRunning(), static fn (WorklogEntry $other) => $other !== $entry);
+        foreach ($running as $other) {
+            // poprzedni stoper kończy się o godzinie startu nowego – koniec musi być po jego starcie
+            if (null !== $at && $at <= $other->getTimerStartedAt()) {
+                throw new \InvalidArgumentException(sprintf('Stoper %s działa od %s – nowy musi zacząć się później.', $other->getIssueKey(), self::clock($other->getTimerStartedAt())));
             }
         }
-        $entry->startTimer($now);
+        $at ??= $now;
+        foreach ($running as $other) {
+            $other->stopTimer($at);
+        }
+        $entry->startTimer($at);
         $this->em->flush();
     }
 
-    /** Zatrzymuje działający stoper o podanej godzinie (domyślnie teraz). */
+    /**
+     * Zatrzymuje działający stoper o podanej godzinie (domyślnie teraz).
+     *
+     * @throws \InvalidArgumentException podana godzina nie jest późniejsza niż start stopera
+     */
     public function stop(?\DateTimeImmutable $at = null, \DateTimeImmutable $now = new \DateTimeImmutable()): ?WorklogEntry
     {
-        $stopped = null;
-        foreach ($this->entries->findRunning() as $entry) {
-            $when = $at ?? $now;
-            $started = $entry->getTimerStartedAt();
-            if ($when < $started) {
-                $when = $started;
+        $running = $this->entries->findRunning();
+        foreach ($running as $entry) {
+            if (null !== $at && $at <= $entry->getTimerStartedAt()) {
+                throw new \InvalidArgumentException(sprintf('Godzina zatrzymania musi być późniejsza niż start stopera (%s).', self::clock($entry->getTimerStartedAt())));
             }
+        }
+        $stopped = null;
+        foreach ($running as $entry) {
+            $when = $at ?? $now;
             if ($when > $now) {
                 $when = $now;
             }
@@ -81,6 +107,7 @@ final class TimerService
             'elapsedSeconds' => max(0, $now->getTimestamp() - $started->getTimestamp()),
             'stale' => self::staleReason($started, $now),
             'suggestedStop' => self::suggestedStop($started, $now, $endClock)->format('Y-m-d\TH:i'),
+            'minStop' => self::earliestStop($started)->format('Y-m-d\TH:i'),
         ];
     }
 
@@ -102,10 +129,28 @@ final class TimerService
     {
         $end = TimeFormat::clockToMinutes($endClock) ?? 16 * 60;
         $candidate = $started->setTime(intdiv($end, 60), $end % 60);
-        if ($candidate < $started) {
-            $candidate = $started;
+        if ($candidate <= $started) {
+            // koniec musi być po starcie: najbliższa pełna minuta po nim
+            $candidate = self::earliestStop($started);
         }
 
         return $candidate > $now ? $now : $candidate;
+    }
+
+    /** Najwcześniejsza godzina zatrzymania do wyboru w polu (co do minuty): pełna minuta po starcie. */
+    public static function earliestStop(\DateTimeImmutable $started): \DateTimeImmutable
+    {
+        return $started->setTime((int) $started->format('H'), (int) $started->format('i'))->modify('+1 minute');
+    }
+
+    /** Zaokrągla w górę do pełnej minuty (godziny wybiera się w polach co do minuty). */
+    private static function ceilMinute(\DateTimeImmutable $at): \DateTimeImmutable
+    {
+        return '00' === $at->format('s') ? $at : self::earliestStop($at);
+    }
+
+    private static function clock(\DateTimeImmutable $at): string
+    {
+        return $at->format('s') === '00' ? $at->format('d.m H:i') : $at->format('d.m H:i:s');
     }
 }

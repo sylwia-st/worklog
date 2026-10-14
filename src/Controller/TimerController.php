@@ -24,12 +24,24 @@ final class TimerController extends AbstractController
     #[Route('/timer/start', name: 'timer_start', methods: ['POST'])]
     public function start(Request $request, WorklogEntryRepository $entries): JsonResponse
     {
-        $id = (int) ($request->toArray()['entryId'] ?? 0);
-        $entry = $entries->find($id);
+        $body = $request->toArray();
+        $entry = $entries->find((int) ($body['entryId'] ?? 0));
         if (null === $entry || $entry->isDeleted()) {
             return $this->json(['error' => 'Nie znaleziono wpisu – zapisz dzień i spróbuj ponownie.'], 404);
         }
-        $this->timer->start($entry);
+        $at = null;
+        $raw = (string) ($body['at'] ?? '');
+        if ('' !== $raw) {
+            $at = \DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $raw) ?: null;
+            if (null === $at) {
+                return $this->json(['error' => 'Niepoprawna godzina startu.'], 422);
+            }
+        }
+        try {
+            $this->timer->start($entry, $at);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], 422);
+        }
 
         return $this->json($this->timer->state());
     }
@@ -45,7 +57,11 @@ final class TimerController extends AbstractController
                 return $this->json(['error' => 'Niepoprawna godzina zatrzymania.'], 422);
             }
         }
-        $stopped = $this->timer->stop($at);
+        try {
+            $stopped = $this->timer->stop($at);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], 422);
+        }
 
         return $this->json($this->timer->state() + ['stopped' => null === $stopped ? null : [
             'entryId' => $stopped->getId(),

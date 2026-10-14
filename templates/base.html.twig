@@ -6,18 +6,8 @@
     <meta name="referrer" content="no-referrer">
     <title>{% block title %}Raport czasu{% endblock %}</title>
     <style>
-        :root {
-            --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e2e0da;
-            --accent: #2f5d50; --accent-ink: #fff; --ok: #2e7d4f; --warn: #a86a00; --err: #b3261e; --info: #3c5a8a;
-            --ok-bg: #e7f3ec; --warn-bg: #fbf1dc; --err-bg: #fbe7e5; --info-bg: #e8eef8;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #161716; --panel: #1f201f; --ink: #ecebe7; --muted: #a09f9a; --line: #343532;
-                --accent: #7fb8a5; --accent-ink: #10201b; --ok: #7fcf9d; --warn: #e8b552; --err: #f08b84; --info: #9db7e3;
-                --ok-bg: #1f3227; --warn-bg: #3a2f17; --err-bg: #3d2120; --info-bg: #1f2a3b;
-            }
-        }
+        /* kolory (--bg, --panel, --ink …) z motywu wybranego w Ustawieniach → Wygląd, patrz App\Domain\Theme */
+        {{ theme_css() }}
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Ubuntu, sans-serif; }
         a { color: var(--accent); }
@@ -46,16 +36,19 @@
         button, .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
             padding: 7px 14px; border-radius: 6px; font: inherit; cursor: pointer; text-decoration: none; }
         button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+        button.danger { background: var(--err-bg); border-color: var(--err); color: var(--err); font-weight: 600; }
         button.link { border: none; background: none; color: var(--accent); padding: 0; }
         button:disabled { opacity: .5; cursor: default; }
         .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 6px; border-bottom: 1px solid var(--line); }
+        th a.sortlink { color: var(--ink); text-decoration: none; white-space: nowrap; } th a.sortlink:hover { text-decoration: underline; }
         td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
         .entries td { border-bottom: none; padding: 4px 4px; }
         .entries td.issue { width: 150px; } .entries td.time { width: 100px; } .entries td.st { width: 34px; text-align: center; padding-top: 10px; }
         .entries td.del { width: 34px; text-align: center; padding-top: 10px; }
         .entries tr.has-error input { border-color: var(--err); }
+        .entries tr.marked-delete :is(.f-issue, .f-time, .f-desc) { text-decoration: line-through; opacity: .55; }
         .rowerr { color: var(--err); font-size: 12px; }
         .flash { padding: 9px 14px; border-radius: 8px; margin-bottom: 10px; }
         .flash.success { background: var(--ok-bg); color: var(--ok); } .flash.error { background: var(--err-bg); color: var(--err); }
@@ -80,11 +73,17 @@
         fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px 4px; margin: 0 0 18px; background: var(--panel); }
         legend { font-weight: 600; padding: 0 6px; }
         .field { margin-bottom: 14px; } .help { font-size: 12px; color: var(--muted); margin-top: 3px; }
+        .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+        .colors label { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ink); font-size: 14px; }
+        .colors input[type=color] { width: 40px; height: 30px; padding: 2px; flex: none; cursor: pointer; }
         tr.weekend td { color: var(--muted); }
         .copied { color: var(--ok); font-size: 13px; }
         .badge.err { background: var(--err-bg); color: var(--err); border-color: transparent; }
         .entries td.tm { width: 40px; text-align: center; }
         .tbtn { padding: 5px 9px; min-width: 34px; justify-content: center; }
+        .tfrom { padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+        tr.running .tfrom { visibility: hidden; }
+        #startat input { width: auto; margin: 0 6px; }
         tr.running .tbtn { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
         tr.running .f-time { background: var(--ok-bg); }
         .live { color: var(--ok); font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -109,7 +108,7 @@
 </header>
 <div id="timerbar" hidden>
     <div class="wrap">
-        <span>⏱ Stoper: <b id="tb-issue"></b> <span class="muted small" id="tb-date"></span></span>
+        <span>⏱ Stoper: <b id="tb-issue"></b> <span class="muted small" id="tb-date"></span> <span class="muted small" id="tb-since"></span></span>
         <span id="tb-time"></span>
         <button type="button" id="tb-stop">❚❚ Zatrzymaj</button>
         <a id="tb-link" href="#">przejdź do dnia</a>
@@ -176,12 +175,13 @@
             if (s.running) {
                 $('tb-issue').textContent = s.issue;
                 $('tb-date').textContent = '(' + s.date.split('-').reverse().join('.') + ')';
+                $('tb-since').textContent = 'od ' + s.startedLabel;
                 $('tb-link').href = DAY_URL.replace('0000-00-00', s.date);
             }
             let keep = false; try { keep = s.running && sessionStorage.getItem(keepKey(s)) === '1'; } catch (e) {}
             const stale = s.running && s.stale && !keep;
             $('timerstale').hidden = !stale;
-            if (stale) { $('ts-msg').textContent = s.stale; $('ts-at').value = s.suggestedStop; }
+            if (stale) { $('ts-msg').textContent = s.stale; $('ts-at').min = s.minStop; $('ts-at').value = s.suggestedStop; }
             tick();
             document.dispatchEvent(new CustomEvent('timer:update', {detail: s}));
         }
@@ -193,7 +193,7 @@
         }
         const api = {
             refresh: async () => render(await call('{{ path('timer_state') }}')),
-            start: async (entryId) => render(await call('{{ path('timer_start') }}', {entryId})),
+            start: async (entryId, at) => render(await call('{{ path('timer_start') }}', at ? {entryId, at} : {entryId})),
             stop: async (at) => render(await call('{{ path('timer_stop') }}', at ? {at} : {})),
         };
         $('tb-stop').onclick = () => api.stop();

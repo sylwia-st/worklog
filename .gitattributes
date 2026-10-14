@@ -1,0 +1,7 @@
+# Końce linii niezależne od ustawień Gita (np. core.autocrlf=true – domyślne w Git for Windows):
+# skrypty uruchamiane w kontenerze i na Linuksie muszą mieć LF, pliki dla Windowsa – CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.pdf binary
+*.db binary

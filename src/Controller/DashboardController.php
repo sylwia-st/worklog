@@ -5,16 +5,28 @@ namespace App\Controller;
 use App\Repository\PlannedChangeRepository;
 use App\Repository\WorkDayRepository;
 use App\Service\ReportBuilder;
+use App\Service\Settings;
 use App\Service\WorklogSync;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class DashboardController extends AbstractController
 {
     #[Route('/', name: 'dashboard', methods: ['GET'])]
-    public function index(WorkDayRepository $days, PlannedChangeRepository $planned, ReportBuilder $reports, WorklogSync $sync): Response
+    public function index(Request $request, WorkDayRepository $days, PlannedChangeRepository $planned, ReportBuilder $reports, WorklogSync $sync, Settings $settings): Response
     {
+        // kolejność dni: ?sort=asc|desc z nagłówka tabeli, zapamiętana na kolejne wejścia
+        $sort = $request->query->getString('sort');
+        if (in_array($sort, ['asc', 'desc'], true)) {
+            if ($sort !== $settings->get('dashboard_sort')) {
+                $settings->save(['dashboard_sort' => $sort]);
+            }
+        } else {
+            $sort = 'asc' === $settings->get('dashboard_sort') ? 'asc' : 'desc';
+        }
+
         $today = new \DateTimeImmutable('today');
         $from = $today->modify('-27 days');
         $saved = $days->findBetween($from, $today);
@@ -42,9 +54,13 @@ final class DashboardController extends AbstractController
             }
             $rows[] = $row;
         }
+        if ('asc' === $sort) {
+            $rows = array_reverse($rows);
+        }
 
         return $this->render('dashboard.html.twig', [
             'rows' => $rows,
+            'sort' => $sort,
             'upcoming' => $planned->findFrom($today, 10),
             'today' => $today,
         ]);

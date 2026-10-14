@@ -2,7 +2,7 @@
 
 {% block body %}
 <h1>Przegląd</h1>
-<p class="sub">Ostatnie 4 tygodnie. Kliknij dzień, żeby go uzupełnić.</p>
+<p class="sub">Ostatnie 4 tygodnie. Kliknij dzień, żeby go uzupełnić, a nagłówek „Dzień” – żeby odwrócić kolejność.</p>
 
 <div class="actions" style="margin:0 0 18px">
     <a class="btn primary" href="{{ path('today') }}">Uzupełnij dzisiaj</a>
@@ -26,7 +26,10 @@
 
 <div class="panel">
     <table>
-        <thead><tr><th>Dzień</th><th>W ticketach</th><th>Bilans</th><th>Jira</th><th>Slack</th><th>Mail</th></tr></thead>
+        <thead><tr><th aria-sort="{{ sort == 'asc' ? 'ascending' : 'descending' }}">
+            <a class="sortlink" href="{{ path('dashboard', {sort: sort == 'asc' ? 'desc' : 'asc'}) }}"
+               title="{{ sort == 'asc' ? 'Najstarsze na górze – kliknij, żeby pokazać najpierw najnowsze' : 'Najnowsze na górze – kliknij, żeby pokazać najpierw najstarsze' }}">Dzień {{ sort == 'asc' ? '↑' : '↓' }}</a>
+        </th><th>W ticketach</th><th>Bilans</th><th>Jira</th><th>Slack</th><th>Mail</th></tr></thead>
         <tbody>
         {% for r in rows %}
             <tr class="{{ r.weekend ? 'weekend' }}">

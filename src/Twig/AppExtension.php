@@ -3,6 +3,7 @@
 namespace App\Twig;
 
 use App\Domain\Template;
+use App\Domain\Theme;
 use App\Domain\TimeFormat;
 use App\Service\Settings;
 use Twig\Extension\AbstractExtension;
@@ -29,6 +30,8 @@ final class AppExtension extends AbstractExtension
         return [
             // tekst w formie wybranej przy instalacji: forma('Pracowałam', 'Pracowałem', 'Praca')
             new TwigFunction('forma', $this->settings->form(...)),
+            // zmienne CSS wybranego motywu (kolory są sprawdzone: tylko #rrggbb)
+            new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme'), $this->settings->get('theme_custom')), ['is_safe' => ['html']]),
         ];
     }
 }

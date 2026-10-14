@@ -23,6 +23,12 @@ namespace Doctrine\ORM {
     }
 }
 
+namespace Doctrine\Bundle\DoctrineBundle\Repository {
+    if (!class_exists(ServiceEntityRepository::class)) {
+        class ServiceEntityRepository {}
+    }
+}
+
 namespace Symfony\Contracts\HttpClient {
     if (!interface_exists(HttpClientInterface::class)) {
         interface HttpClientInterface { public function request(string $method, string $url, array $options = []); }
@@ -259,12 +265,95 @@ namespace {
     $t->update('TIM-1', 90, 'opis 2', 0);
     check('zmiana opisu nie kasuje sekund', $t->getCarrySeconds(), 45);
 
+    // --- stoper od podanej godziny ---
+    $runningRepo = new class extends App\Repository\WorklogEntryRepository {
+        public array $entries = [];
+        public function __construct() {}
+        public function findRunning(): array { return array_values(array_filter($this->entries, fn ($e) => $e->isTimerRunning())); }
+        public function findLastStopped(): ?WorklogEntry
+        {
+            $stopped = array_filter($this->entries, fn ($e) => !$e->isDeleted() && null !== $e->getTimerStoppedAt());
+            usort($stopped, fn ($a, $b) => $b->getTimerStoppedAt() <=> $a->getTimerStoppedAt());
+
+            return $stopped[0] ?? null;
+        }
+    };
+    $flushEm = new class implements Doctrine\ORM\EntityManagerInterface { public function flush(): void {} };
+    $timer = new App\Service\TimerService($runningRepo, $flushEm, $settings);
+    $sday = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $s1 = new WorklogEntry($sday, 'STA-1', 0, '', 0);
+    $s2 = new WorklogEntry($sday, 'STA-2', 0, '', 1);
+    $runningRepo->entries = [$s1, $s2];
+    $now = new DateTimeImmutable('2026-10-20 11:00:00');
+    $timer->start($s1, new DateTimeImmutable('2026-10-20 09:15'), $now);
+    check('start od godziny', $s1->getTimerStartedAt()->format('H:i'), '09:15');
+    check('start od godziny: czas od tej godziny', $s1->liveSeconds($now), 105 * 60);
+    $timer->start($s2, new DateTimeImmutable('2026-10-20 10:30'), $now);
+    check('przełączenie od godziny: poprzedni zatrzymany o tej godzinie', [$s1->isTimerRunning(), $s1->getMinutes()], [false, 75]);
+    check('przełączenie od godziny: nowy działa od niej', $s2->getTimerStartedAt()->format('H:i'), '10:30');
+    $err = null;
+    try { $timer->start($s1, new DateTimeImmutable('2026-10-20 10:00'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('start przed startem działającego stopera – odmowa', [str_contains((string) $err, '10:30'), $s2->isTimerRunning(), $s1->isTimerRunning()], [true, true, false]);
+    $err = null;
+    try { $timer->start($s1, new DateTimeImmutable('2026-10-20 10:30'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('start równo ze startem działającego stopera – odmowa (koniec = początek)', [$err, $s2->isTimerRunning()], ['Stoper STA-2 działa od 20.10 10:30 – nowy musi zacząć się później.', true]);
+    $err = null;
+    try { $timer->start($s1, new DateTimeImmutable('2026-10-20 11:05'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('start w przyszłości – odmowa', [$err, $s1->isTimerRunning()], ['Stoper nie może zacząć się w przyszłości.', false]);
+    $timer->start($s1, null, $now);
+    check('start bez godziny = teraz', [$s1->getTimerStartedAt()->format('H:i'), $s2->getMinutes()], ['11:00', 30]);
+
+    // --- koniec stopera musi być późniejszy niż start ---
+    foreach (['2026-10-20 10:59' => 'przed startem', '2026-10-20 11:00' => 'równo ze startem'] as $at => $label) {
+        $err = null;
+        try { $timer->stop(new DateTimeImmutable($at), new DateTimeImmutable('2026-10-20 12:00')); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+        check("stop $label – odmowa", [$err, $s1->isTimerRunning(), $s1->getMinutes()], ['Godzina zatrzymania musi być późniejsza niż start stopera (20.10 11:00).', true, 75]);
+    }
+    $s3 = new WorklogEntry($sday, 'STA-3', 0, '', 2);
+    $s3->startTimer(new DateTimeImmutable('2026-10-20 11:00:40'));
+    $runningRepo->entries = [$s3];
+    $err = null;
+    try { $timer->stop(new DateTimeImmutable('2026-10-20 11:00'), new DateTimeImmutable('2026-10-20 12:00')); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('stop w tej samej minucie co start z sekundami – odmowa', $err, 'Godzina zatrzymania musi być późniejsza niż start stopera (20.10 11:00:40).');
+    $timer->stop(new DateTimeImmutable('2026-10-20 11:30'), new DateTimeImmutable('2026-10-20 12:00'));
+    check('stop po starcie – dolicza', [$s3->isTimerRunning(), $s3->getMinutes()], [false, 29]);
+    $s3->startTimer(new DateTimeImmutable('2026-10-20 12:00'));
+    $timer->stop(null, new DateTimeImmutable('2026-10-20 12:00'));
+    check('stop „teraz” w sekundzie startu – bez błędu', $s3->isTimerRunning(), false);
+
+    // --- nowy stoper nie może nachodzić na czas zmierzony wcześniej ---
+    $o1 = new WorklogEntry($sday, 'OVL-1', 0, '', 3);
+    $o2 = new WorklogEntry($sday, 'OVL-2', 0, '', 4);
+    $runningRepo->entries = [$o1, $o2];
+    $now = new DateTimeImmutable('2026-10-20 15:00:00');
+    $timer->start($o1, new DateTimeImmutable('2026-10-20 13:00'), $now);
+    $timer->stop(new DateTimeImmutable('2026-10-20 14:00'), $now);
+    $err = null;
+    try { $timer->start($o2, new DateTimeImmutable('2026-10-20 13:30'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('start w środku zmierzonego czasu – odmowa', [$err, $o2->isTimerRunning()], ['Stoper OVL-1 był włączony do 20.10 14:00 – nowy może zacząć się najwcześniej o 14:00, żeby czas się nie nakładał.', false]);
+    $err = null;
+    try { $timer->start($o1, new DateTimeImmutable('2026-10-20 13:59'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('ten sam ticket też nie może nachodzić na siebie', [str_contains((string) $err, 'OVL-1 był włączony do 20.10 14:00'), $o1->getMinutes()], [true, 60]);
+    $timer->start($o2, new DateTimeImmutable('2026-10-20 14:00'), $now);
+    check('start dokładnie o zatrzymaniu poprzedniego – dozwolony', $o2->getTimerStartedAt()->format('H:i'), '14:00');
+    $timer->stop(null, new DateTimeImmutable('2026-10-20 14:20:25'));
+    $err = null;
+    try { $timer->start($o1, new DateTimeImmutable('2026-10-20 14:20'), $now); } catch (InvalidArgumentException $e) { $err = $e->getMessage(); }
+    check('zatrzymanie z sekundami – najwcześniej następna minuta', $err, 'Stoper OVL-2 był włączony do 20.10 14:20:25 – nowy może zacząć się najwcześniej o 14:21, żeby czas się nie nakładał.');
+    $o2->markDeleted();
+    $timer->start($o1, new DateTimeImmutable('2026-10-20 14:10'), $now);
+    check('czas usuniętego wpisu nie blokuje', $o1->getTimerStartedAt()->format('H:i'), '14:10');
+    $timer->stop(null, $now);
+    $timer->start($o1, null, new DateTimeImmutable('2026-10-20 15:00:00'));
+    check('start „teraz” bez sprawdzania (teraz jest zawsze po zatrzymaniu)', $o1->isTimerRunning(), true);
+    check('najwcześniejszy stop: pełna minuta po starcie', App\Service\TimerService::earliestStop(new DateTimeImmutable('2026-10-20 11:00:40'))->format('H:i'), '11:01');
+
     // podejrzany stoper
     check('stale: inny dzień', str_contains((string) App\Service\TimerService::staleReason(new DateTimeImmutable('2026-10-19 15:00'), new DateTimeImmutable('2026-10-20 08:10')), 'innego dnia'), true);
     check('stale: >6h', str_contains((string) App\Service\TimerService::staleReason(new DateTimeImmutable('2026-10-20 08:00'), new DateTimeImmutable('2026-10-20 14:30')), 'ponad 6h'), true);
     check('stale: normalnie', App\Service\TimerService::staleReason(new DateTimeImmutable('2026-10-20 08:00'), new DateTimeImmutable('2026-10-20 11:00')), null);
     check('podpowiedź: koniec dnia startu', App\Service\TimerService::suggestedStop(new DateTimeImmutable('2026-10-19 15:00'), new DateTimeImmutable('2026-10-20 08:10'), '16:00')->format('Y-m-d H:i'), '2026-10-19 16:00');
-    check('podpowiedź: po końcu dnia = start', App\Service\TimerService::suggestedStop(new DateTimeImmutable('2026-10-19 17:20'), new DateTimeImmutable('2026-10-20 08:10'), '16:00')->format('Y-m-d H:i'), '2026-10-19 17:20');
+    check('podpowiedź: po końcu dnia = minuta po starcie', App\Service\TimerService::suggestedStop(new DateTimeImmutable('2026-10-19 17:20'), new DateTimeImmutable('2026-10-20 08:10'), '16:00')->format('Y-m-d H:i'), '2026-10-19 17:21');
     check('podpowiedź: nie w przyszłości', App\Service\TimerService::suggestedStop(new DateTimeImmutable('2026-10-20 08:00'), new DateTimeImmutable('2026-10-20 14:30'), '16:00')->format('H:i'), '14:30');
 
     // wpis bez czasu (pod stoper) nie idzie do Jiry i nie blokuje „wszystko wysłane”

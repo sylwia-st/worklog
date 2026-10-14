@@ -57,6 +57,12 @@
             {% endfor %}
             </tbody>
         </table>
+        <div id="startat" class="flash" hidden style="margin-top:8px">
+            <label for="startat-time" style="display:inline; color:inherit">Stoper dla <b id="startat-issue"></b> od godziny</label>
+            <input type="time" id="startat-time">
+            <button type="button" id="startat-go" class="primary">Włącz od tej godziny</button>
+            <button type="button" id="startat-cancel">Anuluj</button>
+        </div>
         <div class="actions" style="margin-top:8px">
             <button type="button" id="addrow">+ Dodaj wiersz</button>
             {% if form.rows is empty %}
@@ -77,10 +83,19 @@
             <button type="submit" name="action" value="sync" class="primary">Zapisz i wyślij do Jiry</button>
             <span id="savestate" class="badge" aria-live="polite">{{ day ? 'zapisane' : 'nic jeszcze nie zapisano' }}</span>
         </div>
+        {# Za przyciskami „Zapisz” – żeby Enter w polu (domyślny przycisk formularza) nigdy nie potwierdzał usunięcia. #}
+        <div id="delconfirm" class="flash warning" {{ confirmDelete ? '' : 'hidden' }} style="margin-top:12px">
+            <p style="margin:0 0 6px"><strong>Usunąć zaznaczone wpisy?</strong> Jeśli wpis jest już w Jirze, zostanie z niej usunięty przy wysyłce.</p>
+            <ul id="delconfirm-list" style="margin:0 0 10px; padding-left:20px">
+                {% for r in confirmDelete ? confirmDelete.rows : [] %}<li>{{ [r.issue, r.time, r.desc]|filter(v => v)|join(' – ') }}</li>{% endfor %}
+            </ul>
+            <button type="submit" name="confirm_delete" value="{{ confirmDelete ? confirmDelete.action : 'save' }}" id="delconfirm-go" class="danger">Usuń zaznaczone</button>
+            <button type="button" id="delconfirm-cancel">Anuluj</button>
+        </div>
         <p class="muted small" style="margin:10px 0 0">
             <span class="dot synced"></span> w Jirze &nbsp; <span class="dot changed"></span> zmieniony &nbsp;
             <span class="dot new"></span> nowy &nbsp; <span class="dot error"></span> błąd.
-            Usunięcie wiersza (✕) zatwierdzasz przyciskiem „Zapisz”.
+            Usunięcie wiersza (✕) trzeba potwierdzić – aplikacja zapyta o to po kliknięciu „Zapisz”.
         </p>
     </form>
 </div>
@@ -98,7 +113,7 @@
 {% endblock %}
 
 {% macro entry_row(i, row) %}
-    <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}" data-key="{{ i }}">
+    <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}{{ row.delete|default(false) ? ' marked-delete' }}" data-key="{{ i }}">
         <td class="st">
             {% set titles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
             <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? titles[row.status] : '' }}"></span>
@@ -108,7 +123,7 @@
             <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
             <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue">
         </td>
-        <td class="tm"><button type="button" class="tbtn" title="Włącz stoper">▶</button></td>
+        <td class="tm"><button type="button" class="tbtn" title="Włącz stoper">▶</button><button type="button" class="tfrom" title="Włącz stoper od wcześniejszej godziny">od…</button></td>
         <td class="time">
             <input type="text" name="entries[{{ i }}][time]" value="{{ row.time }}" placeholder="1h 30m" class="f-time">
             <div class="live small"></div>
@@ -117,7 +132,7 @@
             <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc">{{ row.desc }}</textarea>
             <div class="rowerr">{% if row.error %}{{ row.status == 'error' ? 'Jira: ' }}{{ row.error }}{% endif %}</div>
         </td>
-        <td class="del"><input type="checkbox" name="entries[{{ i }}][delete]" value="1" class="f-del" title="Usuń wpis{{ row.status ? ' (także z Jiry)' }} – zatwierdź przyciskiem Zapisz"></td>
+        <td class="del"><input type="checkbox" name="entries[{{ i }}][delete]" value="1" class="f-del" {{ row.delete|default(false) ? 'checked' }} title="Usuń wpis{{ row.status ? ' (także z Jiry)' }} – po kliknięciu Zapisz aplikacja poprosi o potwierdzenie"></td>
     </tr>
 {% endmacro %}
 
@@ -250,9 +265,37 @@
         clearTimeout(debounce); clearTimeout(retryTimer);
         while (saving) await new Promise(r => setTimeout(r, 50));
         clearTimeout(debounce); clearTimeout(retryTimer);
+        // usunięcie wierszy nigdy nie zapisuje się samo – najpierw lista do potwierdzenia
+        if (ev.submitter !== delGo && markedRows().length) {
+            showDelConfirm(ev.submitter && ev.submitter.value === 'sync' ? 'sync' : 'save');
+            if (dirty !== savedDirty) debounce = setTimeout(save, 400);
+            return;
+        }
         submitting = true;
         form.requestSubmit(ev.submitter);
     });
+
+    // ---------- usuwanie wierszy: zawsze z potwierdzeniem ----------
+    // Serwer też usuwa tylko z potwierdzeniem (confirm_delete), a autozapis nie usuwa nigdy.
+    const delPanel = document.getElementById('delconfirm');
+    const delGo = document.getElementById('delconfirm-go');
+    const markedRows = () => [...rows.children].filter(tr => tr.querySelector('.f-del').checked && Number(tr.querySelector('.f-id').value) > 0);
+    function showDelConfirm(action) {
+        document.getElementById('delconfirm-list').replaceChildren(...markedRows().map(tr => {
+            const li = document.createElement('li');
+            li.textContent = ['.f-issue', '.f-time', '.f-desc'].map(s => tr.querySelector(s).value.trim()).filter(Boolean).join(' – ');
+            return li;
+        }));
+        delGo.value = action;
+        delPanel.hidden = false;
+        document.getElementById('delconfirm-cancel').focus();   // bezpieczny domyślny wybór
+    }
+    rows.addEventListener('change', (ev) => {
+        if (!ev.target.classList.contains('f-del')) return;
+        ev.target.closest('tr').classList.toggle('marked-delete', ev.target.checked);
+        if (!delPanel.hidden) { if (markedRows().length) showDelConfirm(delGo.value); else delPanel.hidden = true; }
+    });
+    document.getElementById('delconfirm-cancel').addEventListener('click', () => { delPanel.hidden = true; });
     document.addEventListener('keydown', (ev) => {
         if ((ev.ctrlKey || ev.metaKey) && ev.key === 's') { ev.preventDefault(); save(); }
     });
@@ -299,18 +342,43 @@
     const fmt = (m) => { m = Number(m) || 0; if (!m) return ''; const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`; };
     const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
 
-    rows.addEventListener('click', async (ev) => {
-        const btn = ev.target.closest('.tbtn'); if (!btn) return;
-        const tr = btn.closest('tr');
-        if (tr.classList.contains('running')) { await window.WorklogTimer.stop(); return; }
-        if (!tr.querySelector('.f-issue').value.trim()) { alert('Najpierw wpisz numer ticketu.'); tr.querySelector('.f-issue').focus(); return; }
+    // Zapisuje wiersz (jeśli trzeba) i włącza przy nim stoper – teraz albo od podanej godziny ('YYYY-MM-DDTHH:MM').
+    async function startRow(tr, btn, at) {
+        if (!tr.querySelector('.f-issue').value.trim()) { alert('Najpierw wpisz numer ticketu.'); tr.querySelector('.f-issue').focus(); return false; }
         btn.disabled = true;
         if (dirty || tr.querySelector('.f-id').value === '0') { await save(); }
         btn.disabled = false;
         const id = tr.querySelector('.f-id').value;
-        if (!id || id === '0') { alert('Nie udało się zapisać wiersza – sprawdź numer ticketu i czas.'); return; }
-        await window.WorklogTimer.start(Number(id));
+        if (!id || id === '0') { alert('Nie udało się zapisać wiersza – sprawdź numer ticketu i czas.'); return false; }
+        await window.WorklogTimer.start(Number(id), at);
+        return true;
+    }
+
+    rows.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('.tbtn'); if (!btn) return;
+        const tr = btn.closest('tr');
+        if (tr.classList.contains('running')) { await window.WorklogTimer.stop(); return; }
+        await startRow(tr, btn);
     });
+
+    // „od…” – stoper od wcześniejszej godziny (zaczęło się zadanie, a ▶ nie zostało kliknięte od razu)
+    const startAt = document.getElementById('startat');
+    let startAtRow = null;
+    rows.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('.tfrom'); if (!btn) return;
+        startAtRow = btn.closest('tr');
+        const now = new Date();
+        document.getElementById('startat-issue').textContent = startAtRow.querySelector('.f-issue').value.trim() || 'tego wiersza';
+        document.getElementById('startat-time').value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        startAt.hidden = false;
+        document.getElementById('startat-time').focus();
+    });
+    document.getElementById('startat-cancel').onclick = () => { startAt.hidden = true; startAtRow = null; };
+    document.getElementById('startat-go').onclick = async (ev) => {
+        const time = document.getElementById('startat-time').value;
+        if (!startAtRow || !time) return;
+        if (await startRow(startAtRow, ev.target, DATE + 'T' + time).catch(() => false)) { startAt.hidden = true; startAtRow = null; }
+    };
 
     document.addEventListener('timer:update', (ev) => {
         const s = ev.detail;

@@ -135,12 +135,15 @@ table(['Zakładka', 'Do czego służy'], [
     ['Dzień', 'Wpisywanie czasu, wysyłka do Jiry, tekst na Slacka, mail o nadgodzinach / krótszym dniu.'],
     ['Przegląd', 'Ostatnie 4 tygodnie: co jest wysłane, a czego brakuje. Nadchodzące planowane zmiany.'],
     ['Planowane zmiany', 'Zgłoszenie późniejszego przyjścia, wcześniejszego wyjścia lub krótszego dnia.'],
-    ['Ustawienia', 'Forma w tekstach, połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
+    ['Ustawienia', 'Forma w tekstach, wygląd (motyw), połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
 ], [40, 130])
 
 h('1. Pierwsze uruchomienie')
 p('Instalacja (jednorazowo, w terminalu, w katalogu z narzędziem):')
 cmd('sudo usermod -aG docker $USER      # potem wyloguj się i zaloguj\n./install.sh')
+p(f'{B("Na Windowsie:")} zainstaluj i uruchom Docker Desktop, potem kliknij dwukrotnie {M("install.cmd")}. '
+  f'Polecenia {M("./worklog …")} z tej instrukcji wpisujesz jako {M(".\\worklog.cmd …")} (w PowerShellu lub cmd, '
+  f'w katalogu z narzędziem). Przypomnienie i kopie zapasowe robi agent w tle, który startuje razem z Windowsem.')
 p(f'Instalator zapyta o {B("formę w tekstach")} – jak aplikacja ma się zwracać do użytkownika i w jakiej formie '
   f'pisać domyślne maile:')
 table(['Forma', 'W aplikacji', 'W mailu o nadgodzinach'], [
@@ -167,6 +170,9 @@ table(['Twoja Jira', 'Pole „E-mail”', 'Skąd wziąć token'], [
 ], [45, 40, 85])
 box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba. Admina pytasz tylko wtedy, '
           'gdy w profilu nie ma opcji tokenów.')
+p(f'Kolory aplikacji zmienisz w {B("Ustawienia → Wygląd")}: gotowe motywy (m.in. Ciemny, Nocny, Sepia, Wysoki kontrast) '
+  f'albo {B("Własny")} – 15 kolorów do wyboru, z podglądem na żywo. Domyślny motyw Automatyczny jest jasny albo ciemny '
+  f'tak jak system.')
 
 h('2. Wpisanie dnia')
 steps(
@@ -210,6 +216,11 @@ steps(
     'strony – pasek stopera.',
     'Przełączasz się na inne zadanie? Kliknij ▶ przy innym tickecie – poprzedni stoper zatrzyma się sam (działa '
     'zawsze najwyżej jeden).',
+    f'Zadanie zaczęło się wcześniej, a ▶ nie zostało kliknięte od razu? Kliknij {B("od…")} pod ▶, wpisz godzinę '
+    f'startu i {B("Włącz od tej godziny")}. Stoper liczy od tej godziny, a poprzedni zatrzymuje się właśnie o niej. '
+    f'Godzina nie może być w przyszłości i musi być późniejsza niż start działającego stopera (ten zatrzyma się '
+    f'właśnie o niej). Nie może też wypaść przed ostatnim zatrzymaniem stopera – czas zmierzony stoperem nigdy się '
+    f'nie nakłada.',
     f'Koniec pracy nad zadaniem lub przerwa: ❚❚ w wierszu albo {B("❚❚ Zatrzymaj")} na pasku. Zmierzony czas '
     f'dopisuje się do pola Czas.')
 table(['Jak liczy', 'Przykład'], [
@@ -221,7 +232,8 @@ bullets(
     'Godzina startu stopera jest zapisana w bazie – zamknięcie przeglądarki ani restart komputera go nie gubią.',
     f'Jeśli stoper działa od innego dnia (komputer uśpiony, zostawiony na noc) albo dłużej niż 6h, na górze strony '
     f'pojawi się pytanie „O której go zatrzymać?” z podpowiedzią końca dnia pracy. Wybierz godzinę i kliknij '
-    f'{B("Zatrzymaj o tej godzinie")} – nie doliczy się czas, w którym nie było pracy. Jeśli praca faktycznie trwa '
+    f'{B("Zatrzymaj o tej godzinie")} – nie doliczy się czas, w którym nie było pracy. Godzina zatrzymania musi być '
+    f'późniejsza niż start stopera. Jeśli praca faktycznie trwa '
     f'tyle bez przerwy: {B("Pracuję dalej")}.',
     'W czasie działania stopera pole Czas jest tylko do odczytu. Po zatrzymaniu możesz je poprawić ręcznie (np. gdy '
     'stoper nie został zatrzymany na przerwę).',
@@ -245,9 +257,11 @@ h('5. Poprawianie i usuwanie wpisów')
 table(['Chcesz…', 'Zrób tak', 'Co stanie się w Jirze'], [
     ['zmienić czas lub opis', 'Popraw w wierszu → Zapisz i wyślij do Jiry', 'Ten sam worklog zostanie zaktualizowany (bez duplikatu).'],
     ['zmienić numer ticketu', 'Popraw numer → Zapisz i wyślij do Jiry', 'Worklog zniknie ze starego ticketu i pojawi się w nowym.'],
-    ['usunąć wpis', 'Zaznacz ✕ w wierszu → Zapisz i wyślij do Jiry', 'Worklog zostanie usunięty z Jiry.'],
+    ['usunąć wpis', 'Zaznacz ✕ w wierszu → Zapisz i wyślij do Jiry → Usuń zaznaczone', 'Worklog zostanie usunięty z Jiry.'],
 ], [40, 65, 65])
 bullets(
+    f'Usunięcie zawsze wymaga potwierdzenia: po kliknięciu Zapisz przy zaznaczonym ✕ pod przyciskami pojawia się lista '
+    f'wpisów do usunięcia. Usuwa je dopiero {B("Usuń zaznaczone")}; {B("Anuluj")} niczego nie zmienia. Autozapis nigdy nie usuwa.',
     'Samo Zapisz przy zaznaczonym ✕ chowa wpis z listy, ale w Jirze zostaje on do najbliższej wysyłki – pod tabelą '
     'widać ostrzeżenie „zostaną usunięte z Jiry”.',
     f'Narzędzie zmienia i usuwa tylko worklogi, które samo dodało. Wpisy dodane ręcznie w Jirze usuwasz w Jirze '
@@ -304,6 +318,8 @@ table(['Kolumna', 'Co znaczy'], [
     ['Jira', '✓ – wszystko wysłane; np. 2/4 – wysłano 2 z 4 wpisów (zaległość).'],
     ['Slack / Mail', '✓ – zrobione; „do wysłania” – jeszcze nie; „niepotrzebny” – bilans w normie.'],
 ], [45, 125])
+p(f'Domyślnie najnowsze dni są na górze. Kliknięcie nagłówka {B("Dzień ↓")} odwraca kolejność (najstarsze na górze, '
+  f'{B("Dzień ↑")}); aplikacja zapamiętuje wybór.')
 p('Zaległy dzień: kliknij jego datę, uzupełnij i wyślij jak zwykle – trafi pod właściwą datę.')
 
 h('10. Przypomnienie')
@@ -314,6 +330,8 @@ p(f'Od poniedziałku do piątku o wybranej godzinie (domyślnie 15:45) pojawia s
 p(f'Godzinę zmieniasz w {B("Ustawienia → Przypomnienie")} (między 06:00 a 22:00); puste pole wyłącza przypomnienie.')
 cmd('./worklog remind                 # sprawdź teraz w terminalu\n'
     './install.sh --no-remind         # wyłączenie razem z timerem systemd')
+p(f'Na Windowsie powiadomienie przychodzi od „Windows PowerShell” – kliknięcie otwiera raport. Wyłączenie: '
+  f'{M(".\\install.cmd -NoRemind")}.', small)
 
 h('11. Szablony maili i Slacka')
 p(f'W {B("Ustawieniach")} każdy tekst możesz zmienić. W nawiasy klamrowe wpisujesz zmienne, które narzędzie podmieni:')
@@ -341,10 +359,11 @@ table(['Objaw / komunikat', 'Co zrobić'], [
     ['„Brak połączenia z Jirą”', f'Sprawdź adres Jiry w ustawieniach i czy otwiera się w przeglądarce. Jeśli działa '
      f'tylko przez VPN: {M("./install.sh --vpn")}.'],
     ['„Popraw zaznaczone wiersze”', 'Wiersz z czerwoną ramką ma zły numer ticketu (np. ABC-123) albo czas.'],
-    ['Program pocztowy się nie otwiera', 'Ustaw domyślny program pocztowy w Ubuntu (Ustawienia → Aplikacje domyślne) '
-     'albo użyj Kopiuj treść.'],
-    ['Brak powiadomień', f'Sprawdź godzinę w Ustawieniach → Przypomnienie. Zainstaluj libnotify-bin; sprawdź '
-     f'{M("systemctl --user status worklog-remind.timer")}.'],
+    ['Program pocztowy się nie otwiera', 'Ustaw domyślny program pocztowy (Ubuntu: Ustawienia → Aplikacje domyślne; '
+     'Windows: Ustawienia → Aplikacje → Aplikacje domyślne) albo użyj Kopiuj treść.'],
+    ['Brak powiadomień', f'Sprawdź godzinę w Ustawieniach → Przypomnienie. Ubuntu: zainstaluj libnotify-bin; sprawdź '
+     f'{M("systemctl --user status worklog-remind.timer")}. Windows: włącz powiadomienia dla „Windows PowerShell” '
+     f'(Ustawienia → System → Powiadomienia); błędy agenta są w pliku .agent.log w katalogu kopii.'],
 ], [58, 112], key_column=False)
 
 h('13. Bezpieczeństwo danych')

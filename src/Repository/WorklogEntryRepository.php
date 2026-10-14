@@ -23,4 +23,16 @@ class WorklogEntryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** Wpis, przy którym stoper zatrzymano najpóźniej (pomija usunięte – ich czas się nie liczy). */
+    public function findLastStopped(): ?WorklogEntry
+    {
+        return $this->createQueryBuilder('e')
+            ->andWhere('e.timerStoppedAt IS NOT NULL')
+            ->andWhere('e.deleted = false')
+            ->orderBy('e.timerStoppedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

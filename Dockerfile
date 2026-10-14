@@ -29,7 +29,9 @@ RUN addgroup -g 1000 app \
  && mkdir -p /data /app/var \
  && chown app:app /data /app/var
 COPY --from=vendor --chown=app:app /app /app
-RUN chmod +x /app/docker/entrypoint.sh /app/bin/console
+# CRLF w skrypcie startowym (kopia rozpakowana/edytowana na Windowsie) dawałby niejasny błąd „no such file or directory”
+RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
+ && chmod +x /app/docker/entrypoint.sh /app/bin/console
 USER app
 RUN APP_SECRET=build-only php bin/console cache:warmup --no-interaction
 

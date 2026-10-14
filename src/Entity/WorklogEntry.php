@@ -54,6 +54,10 @@ class WorklogEntry
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $timerStartedAt = null;
 
+    /** Kiedy ostatnio zatrzymano stoper przy tym wpisie – nowy stoper nie może zacząć się wcześniej (czas by się nakładał). */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $timerStoppedAt = null;
+
     /** Sekundy ze stopera, które nie złożyły się jeszcze w pełną minutę (0–59) – kolejne sesje je dopełniają. */
     #[ORM\Column(options: ['default' => 0])]
     private int $carrySeconds = 0;
@@ -71,6 +75,11 @@ class WorklogEntry
     public function getTimerStartedAt(): ?\DateTimeImmutable
     {
         return $this->timerStartedAt;
+    }
+
+    public function getTimerStoppedAt(): ?\DateTimeImmutable
+    {
+        return $this->timerStoppedAt;
     }
 
     public function isTimerRunning(): bool
@@ -95,6 +104,7 @@ class WorklogEntry
             return 0;
         }
         $elapsed = max(0, $at->getTimestamp() - $this->timerStartedAt->getTimestamp());
+        $this->timerStoppedAt = max($at, $this->timerStartedAt);
         $this->timerStartedAt = null;
         $this->addTrackedSeconds($elapsed);
 

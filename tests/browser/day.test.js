@@ -19,20 +19,22 @@ function scripts(file) {
 const row = (i, r) => `<tr data-key="${i}"><td class="st"><span class="dot ${r.status || 'none'}"></span></td>
  <td class="issue"><input type="hidden" name="entries[${i}][id]" value="${r.id}" class="f-id"><input type="hidden" name="entries[${i}][orig]" value="${r.time}" class="f-orig">
  <input type="text" name="entries[${i}][issue]" value="${r.issue}" class="f-issue"></td>
- <td class="tm"><button type="button" class="tbtn">▶</button></td>
+ <td class="tm"><button type="button" class="tbtn">▶</button><button type="button" class="tfrom">od…</button></td>
  <td class="time"><input type="text" name="entries[${i}][time]" value="${r.time}" class="f-time"><div class="live"></div></td>
  <td><textarea name="entries[${i}][desc]" class="f-desc">${r.desc}</textarea><div class="rowerr"></div></td>
  <td class="del"><input type="checkbox" name="entries[${i}][delete]" value="1" class="f-del"></td></tr>`;
 
 function page(rows, storage) {
     const html = `<!doctype html><body>
- <div id="timerbar" hidden><b id="tb-issue"></b><span id="tb-date"></span><span id="tb-time"></span><button id="tb-stop"></button><a id="tb-link"></a></div>
+ <div id="timerbar" hidden><b id="tb-issue"></b><span id="tb-date"></span><span id="tb-since"></span><span id="tb-time"></span><button id="tb-stop"></button><a id="tb-link"></a></div>
  <div id="timerstale" hidden><strong id="ts-msg"></strong><input id="ts-at"><button id="ts-stop-at"></button><button id="ts-stop-now"></button><button id="ts-keep"></button></div>
  <div id="draft-banner" hidden><span id="draft-msg"></span><button id="draft-restore"></button><button id="draft-discard"></button></div>
  <form id="dayform"><input id="start" name="start" value="08:00"><input id="end" name="end" value="16:00"><label id="break-label">Dodatkowa przerwa</label><input id="break" name="break" value="">
   <input type="checkbox" id="lunch_worked" name="lunch_worked" value="1" data-lunch="1h" data-help-on="POMOC-WŁ" data-help-off="POMOC-WYŁ"><p id="lunch-help">POMOC-WYŁ</p>
   <table><tbody id="rows">${rows.map((r, i) => row(i, r)).join('')}</tbody></table>
-  <button type="button" id="addrow"></button><button type="submit" name="action" value="sync" id="syncbtn"></button><span id="savestate"></span></form>
+  <div id="startat" hidden><b id="startat-issue"></b><input type="time" id="startat-time"><button type="button" id="startat-go"></button><button type="button" id="startat-cancel"></button></div>
+  <button type="button" id="addrow"></button><button type="submit" name="action" value="sync" id="syncbtn"></button><span id="savestate"></span>
+  <div id="delconfirm" hidden><ul id="delconfirm-list"></ul><button type="submit" name="confirm_delete" value="save" id="delconfirm-go"></button><button type="button" id="delconfirm-cancel"></button></div></form>
  <div id="panels"></div>
  <template id="rowtpl">${row('__i__', {id: 0, issue: '', time: '', desc: ''})}</template></body>`;
     const dom = new JSDOM(html, {runScripts: 'outside-only', url: 'http://127.0.0.1:8765/day/2026-10-20'});
@@ -62,7 +64,7 @@ function page(rows, storage) {
         } else if (url.includes('panels')) {
             return {ok: true, text: async () => '<p>panels</p>'};
         } else if (url.includes('/timer/start')) {
-            w.timer = {running: true, entryId: body.entryId, issue: 'ABC-1', date: '2026-10-20', baseSeconds: 3600, elapsedSeconds: 0, stale: null, startedAt: 'x'};
+            w.timer = {running: true, entryId: body.entryId, issue: 'ABC-1', date: '2026-10-20', baseSeconds: 3600, elapsedSeconds: 0, stale: null, startedAt: 'x', startedLabel: body.at ? '20.10 ' + body.at.slice(11) : '20.10 12:00'};
             json = w.timer;
         } else if (url.includes('/timer/stop')) {
             const id = w.timer.entryId; w.timer = {running: false}; json = {running: false, stopped: {entryId: id, minutes: 75, date: '2026-10-20'}};
@@ -225,6 +227,58 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     check('obiad zaznaczony', [w9.document.getElementById('lunch-help').textContent, w9.document.getElementById('break').value, w9.document.getElementById('break-label').textContent], ['POMOC-WŁ', '1h', 'Przerwa wzięta (łącznie)']);
     lw9.checked = false; fire(w9, lw9, 'change');
     check('obiad odznaczony', [w9.document.getElementById('lunch-help').textContent, w9.document.getElementById('break').value], ['POMOC-WYŁ', '']);
+
+    // 14. „od…” – stoper od podanej godziny: pole z godziną, start z datą dnia i tą godziną
+    const w10 = page([{id: 7, issue: 'ABC-1', time: '', desc: 'a'}]);
+    await sleep(30);
+    const tr10 = w10.document.querySelector('[data-key="0"]');
+    tr10.querySelector('.tfrom').click();
+    const box = w10.document.getElementById('startat');
+    check('od…: pole godziny widoczne', [box.hidden, w10.document.getElementById('startat-issue').textContent, /^\d\d:\d\d$/.test(w10.document.getElementById('startat-time').value)], [false, 'ABC-1', true]);
+    w10.document.getElementById('startat-time').value = '09:15';
+    w10.document.getElementById('startat-go').click();
+    await sleep(100);
+    check('od…: start z godziną', w10.calls.find(c => c.url.includes('/timer/start'))?.body, {entryId: 7, at: '2026-10-20T09:15'});
+    check('od…: pole schowane, wiersz działa', [box.hidden, tr10.classList.contains('running')], [true, true]);
+    check('od…: pasek pokazuje godzinę startu', w10.document.getElementById('tb-since').textContent, 'od 20.10 09:15');
+    tr10.querySelector('.tbtn').click(); await sleep(50);
+    tr10.querySelector('.tfrom').click();
+    w10.document.getElementById('startat-cancel').click();
+    check('od…: anuluj', [box.hidden, w10.calls.filter(c => c.url.includes('/timer/start')).length], [true, 1]);
+
+    // 15. usunięcie wiersza zawsze z potwierdzeniem: lista do potwierdzenia, Anuluj, Usuń zaznaczone
+    const w11 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'opis'}, {id: 8, issue: 'XYZ-2', time: '30m', desc: ''}]);
+    await sleep(30);
+    const d11 = w11.document, panel11 = d11.getElementById('delconfirm');
+    const del11 = d11.querySelector('[data-key="0"] .f-del');
+    del11.checked = true; fire(w11, del11, 'change');
+    check('✕: wiersz przekreślony', d11.querySelector('[data-key="0"]').classList.contains('marked-delete'), true);
+    d11.getElementById('dayform').requestSubmit(d11.getElementById('syncbtn'));
+    await sleep(100);
+    check('✕ + wyślij: nic nie wysłano, pytanie z listą', [w11.submits.length, panel11.hidden, d11.getElementById('delconfirm-list').textContent, d11.getElementById('delconfirm-go').value],
+        [0, false, 'ABC-1 – 1h – opis', 'sync']);
+    check('✕ + wyślij: kursor na Anuluj', d11.activeElement.id, 'delconfirm-cancel');
+    d11.getElementById('delconfirm-cancel').click();
+    check('Anuluj: nic nie wysłano, zaznaczenie zostaje', [w11.submits.length, panel11.hidden, del11.checked], [0, true, true]);
+    d11.getElementById('dayform').requestSubmit(d11.getElementById('syncbtn'));
+    await sleep(100);
+    d11.getElementById('delconfirm-go').click();
+    await sleep(100);
+    check('Usuń zaznaczone: wysłano z potwierdzeniem i akcją', w11.submits.map(s => [s.confirm_delete, s.action, s['entries[0][delete]'], s['entries[1][delete]']]),
+        [['sync', undefined, '1', undefined]]);
+
+    // 16. odznaczenie ✕ przy otwartym pytaniu chowa je; bez zaznaczeń zapis idzie od razu
+    const w12 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    const d12 = w12.document, del12 = d12.querySelector('[data-key="0"] .f-del');
+    del12.checked = true; fire(w12, del12, 'change');
+    d12.getElementById('dayform').requestSubmit(d12.getElementById('syncbtn'));
+    await sleep(100);
+    del12.checked = false; fire(w12, del12, 'change');
+    check('odznaczenie ✕ chowa pytanie', [d12.getElementById('delconfirm').hidden, d12.querySelector('[data-key="0"]').classList.contains('marked-delete')], [true, false]);
+    d12.getElementById('dayform').requestSubmit(d12.getElementById('syncbtn'));
+    await sleep(100);
+    check('bez ✕ zapis bez pytania', w12.submits.map(s => [s.action, s.confirm_delete]), [['sync', undefined]]);
 
     console.log(fails ? `\n${fails} błędów` : 'OK – wszystkie testy przeglądarkowe przeszły');
     process.exit(fails ? 1 : 0);
