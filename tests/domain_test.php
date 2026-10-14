@@ -140,10 +140,14 @@ foreach (Theme::palettes() as $id => $c) {
     sort($expected);
     check("motyw $id: komplet kolorów", $keys, $expected);
     check("motyw $id: same #rrggbb", array_filter($c, static fn (string $v) => !Theme::isColor($v)), []);
-    // czytelność wg WCAG: tekst 4.5:1 (główny 7:1), komunikaty co najmniej jak elementy interfejsu 3:1
+    // czytelność wg WCAG: tekst 4.5:1 (główny 7:1). Kolory komunikatów to też tekst: na swoim tle (plakietki, komunikaty),
+    // na panelu i na tle strony (bilans w tabelach, błędy pod wierszami)
     $low = [];
-    foreach ([['ink', 'bg', 7], ['ink', 'panel', 7], ['muted', 'panel', 4.5], ['muted', 'bg', 4.5], ['accent', 'panel', 4.5], ['accent-ink', 'accent', 4.5],
-              ['ok', 'ok-bg', 3], ['warn', 'warn-bg', 3], ['err', 'err-bg', 3], ['info', 'info-bg', 3]] as [$fg, $bg, $min]) {
+    $pairs = [['ink', 'bg', 7], ['ink', 'panel', 7], ['muted', 'panel', 4.5], ['muted', 'bg', 4.5], ['accent', 'panel', 4.5], ['accent-ink', 'accent', 4.5]];
+    foreach (['ok', 'warn', 'err', 'info'] as $k) {
+        array_push($pairs, [$k, $k.'-bg', 4.5], [$k, 'panel', 4.5], [$k, 'bg', 4.5]);
+    }
+    foreach ($pairs as [$fg, $bg, $min]) {
         if ($contrast($c[$fg], $c[$bg]) < $min) {
             $low[] = sprintf('%s/%s %.2f', $fg, $bg, $contrast($c[$fg], $c[$bg]));
         }

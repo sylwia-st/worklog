@@ -34,7 +34,7 @@ final class Theme
     public const BUILT_IN = [
         'light' => ['Jasny', [
             'bg' => '#f6f5f2', 'panel' => '#ffffff', 'ink' => '#1d1d1b', 'muted' => '#6b6a66', 'line' => '#e2e0da',
-            'accent' => '#2f5d50', 'accent-ink' => '#ffffff', 'ok' => '#2e7d4f', 'ok-bg' => '#e7f3ec', 'warn' => '#a86a00',
+            'accent' => '#2f5d50', 'accent-ink' => '#ffffff', 'ok' => '#2d794d', 'ok-bg' => '#e7f3ec', 'warn' => '#996000',
             'warn-bg' => '#fbf1dc', 'err' => '#b3261e', 'err-bg' => '#fbe7e5', 'info' => '#3c5a8a', 'info-bg' => '#e8eef8',
         ]],
         'dark' => ['Ciemny', [
@@ -44,7 +44,7 @@ final class Theme
         ]],
         'sea' => ['Morski', [
             'bg' => '#f2f6f9', 'panel' => '#ffffff', 'ink' => '#14212b', 'muted' => '#5d6b77', 'line' => '#d9e2ea',
-            'accent' => '#1f5f8b', 'accent-ink' => '#ffffff', 'ok' => '#2e7d4f', 'ok-bg' => '#e6f3ec', 'warn' => '#9a6200',
+            'accent' => '#1f5f8b', 'accent-ink' => '#ffffff', 'ok' => '#2d794d', 'ok-bg' => '#e6f3ec', 'warn' => '#9a6200',
             'warn-bg' => '#fbf0d9', 'err' => '#b3261e', 'err-bg' => '#fbe7e5', 'info' => '#1f5f8b', 'info-bg' => '#e3eef7',
         ]],
         'sepia' => ['Sepia', [
