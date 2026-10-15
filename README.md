@@ -129,7 +129,7 @@ Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, któr
 
 ## Wygląd
 
-W **Ustawieniach → Wygląd** wybierasz motyw: Automatyczny (domyślny – jasny albo ciemny jak w systemie), Jasny, Ciemny, Morski, Sepia, Nocny albo Wysoki kontrast. Motyw **Własny** pozwala ustawić 15 kolorów (tła, tekst, akcent, kolory komunikatów); „Wczytaj kolory z motywu” daje punkt wyjścia. Zmianę widać od razu na stronie Ustawień, a po zapisie – na wszystkich stronach.
+Jeden ciemny motyw z poświatą (kolory w `templates/base.html.twig`, w `:root`; `tests/domain_test.php` sprawdza ich kontrast). Każdy ticket na osi dnia ma własny kolor – ten sam przy jego wierszu.
 
 ## Obsługa
 
@@ -173,7 +173,7 @@ Jeśli wolisz rzadsze aktualizacje, możesz zamiast tego użyć LTS: `7.4.*` (ws
 ```bash
 docker exec worklog php tests/domain_test.php
 docker exec worklog php tests/services_test.php
-cd tests/browser && npm install && npm test     # autozapis, szkic, stoper, usuwanie, podgląd motywu – w symulowanej przeglądarce
+cd tests/browser && npm install && npm test     # autozapis, szkic, stoper, usuwanie, od–do, tytuły – w symulowanej przeglądarce
 ```
 
 ## Instrukcja PDF

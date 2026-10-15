@@ -139,7 +139,7 @@ table(['Zakładka', 'Do czego służy'], [
     ['Miesiąc', 'Bilans miesiąca, nadgodziny i niedobory, czas per ticket, eksport do CSV.'],
     ['Planowane zmiany', 'Zgłoszenie późniejszego przyjścia, wcześniejszego wyjścia lub krótszego dnia.'],
     ['Wolne', 'Urlop, L4 i inne dni wolne; najbliższe święta.'],
-    ['Ustawienia', 'Forma w tekstach, wygląd (motyw), połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
+    ['Ustawienia', 'Forma w tekstach, połączenie z Jirą, godziny pracy, przypomnienie, adresaci i treści maili, szablon Slacka.'],
 ], [40, 130])
 
 h('1. Pierwsze uruchomienie')
@@ -174,9 +174,6 @@ table(['Twoja Jira', 'Pole „E-mail”', 'Skąd wziąć token'], [
 ], [45, 40, 85])
 box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba. Admina pytasz tylko wtedy, '
           'gdy w profilu nie ma opcji tokenów.')
-p(f'Kolory aplikacji zmienisz w {B("Ustawienia → Wygląd")}: gotowe motywy (m.in. Ciemny, Nocny, Sepia, Wysoki kontrast) '
-  f'albo {B("Własny")} – 15 kolorów do wyboru, z podglądem na żywo. Domyślny motyw Automatyczny jest jasny albo ciemny '
-  f'tak jak system.')
 
 h('2. Wpisanie dnia')
 steps(

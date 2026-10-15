@@ -81,10 +81,6 @@ final class Settings
 
         // Przegląd: kolejność dni (desc = najnowsze na górze, asc = najstarsze) – zapamiętana po kliknięciu nagłówka
         'dashboard_sort' => 'desc',
-
-        // Wygląd: motyw (auto = jasny/ciemny jak system, patrz App\Domain\Theme) i kolory motywu własnego (JSON)
-        'theme' => 'auto',
-        'theme_custom' => '',
     ];
 
     /** Dawne domyślne teksty – zapisane bez zmian traktujemy jak domyślne, więc przechodzą na obecne. */

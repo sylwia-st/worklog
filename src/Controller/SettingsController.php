@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\Domain\ReminderSchedule;
 use App\Domain\Template;
-use App\Domain\Theme;
 use App\Domain\TimeFormat;
 use App\Service\JiraClient;
 use App\Service\JiraException;
@@ -23,10 +22,6 @@ final class SettingsController extends AbstractController
     private const FORM = [
         'Ogólne' => [
             'forma' => ['Forma w tekstach', 'select', 'Jak aplikacja zwraca się do Ciebie i w jakiej formie pisze domyślne maile, np. „pracowałam / pracowałem dłużej” albo neutralnie „mój czas pracy był dłuższy”. Zmiana podmienia też treści maili, których nie edytowano.'],
-        ],
-        'Wygląd' => [
-            'theme' => ['Motyw', 'select', 'Kolory całej aplikacji. Zmianę widać od razu na tej stronie – kliknij Zapisz ustawienia, żeby została.'],
-            'theme_custom' => ['Kolory motywu własnego', 'colors', 'Kliknij kolor, żeby go zmienić. Zadbaj, żeby tekst był dobrze widoczny na tle.'],
         ],
         'Jira' => [
             'jira_url' => ['Adres Jiry', 'url', 'np. https://firma.atlassian.net albo https://jira.firma.pl'],
@@ -87,10 +82,8 @@ final class SettingsController extends AbstractController
     {
         $values = [];
         foreach (self::FORM as $fields) {
-            foreach ($fields as $key => [, $type]) {
-                if ('colors' !== $type) {
-                    $values[$key] = str_replace("\r\n", "\n", trim((string) $request->request->get($key, '')));
-                }
+            foreach (array_keys($fields) as $key) {
+                $values[$key] = str_replace("\r\n", "\n", trim((string) $request->request->get($key, '')));
             }
         }
         if ('' === $values['jira_token']) {
@@ -100,21 +93,6 @@ final class SettingsController extends AbstractController
         $errors = [];
         if (!isset(Settings::FORMS[$values['forma']])) {
             $errors[] = 'Wybierz formę w tekstach.';
-        }
-        if (!isset(Theme::choices()[$values['theme']])) {
-            $errors[] = 'Wybierz motyw.';
-        }
-        $colors = $request->request->all('theme_custom');
-        if ([] !== $colors) {
-            $custom = [];
-            foreach (array_keys(Theme::VARS) as $name) {
-                if (!Theme::isColor((string) ($colors[$name] ?? ''))) {
-                    $errors[] = 'Kolory motywu własnego wybierz z palety (format #rrggbb).';
-                    break;
-                }
-                $custom[$name] = strtolower((string) $colors[$name]);
-            }
-            $values['theme_custom'] = (string) json_encode($custom);
         }
         if ('' !== $values['jira_url'] && !preg_match('#^https?://[^\s/]+#', $values['jira_url'])) {
             $errors[] = 'Adres Jiry musi zaczynać się od https://';
@@ -207,12 +185,8 @@ final class SettingsController extends AbstractController
     {
         return $this->render('settings.html.twig', [
             'form' => self::FORM,
-            'options' => ['forma' => Settings::FORMS, 'theme' => Theme::choices()],
+            'options' => ['forma' => Settings::FORMS],
             'values' => $values,
-            // motyw własny jeszcze nieustawiony → zaczyna od kolorów obecnego motywu
-            'themeColors' => '' !== $values['theme_custom'] ? Theme::custom($values['theme_custom']) : (Theme::palettes()[$values['theme']] ?? Theme::palettes()['light']),
-            'themeVars' => Theme::VARS,
-            'palettes' => Theme::palettes(),
             'hasToken' => '' !== $settings->get('jira_token'),
             'issueCount' => count($settings->issueCache()),
         ], new Response(status: $status));

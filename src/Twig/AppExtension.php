@@ -3,7 +3,6 @@
 namespace App\Twig;
 
 use App\Domain\Template;
-use App\Domain\Theme;
 use App\Domain\TimeFormat;
 use App\Service\Settings;
 use Twig\Extension\AbstractExtension;
@@ -36,8 +35,6 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('plural', Template::plural(...)),
             // „dziś”, „jutro”, „piątek 16.10”
             new TwigFunction('rel_day', static fn (\DateTimeInterface $d) => Template::relativeDay($d, new \DateTimeImmutable('today'))),
-            // zmienne CSS wybranego motywu (kolory są sprawdzone: tylko #rrggbb)
-            new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme'), $this->settings->get('theme_custom')), ['is_safe' => ['html']]),
         ];
     }
 }
