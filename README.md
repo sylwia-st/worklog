@@ -129,7 +129,7 @@ Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, któr
 
 ## Wygląd
 
-Jeden ciemny motyw z poświatą (kolory w `templates/base.html.twig`, w `:root`; `tests/domain_test.php` sprawdza ich kontrast). Każdy ticket na osi dnia ma własny kolor – ten sam przy jego wierszu.
+W **Ustawieniach → Wygląd** wybierasz jeden z ciemnych motywów z poświatą: Aurora (domyślny, fiolet i błękit), Głębia (turkus), Zachód (pomarańcz i róż), Neon (róż i fiolet) albo Grafit (szarości). Kliknięty motyw widać od razu, po zapisie – na wszystkich stronach. Kolory są w `src/Domain/Theme.php`, a `tests/domain_test.php` sprawdza ich kontrast. Każdy ticket na osi dnia ma własny kolor – ten sam przy jego wierszu.
 
 ## Obsługa
 

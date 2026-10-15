@@ -1,5 +1,5 @@
 {
   "private": true,
-  "scripts": { "test": "node day.test.js" },
+  "scripts": { "test": "node day.test.js && node settings.test.js" },
   "devDependencies": { "jsdom": "^24" }
 }

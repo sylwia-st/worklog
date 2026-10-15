@@ -81,6 +81,9 @@ final class Settings
 
         // Przegląd: kolejność dni (desc = najnowsze na górze, asc = najstarsze) – zapamiętana po kliknięciu nagłówka
         'dashboard_sort' => 'desc',
+
+        // Wygląd: motyw, patrz App\Domain\Theme
+        'theme' => 'aurora',
     ];
 
     /** Dawne domyślne teksty – zapisane bez zmian traktujemy jak domyślne, więc przechodzą na obecne. */

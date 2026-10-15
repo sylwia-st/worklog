@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Domain\ReminderSchedule;
 use App\Domain\Template;
+use App\Domain\Theme;
 use App\Domain\TimeFormat;
 use App\Service\JiraClient;
 use App\Service\JiraException;
@@ -22,6 +23,9 @@ final class SettingsController extends AbstractController
     private const FORM = [
         'Ogólne' => [
             'forma' => ['Forma w tekstach', 'select', 'Jak aplikacja zwraca się do Ciebie i w jakiej formie pisze domyślne maile, np. „pracowałam / pracowałem dłużej” albo neutralnie „mój czas pracy był dłuższy”. Zmiana podmienia też treści maili, których nie edytowano.'],
+        ],
+        'Wygląd' => [
+            'theme' => ['Motyw', 'themes', 'Kliknij motyw, żeby zobaczyć go od razu na tej stronie – zostanie po kliknięciu Zapisz ustawienia.'],
         ],
         'Jira' => [
             'jira_url' => ['Adres Jiry', 'url', 'np. https://firma.atlassian.net albo https://jira.firma.pl'],
@@ -93,6 +97,9 @@ final class SettingsController extends AbstractController
         $errors = [];
         if (!isset(Settings::FORMS[$values['forma']])) {
             $errors[] = 'Wybierz formę w tekstach.';
+        }
+        if (!isset(Theme::BUILT_IN[$values['theme']])) {
+            $errors[] = 'Wybierz motyw.';
         }
         if ('' !== $values['jira_url'] && !preg_match('#^https?://[^\s/]+#', $values['jira_url'])) {
             $errors[] = 'Adres Jiry musi zaczynać się od https://';
@@ -186,6 +193,8 @@ final class SettingsController extends AbstractController
         return $this->render('settings.html.twig', [
             'form' => self::FORM,
             'options' => ['forma' => Settings::FORMS],
+            'themes' => Theme::choices(),
+            'palettes' => Theme::palettes(),
             'values' => $values,
             'hasToken' => '' !== $settings->get('jira_token'),
             'issueCount' => count($settings->issueCache()),

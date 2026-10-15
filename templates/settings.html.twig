@@ -30,7 +30,7 @@
             <div class="fields">
             {% for key, f in fields %}
                 {% set label = f[0] %}{% set type = f[1] %}{% set help = f[2] %}
-                {% set wide = type == 'textarea' or key starts with 'slack_' or key ends with '_subject' or key starts with 'plan_phrase' or key in ['jira_jql', 'forma'] %}
+                {% set wide = type in ['textarea', 'themes'] or key starts with 'slack_' or key ends with '_subject' or key starts with 'plan_phrase' or key in ['jira_jql', 'forma'] %}
                 <div class="field{{ wide ? ' wide' }}" id="field-{{ key }}">
                     <label for="{{ key }}">{{ label }}</label>
                     {% if type == 'textarea' %}
@@ -39,6 +39,20 @@
                         <select id="{{ key }}" name="{{ key }}">
                             {% for value, name in options[key] %}<option value="{{ value }}" {{ values[key] == value ? 'selected' }}>{{ name }}</option>{% endfor %}
                         </select>
+                    {% elseif type == 'themes' %}
+                        {% set current = palettes[values[key]] is defined ? values[key] : 'aurora' %}
+                        <div class="themes" role="radiogroup" aria-label="{{ label }}">
+                            {% for id, name in themes %}
+                                {% set c = palettes[id] %}
+                                <label class="theme-card" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
+                                    <input type="radio" name="{{ key }}" value="{{ id }}" {{ id == current ? 'checked' }}>
+                                    <span class="tc-preview" aria-hidden="true">
+                                        <span class="tc-panel"><i class="tc-l1"></i><i class="tc-l2"></i><span class="tc-bars"><i style="height:55%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:95%"></i></span><i class="tc-btn"></i></span>
+                                    </span>
+                                    <span class="tc-name">{{ name }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
                     {% elseif type == 'password' %}
                         <input type="password" id="{{ key }}" name="{{ key }}" value="" autocomplete="new-password" placeholder="{{ hasToken ? '•••••••• (zapisany)' : '' }}">
                     {% else %}
@@ -57,6 +71,15 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Podgląd motywu na żywo: kliknięty motyw od razu przemalowuje stronę (zostaje po zapisaniu ustawień).
+    (() => {
+        const PALETTES = {{ palettes|json_encode|raw }};
+        document.querySelectorAll('input[name="theme"]').forEach(radio => radio.addEventListener('change', () => {
+            for (const [name, value] of Object.entries(PALETTES[radio.value] || {})) document.documentElement.style.setProperty('--' + name, value);
+        }));
+    })();
+</script>
 <script>
     // menu sekcji: podświetla sekcję widoczną na ekranie
     (() => {

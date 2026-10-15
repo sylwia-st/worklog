@@ -14,6 +14,7 @@ use App\Domain\Holidays;
 use App\Domain\MailDraft;
 use App\Domain\ReminderSchedule;
 use App\Domain\Template;
+use App\Domain\Theme;
 use App\Domain\TimeFormat;
 
 $fail = 0;
@@ -145,10 +146,7 @@ check('dni robocze: sam weekend', Holidays::workingDays(new DateTimeImmutable('2
 check('odmiana', array_map(static fn (int $n) => Template::plural($n, 'dzień roboczy', 'dni robocze', 'dni roboczych'), [0, 1, 2, 5, 12, 22, 25]),
     ['0 dni roboczych', '1 dzień roboczy', '2 dni robocze', '5 dni roboczych', '12 dni roboczych', '22 dni robocze', '25 dni roboczych']);
 
-// --- kolory (base.html.twig, :root) ---
-preg_match('/:root \{(.*?)\}/s', (string) file_get_contents(__DIR__.'/../templates/base.html.twig'), $root);
-preg_match_all('/--([a-z0-9-]+): (#[0-9a-f]{6});/', $root[1] ?? '', $m);
-$c = array_combine($m[1], $m[2]);
+// --- motywy ---
 $luminance = static function (string $hex): float {
     $ch = static fn (int $v): float => ($v / 255) <= 0.03928 ? ($v / 255) / 12.92 : ((($v / 255) + 0.055) / 1.055) ** 2.4;
     [$r, $g, $b] = array_map('hexdec', str_split(substr($hex, 1), 2));
@@ -160,20 +158,27 @@ $contrast = static function (string $a, string $b) use ($luminance): float {
 
     return ($hi + 0.05) / ($lo + 0.05);
 };
-check('kolory: komplet', array_diff(['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-ink', 'ok', 'ok-bg', 'warn', 'warn-bg', 'err', 'err-bg', 'info', 'info-bg', 's1', 's8'], array_keys($c)), []);
-// czytelność wg WCAG: tekst 4.5:1 (główny 7:1). Kolory komunikatów to też tekst: na swoim tle (plakietki, komunikaty),
-// na panelu i na tle strony (bilans w tabelach, błędy pod wierszami)
-$low = [];
-$pairs = [['ink', 'bg', 7], ['ink', 'panel', 7], ['muted', 'panel', 4.5], ['muted', 'bg', 4.5], ['accent', 'panel', 4.5], ['accent-ink', 'accent', 4.5], ['accent-ink', 'info', 4.5]];
-foreach (['ok', 'warn', 'err', 'info'] as $k) {
-    array_push($pairs, [$k, $k.'-bg', 4.5], [$k, 'panel', 4.5], [$k, 'bg', 4.5]);
-}
-foreach ($pairs as [$fg, $bg, $min]) {
-    if (isset($c[$fg], $c[$bg]) && $contrast($c[$fg], $c[$bg]) < $min) {
-        $low[] = sprintf('%s/%s %.2f', $fg, $bg, $contrast($c[$fg], $c[$bg]));
+check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono']);
+$names = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-2', 'accent-ink', 'ok', 'ok-bg', 'warn', 'warn-bg', 'err', 'err-bg', 'info', 'info-bg'];
+foreach (Theme::palettes() as $id => $c) {
+    check("motyw $id: komplet kolorów", [array_diff($names, array_keys($c)), array_diff(array_keys($c), $names)], [[], []]);
+    check("motyw $id: same #rrggbb", array_filter($c, static fn (string $v) => 1 !== preg_match('/^#[0-9a-f]{6}$/', $v)), []);
+    // czytelność wg WCAG: tekst 4.5:1 (główny 7:1). Kolory stanów to też tekst: na swoim tle (plakietki, komunikaty),
+    // na panelu i na tle strony (bilans w tabelach, błędy pod wierszami); tekst przycisku na obu końcach gradientu
+    $low = [];
+    $pairs = [['ink', 'bg', 7], ['ink', 'panel', 7], ['muted', 'panel', 4.5], ['muted', 'bg', 4.5], ['accent', 'panel', 4.5], ['accent-ink', 'accent', 4.5], ['accent-ink', 'accent-2', 4.5]];
+    foreach (['ok', 'warn', 'err', 'info'] as $k) {
+        array_push($pairs, [$k, $k.'-bg', 4.5], [$k, 'panel', 4.5], [$k, 'bg', 4.5]);
     }
+    foreach ($pairs as [$fg, $bg, $min]) {
+        if ($contrast($c[$fg], $c[$bg]) < $min) {
+            $low[] = sprintf('%s/%s %.2f', $fg, $bg, $contrast($c[$fg], $c[$bg]));
+        }
+    }
+    check("motyw $id: kontrast", $low, []);
 }
-check('kolory: kontrast', $low, []);
+check('css: kolory motywu', str_contains(Theme::css('ocean'), '--accent: #2dd4bf;'), true);
+check('css: nieznany motyw (np. dawny „auto”) = domyślny', Theme::css('auto'), Theme::css(Theme::DEFAULT));
 
 // --- oś dnia ---
 $ax = DayAxis::build('08:00', '16:30', [[720, 780]], [['ABC-1', 150], ['ABC-2', 60], ['OPS-8', 45], ['ABC-3', 165]], 420, 450);
