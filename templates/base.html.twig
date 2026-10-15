@@ -11,13 +11,8 @@
         @font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
             src: url(/fonts/inter-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
-        /* kolory motywu (tła, tekst, akcenty --accent / --accent-2, stany) – wybór w Ustawieniach → Wygląd, patrz App\Domain\Theme */
+        /* kolory motywu (tła, tekst, akcenty --accent / --accent-2, stany, tickety --s1…--s8) – wybór w Ustawieniach → Wygląd, patrz App\Domain\Theme */
         {{ theme_css() }}
-        :root {
-            color-scheme: dark;
-            /* kolory ticketów na osi dnia: stała kolejność, sprawdzona pod kątem daltonizmu (kolejne pary rozróżnialne) */
-            --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-        }
         body {
             --sunk: color-mix(in srgb, var(--ink) 3.5%, var(--bg));
             --hover: color-mix(in srgb, var(--ink) 5%, transparent);
@@ -252,6 +247,9 @@
         .settings-nav a { padding: 7px 12px; border-radius: 9px; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 550; }
         .settings-nav a:hover { background: var(--hover); color: var(--ink); }
         .settings-nav a.on { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); box-shadow: 0 0 0 1px var(--edge) inset; }
+        .colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 16px; }
+        .colors label { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--ink); font-size: 14px; }
+        .colors input[type=color] { width: 40px; height: 32px; padding: 2px; flex: none; cursor: pointer; border: 1px solid var(--hair); border-radius: 8px; background: transparent; }
         .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
         .theme-card { position: relative; display: grid; gap: 8px; margin: 0; cursor: pointer; color: var(--ink); font-size: 14px; font-weight: 600; }
         .theme-card input { position: absolute; opacity: 0; pointer-events: none; }

@@ -26,6 +26,7 @@ final class SettingsController extends AbstractController
         ],
         'Wygląd' => [
             'theme' => ['Motyw', 'themes', 'Kliknij motyw, żeby zobaczyć go od razu na tej stronie – zostanie po kliknięciu Zapisz ustawienia.'],
+            'theme_custom' => ['Kolory motywu Własnego', 'colors', 'Kliknij kolor, żeby go zmienić – zmiana jest widoczna od razu. Przy jasnym tle kolory stanów (nadgodziny, błędy) przechodzą na wersję dla jasnego tła.'],
         ],
         'Jira' => [
             'jira_url' => ['Adres Jiry', 'url', 'np. https://firma.atlassian.net albo https://jira.firma.pl'],
@@ -86,8 +87,10 @@ final class SettingsController extends AbstractController
     {
         $values = [];
         foreach (self::FORM as $fields) {
-            foreach (array_keys($fields) as $key) {
-                $values[$key] = str_replace("\r\n", "\n", trim((string) $request->request->get($key, '')));
+            foreach ($fields as $key => [, $type]) {
+                if ('colors' !== $type) {
+                    $values[$key] = str_replace("\r\n", "\n", trim((string) $request->request->get($key, '')));
+                }
             }
         }
         if ('' === $values['jira_token']) {
@@ -98,8 +101,20 @@ final class SettingsController extends AbstractController
         if (!isset(Settings::FORMS[$values['forma']])) {
             $errors[] = 'Wybierz formę w tekstach.';
         }
-        if (!isset(Theme::BUILT_IN[$values['theme']])) {
+        if (!isset(Theme::choices()[$values['theme']])) {
             $errors[] = 'Wybierz motyw.';
+        }
+        $colors = $request->request->all('theme_custom');
+        if ([] !== $colors) {
+            $custom = [];
+            foreach (array_keys(Theme::VARS) as $name) {
+                if (!Theme::isColor((string) ($colors[$name] ?? ''))) {
+                    $errors[] = 'Kolory motywu Własnego wybierz z palety (format #rrggbb).';
+                    break;
+                }
+                $custom[$name] = strtolower((string) $colors[$name]);
+            }
+            $values['theme_custom'] = (string) json_encode($custom);
         }
         if ('' !== $values['jira_url'] && !preg_match('#^https?://[^\s/]+#', $values['jira_url'])) {
             $errors[] = 'Adres Jiry musi zaczynać się od https://';
@@ -195,6 +210,11 @@ final class SettingsController extends AbstractController
             'options' => ['forma' => Settings::FORMS],
             'themes' => Theme::choices(),
             'palettes' => Theme::palettes(),
+            // Własny jeszcze nieustawiony → zaczyna od kolorów obecnego motywu
+            'customColors' => '' !== $values['theme_custom'] ? Theme::custom($values['theme_custom']) : (Theme::palettes()[$values['theme']] ?? Theme::palettes()[Theme::DEFAULT]),
+            'themeVars' => Theme::VARS,
+            'states' => ['dark' => Theme::STATES_DARK, 'light' => Theme::STATES_LIGHT],
+            'series' => ['dark' => Theme::SERIES_DARK, 'light' => Theme::SERIES_LIGHT],
             'values' => $values,
             'hasToken' => '' !== $settings->get('jira_token'),
             'issueCount' => count($settings->issueCache()),

@@ -30,9 +30,9 @@
             <div class="fields">
             {% for key, f in fields %}
                 {% set label = f[0] %}{% set type = f[1] %}{% set help = f[2] %}
-                {% set wide = type in ['textarea', 'themes'] or key starts with 'slack_' or key ends with '_subject' or key starts with 'plan_phrase' or key in ['jira_jql', 'forma'] %}
-                <div class="field{{ wide ? ' wide' }}" id="field-{{ key }}">
-                    <label for="{{ key }}">{{ label }}</label>
+                {% set wide = type in ['textarea', 'themes', 'colors'] or key starts with 'slack_' or key ends with '_subject' or key starts with 'plan_phrase' or key in ['jira_jql', 'forma'] %}
+                <div class="field{{ wide ? ' wide' }}" id="field-{{ key }}" {{ type == 'colors' and values.theme != 'custom' ? 'hidden' }}>
+                    <label {% if type not in ['colors', 'themes'] %}for="{{ key }}"{% endif %}>{{ label }}</label>
                     {% if type == 'textarea' %}
                         <textarea id="{{ key }}" name="{{ key }}" rows="{{ key ends with '_body' ? 7 : 2 }}" class="{{ key ends with '_body' ? 'mono' }}">{{ values[key] }}</textarea>
                     {% elseif type == 'select' %}
@@ -40,11 +40,11 @@
                             {% for value, name in options[key] %}<option value="{{ value }}" {{ values[key] == value ? 'selected' }}>{{ name }}</option>{% endfor %}
                         </select>
                     {% elseif type == 'themes' %}
-                        {% set current = palettes[values[key]] is defined ? values[key] : 'aurora' %}
+                        {% set current = themes[values[key]] is defined ? values[key] : 'aurora' %}
                         <div class="themes" role="radiogroup" aria-label="{{ label }}">
                             {% for id, name in themes %}
-                                {% set c = palettes[id] %}
-                                <label class="theme-card" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
+                                {% set c = id == 'custom' ? customColors : palettes[id] %}
+                                <label class="theme-card" data-id="{{ id }}" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
                                     <input type="radio" name="{{ key }}" value="{{ id }}" {{ id == current ? 'checked' }}>
                                     <span class="tc-preview" aria-hidden="true">
                                         <span class="tc-panel"><i class="tc-l1"></i><i class="tc-l2"></i><span class="tc-bars"><i style="height:55%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:95%"></i></span><i class="tc-btn"></i></span>
@@ -52,6 +52,20 @@
                                     <span class="tc-name">{{ name }}</span>
                                 </label>
                             {% endfor %}
+                        </div>
+                    {% elseif type == 'colors' %}
+                        <div class="colors">
+                            {% for name, title in themeVars %}
+                                <label><input type="color" name="{{ key }}[{{ name }}]" value="{{ customColors[name] }}" data-var="{{ name }}"> {{ title }}</label>
+                            {% endfor %}
+                        </div>
+                        <p id="contrast-warn" class="flash warning small" style="margin:12px 0 0" hidden></p>
+                        <div class="actions" style="margin-top:10px">
+                            <label for="theme-base" style="display:inline; margin:0">Zacznij od motywu</label>
+                            <select id="theme-base" style="width:auto">
+                                {% for id, name in themes %}{% if palettes[id] is defined %}<option value="{{ id }}">{{ name }}</option>{% endif %}{% endfor %}
+                            </select>
+                            <button type="button" id="theme-load">Wczytaj kolory</button>
                         </div>
                     {% elseif type == 'password' %}
                         <input type="password" id="{{ key }}" name="{{ key }}" value="" autocomplete="new-password" placeholder="{{ hasToken ? '•••••••• (zapisany)' : '' }}">
@@ -72,12 +86,62 @@
 
 {% block scripts %}
 <script>
-    // Podgląd motywu na żywo: kliknięty motyw od razu przemalowuje stronę (zostaje po zapisaniu ustawień).
+    // Podgląd motywu na żywo: kliknięty motyw albo zmiana koloru Własnego od razu przemalowuje stronę (zostaje po zapisaniu).
+    // Jasne tło przełącza kolory stanów i ticketów na wersję dla jasnego tła – jak App\Domain\Theme::css().
     (() => {
         const PALETTES = {{ palettes|json_encode|raw }};
-        document.querySelectorAll('input[name="theme"]').forEach(radio => radio.addEventListener('change', () => {
-            for (const [name, value] of Object.entries(PALETTES[radio.value] || {})) document.documentElement.style.setProperty('--' + name, value);
-        }));
+        const STATES = {{ states|json_encode|raw }};
+        const SERIES = {{ series|json_encode|raw }};
+        const root = document.documentElement.style;
+        const radios = [...document.querySelectorAll('input[name="theme"]')];
+        const inputs = [...document.querySelectorAll('input[type=color][data-var]')];
+        const field = document.getElementById('field-theme_custom');
+        const card = document.querySelector('.theme-card[data-id="custom"]');
+        const warn = document.getElementById('contrast-warn');
+
+        // jak Theme::luminance()
+        const luminance = (hex) => [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16) / 255)
+            .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+            .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+        const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)]; return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+        const isLight = (hex) => luminance(hex) >= 0.18;
+
+        const custom = () => Object.fromEntries(inputs.map(i => [i.dataset.var, i.value]));
+        const selected = () => (radios.find(r => r.checked) || {}).value;
+        const apply = (colors) => {
+            const light = isLight(colors.bg);
+            root.setProperty('color-scheme', light ? 'light' : 'dark');
+            for (const [name, value] of Object.entries({...colors, ...STATES[light ? 'light' : 'dark']})) root.setProperty('--' + name, value);
+            SERIES[isLight(colors.panel) ? 'light' : 'dark'].forEach((hex, i) => root.setProperty('--s' + (i + 1), hex));
+        };
+        // miniatura kafelka Własny i ostrzeżenie, gdy tekst będzie słabo czytelny
+        const refreshCustom = () => {
+            const c = custom();
+            if (card) for (const [v, n] of [['--t-bg', 'bg'], ['--t-panel', 'panel'], ['--t-ink', 'ink'], ['--t-muted', 'muted'], ['--t-a', 'accent'], ['--t-a2', 'accent-2']]) card.style.setProperty(v, c[n]);
+            if (!warn || !inputs.length) return;
+            const low = [['Tekst na tle paneli', 'ink', 'panel', 7], ['Tekst na tle strony', 'ink', 'bg', 7], ['Tekst pomocniczy', 'muted', 'panel', 4.5],
+                ['Akcent (linki) na tle paneli', 'accent', 'panel', 4.5], ['Tekst na przyciskach', 'accent-ink', 'accent', 4.5]]
+                .filter(([, fg, bg, min]) => contrast(c[fg], c[bg]) < min)
+                .map(([label, fg, bg]) => label + ' (' + contrast(c[fg], c[bg]).toFixed(1) + ':1)');
+            warn.hidden = !low.length;
+            warn.textContent = low.length ? 'Słabo czytelne: ' + low.join(', ') + '. Dobrze, żeby tekst miał kontrast co najmniej 4.5:1 (główny 7:1).' : '';
+        };
+        const preview = () => {
+            const id = selected();
+            if (field) field.hidden = id !== 'custom';
+            apply(id === 'custom' ? custom() : PALETTES[id]);
+        };
+
+        radios.forEach(r => r.addEventListener('change', preview));
+        inputs.forEach(i => i.addEventListener('input', () => { refreshCustom(); if (selected() === 'custom') apply(custom()); }));
+        const load = document.getElementById('theme-load');
+        if (load) load.addEventListener('click', () => {
+            const colors = PALETTES[document.getElementById('theme-base').value];
+            inputs.forEach(i => { i.value = colors[i.dataset.var]; });
+            refreshCustom();
+            if (selected() === 'custom') apply(custom());
+        });
+        refreshCustom();
     })();
 </script>
 <script>

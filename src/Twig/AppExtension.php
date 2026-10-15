@@ -37,7 +37,7 @@ final class AppExtension extends AbstractExtension
             // „dziś”, „jutro”, „piątek 16.10”
             new TwigFunction('rel_day', static fn (\DateTimeInterface $d) => Template::relativeDay($d, new \DateTimeImmutable('today'))),
             // zmienne CSS z kolorami wybranego motywu
-            new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme')), ['is_safe' => ['html']]),
+            new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme'), $this->settings->get('theme_custom')), ['is_safe' => ['html']]),
         ];
     }
 }
