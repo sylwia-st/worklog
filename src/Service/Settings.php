@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Domain\Theme;
 use App\Entity\Setting;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -83,7 +84,7 @@ final class Settings
         'dashboard_sort' => 'desc',
 
         // Wygląd: motyw (patrz App\Domain\Theme) i kolory motywu Własnego (JSON)
-        'theme' => 'aurora',
+        'theme' => Theme::DEFAULT,
         'theme_custom' => '',
     ];
 

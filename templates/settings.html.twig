@@ -40,18 +40,19 @@
                             {% for value, name in options[key] %}<option value="{{ value }}" {{ values[key] == value ? 'selected' }}>{{ name }}</option>{% endfor %}
                         </select>
                     {% elseif type == 'themes' %}
-                        {% set current = themes[values[key]] is defined ? values[key] : 'aurora' %}
+                        {% set current = themes[values[key]] is defined ? values[key] : defaultTheme %}
                         <div class="themes" role="radiogroup" aria-label="{{ label }}">
                             {% for group, ids in themeGroups %}
                                 <span class="themes-h">{{ group }}</span>
                                 {% for id in ids %}
                                     {% set c = id == 'custom' ? customColors : palettes[id] %}
-                                    <label class="theme-card" data-id="{{ id }}" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
+                                    <label class="theme-card" data-id="{{ id }}"{% if themeGames[id] is defined %} title="W stylu {{ themeGames[id] }}"{% endif %} style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
                                         <input type="radio" name="{{ key }}" value="{{ id }}" {{ id == current ? 'checked' }}>
                                         <span class="tc-preview" aria-hidden="true">
                                             <span class="tc-panel"><i class="tc-l1"></i><i class="tc-l2"></i><span class="tc-bars"><i style="height:55%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:95%"></i></span><i class="tc-btn"></i></span>
                                         </span>
                                         <span class="tc-name">{{ themes[id] }}</span>
+                                        {% if themeGames[id] is defined %}<small class="tc-game">w stylu {{ themeGames[id] }}</small>{% endif %}
                                     </label>
                                 {% endfor %}
                             {% endfor %}
@@ -134,6 +135,7 @@
         const preview = () => {
             const id = selected();
             if (field) field.hidden = id !== 'custom';
+            document.documentElement.dataset.theme = id; // własny wygląd motywów z gier (base.html.twig)
             apply(id === 'custom' ? custom() : PALETTES[id]);
         };
 

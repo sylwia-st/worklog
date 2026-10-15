@@ -175,8 +175,8 @@ table(['Twoja Jira', 'Pole „E-mail”', 'Skąd wziąć token'], [
 box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba. Admina pytasz tylko wtedy, '
           'gdy w profilu nie ma opcji tokenów.')
 
-p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora (domyślny), Głębia, Zachód, Neon, Grafit, '
-  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
+p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
+  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Osadnicy w stylu The Settlers II (drewno, złoto, łąka) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
   f'czytelny. Zmianę widać od razu; zostaje po {G("Zapisz ustawienia")}.')
 
 h('2. Wpisanie dnia')

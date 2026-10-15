@@ -37,7 +37,7 @@ const pick = (value) => { const r = d.querySelector(`input[value="${value}"]`); 
 
 check('przed wyborem strona ma kolory z serwera', v('bg'), '');
 pick('ocean');
-check('Głębia: podgląd od razu', [v('bg'), v('accent')], ['#050e12', '#2dd4bf']);
+check('Głębia: podgląd od razu', [v('bg'), v('accent'), d.documentElement.dataset.theme], ['#050e12', '#2dd4bf', 'ocean']);
 pick('aurora');
 check('powrót do Aurory', [v('bg'), v('accent')], ['#0a0b10', '#8b7dff']);
 
@@ -45,7 +45,7 @@ const field = d.getElementById('field-theme_custom'), warn = d.getElementById('c
 const color = (name, value) => { const i = d.querySelector(`[data-var="${name}"]`); i.value = value; i.dispatchEvent(new w.Event('input')); };
 check('pola kolorów schowane przy motywie wbudowanym', field.hidden, true);
 pick('custom');
-check('Własny: pola kolorów widoczne, podgląd z pól', [field.hidden, v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1')], [false, '#0a0b10', 'dark', '#4ade80', '#dark1']);
+check('Własny: pola kolorów widoczne, podgląd z pól', [d.documentElement.dataset.theme, field.hidden, v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1')], ['custom', false, '#0a0b10', 'dark', '#4ade80', '#dark1']);
 color('bg', '#ffffff'); color('panel', '#f4f4f4');
 check('Własny z jasnym tłem: jasne kontrolki, stany, tickety i cienie', [v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1'), v('shade')], ['#ffffff', 'light', '#2d794d', '#light1', 'cień-jasny']);
 check('słaby kontrast: jasny tekst na jasnym tle → ostrzeżenie', [warn.hidden, warn.textContent.startsWith('Słabo czytelne: Tekst na tle paneli')], [false, true]);

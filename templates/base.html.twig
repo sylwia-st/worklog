@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl">
+<html lang="pl" data-theme="{{ theme_id() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,6 +10,11 @@
             src: url(/fonts/inter-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
         @font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
             src: url(/fonts/inter-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        /* rzymskie litery do motywu Osadnicy (Cinzel, licencja OFL – public/fonts/Cinzel-LICENSE.txt) */
+        @font-face { font-family: "Cinzel"; font-style: normal; font-display: swap; font-weight: 400 900;
+            src: url(/fonts/cinzel-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+        @font-face { font-family: "Cinzel"; font-style: normal; font-display: swap; font-weight: 400 900;
+            src: url(/fonts/cinzel-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
         /* kolory motywu (tła, tekst, akcenty --accent / --accent-2, stany, tickety --s1…--s8) – wybór w Ustawieniach → Wygląd, patrz App\Domain\Theme */
         {{ theme_css() }}
@@ -269,6 +274,7 @@
         .tc-btn { right: 9px; top: 8px; width: 26%; height: 11px; border-radius: 6px !important; background: linear-gradient(135deg, var(--t-a), var(--t-a2)); box-shadow: 0 0 10px -2px var(--t-a); }
         .tc-bars { position: absolute; left: 9px; right: 9px; bottom: 12px; height: 26px; display: flex; align-items: flex-end; gap: 4px; }
         .tc-bars i { position: static !important; flex: 1; border-radius: 2px 2px 0 0 !important; background: linear-gradient(180deg, var(--t-a2), var(--t-a)); }
+        .tc-game { margin-top: -6px; font-size: 12px; font-weight: 450; line-height: 1.35; color: var(--muted); }
         .theme-card input:checked ~ .tc-name::after { content: " ✓"; color: var(--t-a); }
         .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0 18px; }
         .fields .field.wide { grid-column: 1 / -1; }
@@ -458,6 +464,57 @@
         #timerstale input { width: auto; margin: 0 6px; }
         footer { padding-bottom: 28px; display: flex; gap: 6px; align-items: center; }
         footer::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); opacity: .8; }
+
+        /* motyw Osadnicy – w stylu The Settlers II: Veni Vidi Vici: łąka w tle, panele z drewna w rzeźbionej ramie,
+           wypukłe przyciski jak w grze, złote rzymskie litery w nagłówkach. Kolory – App\Domain\Theme ('settlers'). */
+        body {
+            --wood: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='480' height='240'><filter id='d' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.004 .16' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 .07 0 0 0 0 .04 0 0 0 0 .01 1.4 0 0 0 -.62'/></filter><filter id='l' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.006 .3' numOctaves='2' seed='9'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 .92 0 0 0 0 .7 1 0 0 0 -.6'/></filter><rect width='100%' height='100%' filter='url(%23d)'/><rect width='100%' height='100%' filter='url(%23l)'/></svg>");
+        }
+        [data-theme=settlers] body {
+            --frame: linear-gradient(180deg, #b08a55, #6e5230 40%, #3a2812) border-box;
+            --card: var(--wood) padding-box, linear-gradient(180deg, color-mix(in srgb, #fff 4%, var(--panel)), color-mix(in srgb, #000 18%, var(--panel))) padding-box, var(--frame);
+            --shadow: 0 0 0 1px #0d0904, 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent) inset, 0 18px 36px -16px var(--shade);
+            --shadow-lg: var(--shadow);
+            --r: 6px;
+            --display: "Cinzel", "Palatino Linotype", Georgia, serif;
+            background: radial-gradient(900px 520px at 12% -180px, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%),
+                radial-gradient(1000px 640px at 92% 115%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 70%), var(--bg);
+            background-attachment: fixed; }
+        /* trawa: drobne jasne źdźbła zamiast siatki kropek */
+        [data-theme=settlers] body::before { -webkit-mask-image: none; mask-image: none; background-size: 220px 220px; opacity: .7;
+            background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.75' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 .6 0 0 0 0 .8 0 0 0 0 .3 0 1.7 0 0 -1.02'/></filter><filter id='p' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.012' numOctaves='3' seed='5'/><feColorMatrix values='0 0 0 0 .02 0 0 0 0 .03 0 0 0 0 0 0 0 1.5 0 -.6'/></filter><rect width='100%' height='100%' filter='url(%23p)'/><rect width='100%' height='100%' filter='url(%23g)'/></svg>"); }
+        [data-theme=settlers] :is(.panel, fieldset, .tile) { border-width: 3px; }
+        [data-theme=settlers] header { background: var(--wood), linear-gradient(180deg, #4b3720, #2c2011); border-bottom: 3px solid #6e5230; border-image: none;
+            box-shadow: 0 1px 0 #0d0904, 0 12px 26px -14px #000; backdrop-filter: none; -webkit-backdrop-filter: none; }
+        [data-theme=settlers] header nav { border-radius: 5px; background: rgb(0 0 0 / .28); border-color: #6e5432; box-shadow: inset 0 1px 3px rgb(0 0 0 / .5); }
+        [data-theme=settlers] header nav a { border-radius: 3px; }
+        [data-theme=settlers] header nav a.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent) inset; }
+        [data-theme=settlers] .brand .mark { border-radius: 4px; box-shadow: 0 0 0 1px #0d0904, 0 0 0 1px rgb(255 255 255 / .35) inset; }
+        [data-theme=settlers] :is(h1, h2, legend, .brand, .eyebrow, .themes-h, .settings-nav a) { font-family: var(--display); letter-spacing: .02em; }
+        [data-theme=settlers] h1 { font-weight: 700; letter-spacing: .01em; background: linear-gradient(180deg, #fff3c4 10%, var(--accent) 55%, #b5801a);
+            -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 2px 0 #0d0904); }
+        [data-theme=settlers] h1 .soft { -webkit-text-fill-color: var(--muted); }
+        [data-theme=settlers] :is(h2, legend) { color: var(--accent); font-weight: 700; font-size: 16px; text-shadow: 0 1px 0 #0d0904; }
+        [data-theme=settlers] h2 svg { color: var(--accent-2); }
+        /* przyciski: wypukłe, jasna krawędź u góry i z lewej, wciśnięte – odwrotnie */
+        [data-theme=settlers] :is(button, .btn):not(.link, .danger) { border-radius: 4px; border: 2px solid; border-color: #b08a55 #3a2712 #24180a #8c6b3f;
+            background: var(--wood), linear-gradient(180deg, #6a5030, #46331b); color: var(--ink); text-shadow: 0 1px 0 #000; box-shadow: 0 0 0 1px #0d0904; }
+        [data-theme=settlers] :is(button, .btn):not(.link, .danger):hover { background: var(--wood), linear-gradient(180deg, #7a5d38, #523c20); border-color: #c49c63 #3a2712 #24180a #9c7a4a; }
+        [data-theme=settlers] :is(button, .btn):not(.link, .danger):active { border-color: #24180a #8c6b3f #b08a55 #3a2712; }
+        [data-theme=settlers] :is(button.primary, .btn.primary) { color: var(--accent-ink); text-shadow: 0 1px 0 rgb(255 255 255 / .35); border-color: #fff0b0 #9a6a0c #6e4a06 #f0cc60;
+            background: linear-gradient(180deg, #ffe48a, var(--accent) 48%, #c68d17); box-shadow: 0 0 0 1px #0d0904, 0 8px 20px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+        [data-theme=settlers] :is(button.primary, .btn.primary):hover { background: linear-gradient(180deg, #fff0b0, #ffd04a 48%, #d89c20); border-color: #fff6cc #9a6a0c #6e4a06 #f0cc60; filter: none; }
+        [data-theme=settlers] :is(button.primary, .btn.primary):active { border-color: #6e4a06 #f0cc60 #fff0b0 #9a6a0c; }
+        /* pola: wklęsłe */
+        [data-theme=settlers] :is(input:not([type=checkbox], [type=radio], [type=color]), select, textarea) { border-radius: 4px; border-color: #6e5432;
+            background: color-mix(in srgb, #000 38%, var(--panel)); box-shadow: inset 0 2px 4px rgb(0 0 0 / .55); }
+        [data-theme=settlers] :is(input, select, textarea):focus { border-color: var(--accent); box-shadow: inset 0 2px 4px rgb(0 0 0 / .55), 0 0 0 3px var(--accent-soft); }
+        [data-theme=settlers] :is(.badge, .delta, .pill-today, .datechip, .flash, code, pre, .mailmeta, .item, .settings-nav a, .tile .lbl svg) { border-radius: 4px; }
+        /* kafelek motywu w Ustawieniach – widać drewno i złoto także z innego motywu */
+        .theme-card[data-id=settlers] .tc-panel { background: var(--wood), var(--t-panel); border: 2px solid #8c6b3f; border-radius: 3px; }
+        .theme-card[data-id=settlers] .tc-btn { border-radius: 2px !important; background: linear-gradient(180deg, #ffe48a, var(--t-a) 50%, #c68d17); box-shadow: 0 0 0 1px #0d0904; }
+        .theme-card[data-id=settlers] .tc-name { font-family: "Cinzel", Georgia, serif; }
 
     </style>
 </head>

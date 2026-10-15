@@ -16,6 +16,7 @@ use App\Domain\ReminderSchedule;
 use App\Domain\Template;
 use App\Domain\Theme;
 use App\Domain\TimeFormat;
+use App\Service\Settings;
 
 $fail = 0;
 function check(string $name, mixed $actual, mixed $expected): void
@@ -158,8 +159,10 @@ $contrast = static function (string $a, string $b) use ($luminance): float {
 
     return ($hi + 0.05) / ($lo + 0.05);
 };
-check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'dawn', 'mint', 'peach', 'lavender', 'paper', 'custom']);
-check('motywy: grupy', Theme::groups(), ['Ciemne' => ['aurora', 'ocean', 'sunset', 'neon', 'mono'], 'Jasne' => ['dawn', 'mint', 'peach', 'lavender', 'paper'], 'Własny' => ['custom']]);
+check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'dawn', 'mint', 'peach', 'lavender', 'paper', 'settlers', 'custom']);
+check('motywy: grupy', Theme::groups(), ['Ciemne' => ['aurora', 'ocean', 'sunset', 'neon', 'mono'], 'Jasne' => ['dawn', 'mint', 'peach', 'lavender', 'paper'], 'Z gier' => ['settlers'], 'Własny' => ['custom']]);
+check('motywy: domyślny Papier', [Theme::DEFAULT, Settings::DEFAULTS['theme']], ['paper', 'paper']);
+check('motywy: id do data-theme', [Theme::id('settlers'), Theme::id('custom'), Theme::id('auto'), Theme::id('')], ['settlers', 'custom', 'paper', 'paper']);
 $names = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-2', 'accent-ink', 'ok', 'ok-bg', 'warn', 'warn-bg', 'err', 'err-bg', 'info', 'info-bg'];
 // wbudowane motywy z kolorami stanów, które dostaną (dla jasnego albo ciemnego tła)
 $cases = array_map(static fn (array $c): array => $c + (Theme::isLight($c['bg']) ? Theme::STATES_LIGHT : Theme::STATES_DARK), Theme::palettes());
@@ -183,7 +186,7 @@ foreach ($cases as $id => $c) {
 check('css: kolory motywu', [str_contains(Theme::css('ocean'), '--accent: #2dd4bf;'), str_contains(Theme::css('ocean'), 'color-scheme: dark;'), str_contains(Theme::css('ocean'), '--s1: #3987e5;')], [true, true, true]);
 check('css: nieznany motyw (np. dawny „auto”) = domyślny', Theme::css('auto'), Theme::css(Theme::DEFAULT));
 $own = Theme::css('custom', (string) json_encode(['bg' => '#FFFFFF', 'panel' => '#f0f0f0', 'ink' => '#111111']));
-check('Własny: kolory z ustawień, reszta z domyślnego', [str_contains($own, '--bg: #ffffff;'), str_contains($own, '--ink: #111111;'), str_contains($own, '--accent: #8b7dff;')], [true, true, true]);
+check('Własny: kolory z ustawień, reszta z domyślnego', [str_contains($own, '--bg: #ffffff;'), str_contains($own, '--ink: #111111;'), str_contains($own, '--accent: #27272a;')], [true, true, true]);
 check('Własny z jasnym tłem: jasne kontrolki, stany, tickety i cienie dla jasnego tła', [str_contains($own, 'color-scheme: light;'), str_contains($own, '--ok: #2d794d;'), str_contains($own, '--s1: #2a78d6;'), str_contains($own, '--shade: rgb(40 40 70 / .16);')], [true, true, true, true]);
 check('jasny motyw wbudowany: stany dla jasnego tła', [str_contains(Theme::css('mint'), '--ok: #2d794d;'), str_contains(Theme::css('mint'), 'color-scheme: light;')], [true, true]);
 check('Własny: śmieci zamiast koloru → domyślne', Theme::custom((string) json_encode(['bg' => 'red; } body { display:none', 'line' => '#12345'])), Theme::palettes()[Theme::DEFAULT]);

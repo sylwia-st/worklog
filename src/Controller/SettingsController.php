@@ -210,6 +210,8 @@ final class SettingsController extends AbstractController
             'options' => ['forma' => Settings::FORMS],
             'themes' => Theme::choices(),
             'themeGroups' => Theme::groups(),
+            'themeGames' => Theme::GAMES,
+            'defaultTheme' => Theme::DEFAULT,
             'palettes' => Theme::palettes(),
             // Własny jeszcze nieustawiony → zaczyna od kolorów obecnego motywu
             'customColors' => '' !== $values['theme_custom'] ? Theme::custom($values['theme_custom']) : (Theme::palettes()[$values['theme']] ?? Theme::palettes()[Theme::DEFAULT]),

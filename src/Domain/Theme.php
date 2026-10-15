@@ -6,11 +6,12 @@ namespace App\Domain;
  * Motywy – ciemne i jasne, wszystkie z poświatą; różnią się tłem i parą akcentów (--accent, --accent-2: przyciski,
  * gradienty, poświata). Kolory stanów (ok, warn, err, info), ticketów i cieni zależą tylko od tego, czy tło jest jasne,
  * żeby „nadgodziny” czy „krócej” wyglądały w każdym motywie tak samo.
- * Efekty (szkło, krawędzie, gradienty) są w base.html.twig i liczą się z tych zmiennych.
+ * Efekty (szkło, krawędzie, gradienty) są w base.html.twig i liczą się z tych zmiennych. Motywy z GAMES mają tam
+ * jeszcze własny wygląd (czcionka, ramki, przyciski) – pod [data-theme=id].
  */
 final class Theme
 {
-    public const DEFAULT = 'aurora';
+    public const DEFAULT = 'paper';
     public const CUSTOM = 'custom';
 
     /** Kolory, które ustawia się w motywie Własnym: zmienna CSS → opis (w tej kolejności pola w Ustawieniach). */
@@ -44,6 +45,9 @@ final class Theme
      */
     public const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
     public const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+
+    /** Motywy w stylu gier: id → gra (opis w Ustawieniach) */
+    public const GAMES = ['settlers' => 'The Settlers II: Veni Vidi Vici'];
 
     /** id → [nazwa, kolory]; kontrast tekstu sprawdza tests/domain_test.php */
     public const BUILT_IN = [
@@ -88,6 +92,11 @@ final class Theme
             'bg' => '#f5f5f4', 'panel' => '#ffffff', 'ink' => '#18181b', 'muted' => '#63636b', 'line' => '#e4e4e7',
             'accent' => '#27272a', 'accent-2' => '#52525b', 'accent-ink' => '#ffffff',
         ]],
+        // z gier: łąka, drewno, złote litery
+        'settlers' => ['Osadnicy', [
+            'bg' => '#1b2410', 'panel' => '#3d2c19', 'ink' => '#f6e7b9', 'muted' => '#c9b183', 'line' => '#6e5432',
+            'accent' => '#f4c233', 'accent-2' => '#9ccc45', 'accent-ink' => '#2b1a06',
+        ]],
     ];
 
     /** @return array<string, string> id → nazwa (wbudowane i Własny) */
@@ -99,12 +108,18 @@ final class Theme
     /** @return array<string, list<string>> nagłówek → id motywów (kafelki w Ustawieniach) */
     public static function groups(): array
     {
-        $out = ['Ciemne' => [], 'Jasne' => []];
+        $out = ['Ciemne' => [], 'Jasne' => [], 'Z gier' => []];
         foreach (self::palettes() as $id => $colors) {
-            $out[self::isLight($colors['bg']) ? 'Jasne' : 'Ciemne'][] = $id;
+            $out[isset(self::GAMES[$id]) ? 'Z gier' : (self::isLight($colors['bg']) ? 'Jasne' : 'Ciemne')][] = $id;
         }
 
         return $out + ['Własny' => [self::CUSTOM]];
+    }
+
+    /** Zapisany motyw, jeśli istnieje, inaczej domyślny – do data-theme na <html>. */
+    public static function id(string $theme): string
+    {
+        return isset(self::choices()[$theme]) ? $theme : self::DEFAULT;
     }
 
     /** @return array<string, array<string, string>> id → kolory wbudowanych motywów (bez kolorów stanów) */
@@ -116,7 +131,8 @@ final class Theme
     /** Reguła CSS z kolorami motywu – do <style> w base.html.twig. Nieznany motyw = domyślny. */
     public static function css(string $theme, string $customJson = ''): string
     {
-        $colors = self::CUSTOM === $theme ? self::custom($customJson) : (self::palettes()[$theme] ?? self::palettes()[self::DEFAULT]);
+        $theme = self::id($theme);
+        $colors = self::CUSTOM === $theme ? self::custom($customJson) : self::palettes()[$theme];
         $light = self::isLight($colors['bg']);
         $declarations = ['color-scheme: '.($light ? 'light' : 'dark').';', '--shade: '.self::SHADES[$light ? 'light' : 'dark'].';'];
         foreach ($colors + ($light ? self::STATES_LIGHT : self::STATES_DARK) as $name => $value) {
