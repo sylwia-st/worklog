@@ -53,7 +53,7 @@ final class DayController extends AbstractController
             $prev = $this->days->findPreviousWithEntries($d);
             if (null !== $prev) {
                 $form['rows'] = array_map(static fn (WorklogEntry $e) => [
-                    'id' => 0, 'issue' => $e->getIssueKey(), 'time' => '', 'desc' => '', 'status' => null, 'error' => null,
+                    'id' => 0, 'issue' => $e->getIssueKey(), 'from' => '', 'to' => '', 'time' => '', 'desc' => '', 'status' => null, 'error' => null,
                 ], $prev->getActiveEntries());
                 $this->addFlash('info', 'Skopiowano tickety z '.$prev->getDate()->format('d.m.Y').' – uzupełnij czas i opisy, potem zapisz.');
             }
@@ -150,6 +150,7 @@ final class DayController extends AbstractController
             'savedAt' => (new \DateTimeImmutable())->format('H:i:s'),
             'ids' => $result['ids'],
             'minutes' => $result['minutes'],
+            'ends' => $result['ends'],
             'statuses' => $this->sync->statuses($day),
             'rowErrors' => (object) $rowErrors,
             'dayErrors' => $form['dayErrors'],
@@ -172,7 +173,7 @@ final class DayController extends AbstractController
      *
      * @param array<string, mixed> $form
      *
-     * @return array{day: WorkDay, ids: array<string, int>, minutes: array<string, int>}
+     * @return array{day: WorkDay, ids: array<string, int>, minutes: array<string, int>, ends: array<string, string>}
      */
     private function applyForm(\DateTimeImmutable $d, ?WorkDay $day, array $form, bool $partial = false): array
     {
@@ -224,21 +225,24 @@ final class DayController extends AbstractController
                 $this->em->persist($entry);
                 $created[$row['key']] = $entry;
             }
+            $entry->setStartClock($row['from']);
             ++$position;
         }
         $this->em->flush();
 
         $ids = [];
         $minutes = [];
+        $ends = [];
         foreach ($form['rows'] as $row) {
             $entry = $created[$row['key']] ?? ($row['id'] > 0 ? ($existing[$row['id']] ?? null) : null);
             if (null !== $entry && !$row['delete'] && null !== $entry->getId()) {
                 $ids[$row['key']] = (int) $entry->getId();
                 $minutes[$row['key']] = $entry->getMinutes();
+                $ends[$row['key']] = $entry->getEndClock() ?? '';
             }
         }
 
-        return ['day' => $day, 'ids' => $ids, 'minutes' => $minutes];
+        return ['day' => $day, 'ids' => $ids, 'minutes' => $minutes, 'ends' => $ends];
     }
 
     /** @return array<string, mixed> */
@@ -338,6 +342,8 @@ final class DayController extends AbstractController
             'rows' => array_map(static fn (WorklogEntry $e) => [
                 'id' => (int) $e->getId(),
                 'issue' => $e->getIssueKey(),
+                'from' => $e->getStartClock() ?? '',
+                'to' => $e->getEndClock() ?? '',
                 'time' => $e->getMinutes() > 0 ? TimeFormat::format($e->getMinutes()) : '',
                 'desc' => $e->getDescription(),
                 'status' => $statuses[(int) $e->getId()] ?? null,
@@ -407,6 +413,8 @@ final class DayController extends AbstractController
                 'key' => (string) $key,
                 'id' => (int) ($raw['id'] ?? 0),
                 'issue' => trim((string) ($raw['issue'] ?? '')),
+                'from' => trim((string) ($raw['from'] ?? '')),
+                'to' => trim((string) ($raw['to'] ?? '')),
                 'time' => trim((string) ($raw['time'] ?? '')),
                 'desc' => trim((string) ($raw['desc'] ?? '')),
                 'delete' => !empty($raw['delete']),
@@ -416,20 +424,38 @@ final class DayController extends AbstractController
                 'status' => null,
                 'error' => null,
             ];
-            if (0 === $row['id'] && '' === $row['issue'] && '' === $row['time'] && '' === $row['desc']) {
+            if (0 === $row['id'] && '' === $row['issue'] && '' === $row['from'] && '' === $row['to'] && '' === $row['time'] && '' === $row['desc']) {
                 continue; // pusty wiersz
             }
             if (!$row['delete']) {
                 $issue = Template::extractIssueKey($row['issue']);
                 $minutes = '' === $row['time'] ? 0 : TimeFormat::parse($row['time']); // puste = 0m (np. czeka na stoper)
+                $from = '' === $row['from'] ? null : TimeFormat::clockToMinutes($row['from']);
+                $to = '' === $row['to'] ? null : TimeFormat::clockToMinutes($row['to']);
                 if (null === $issue) {
                     $row['error'] = 'Niepoprawny numer ticketu (np. ABC-123).';
+                } elseif (null === $from && '' !== $row['from'] || null === $to && '' !== $row['to']) {
+                    $row['error'] = 'Godzina: wpisz w formacie GG:MM.';
+                } elseif (null === $from && null !== $to && '' === $row['time']) {
+                    $row['error'] = 'Podaj też godzinę rozpoczęcia (od).';
                 } elseif (null === $minutes) {
                     $row['error'] = self::timeError($row['time']);
+                } elseif (null !== $to && '' === $row['time'] && $to <= $from) {
+                    $row['error'] = 'Godzina zakończenia musi być późniejsza niż rozpoczęcia.';
                 } else {
-                    $row['issue'] = $issue;
-                    $row['minutes'] = $minutes;
-                    $row['time'] = $minutes > 0 ? TimeFormat::format($minutes) : '';
+                    // czas ma pierwszeństwo; z samych godzin od–do wyliczamy go
+                    if (0 === $minutes && null !== $to) {
+                        $minutes = $to - $from;
+                    }
+                    if (null !== $from && $from + $minutes > 24 * 60) {
+                        $row['error'] = 'Wpis kończyłby się po północy – skróć czas albo zmień godzinę rozpoczęcia.';
+                    } else {
+                        $row['issue'] = $issue;
+                        $row['minutes'] = $minutes;
+                        $row['from'] = null !== $from ? TimeFormat::minutesToClock($from) : null;
+                        $row['to'] = null !== $from && $minutes > 0 ? TimeFormat::minutesToClock($from + $minutes) : '';
+                        $row['time'] = $minutes > 0 ? TimeFormat::format($minutes) : '';
+                    }
                 }
                 if (null !== $row['error']) {
                     $errors[] = 'Popraw zaznaczone wiersze.';

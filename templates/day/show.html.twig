@@ -81,7 +81,7 @@
 
         <div class="panel-h entries-h"><h2>Czas w ticketach</h2></div>
         <table class="entries">
-            <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th>Opis – komentarz w Jirze i na Slacku</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
+            <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th>Opis – komentarz w Jirze i na Slacku</th><th>Od–do</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
             <tbody id="rows">
             {% for row in form.rows %}
                 {{ _self.entry_row(loop.index0, row, issueOptions) }}
@@ -99,7 +99,7 @@
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
             {% endif %}
-            <span class="hint">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper</span>
+            <span class="hint">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper. Od–do niewymagane: start + czas albo start + koniec.</span>
         </div>
 
         {% if pendingDeletions is not empty %}
@@ -141,7 +141,7 @@
     {% for key, title in issueOptions %}<option value="{{ key }}">{{ key }}{{ title ? ' – ' ~ title }}</option>{% endfor %}
 </datalist>
 
-<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
+<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', from: '', to: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
 {% endblock %}
 
 {% macro entry_row(i, row, titles) %}
@@ -159,6 +159,11 @@
         <td class="desc">
             <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc" aria-label="Opis">{{ row.desc }}</textarea>
             <div class="rowerr">{% if row.error %}{{ row.status == 'error' ? 'Jira: ' }}{{ row.error }}{% endif %}</div>
+        </td>
+        <td class="fromto">
+            <input type="text" name="entries[{{ i }}][from]" value="{{ row.from|default('') }}" placeholder="od" inputmode="numeric" autocomplete="off" class="f-from" aria-label="Godzina rozpoczęcia" title="Godzina rozpoczęcia – worklog w Jirze zacznie się dokładnie o niej">
+            <span aria-hidden="true">–</span>
+            <input type="text" name="entries[{{ i }}][to]" value="{{ row.to|default('') }}" placeholder="do" inputmode="numeric" autocomplete="off" class="f-to" aria-label="Godzina zakończenia" title="Godzina zakończenia – czas wyliczy się sam">
         </td>
         <td class="time">
             <input type="text" name="entries[{{ i }}][time]" value="{{ row.time }}" placeholder="1h 30m" class="f-time" aria-label="Czas">
@@ -200,6 +205,7 @@
             ev.preventDefault(); add();
         }
     });
+    const val = (tr, sel) => { const el = tr.querySelector(sel); return el ? el.value.trim() : ''; };
     const rowById = (id) => [...rows.children].find(tr => tr.querySelector('.f-id').value === String(id));
     const rowByKey = (key) => rows.querySelector(`tr[data-key="${key}"]`);
 
@@ -215,7 +221,8 @@
         for (const tr of rows.children) {
             if (tr.querySelector('.f-del').checked) continue;
             const issue = tr.querySelector('.f-issue').value.trim(), time = tr.querySelector('.f-time').value.trim(), desc = tr.querySelector('.f-desc').value.trim();
-            if (issue || time || desc) out.rows.push([issue, time, desc]);
+            const from = val(tr, '.f-from'), to = val(tr, '.f-to');
+            if (issue || time || desc || from || to) out.rows.push([issue, from, to, time, desc]);
         }
         return JSON.stringify(out);
     };
@@ -267,6 +274,8 @@
             const serverTime = fmt(r.minutes[key]);
             if (document.activeElement !== time && !tr.classList.contains('running')) time.value = serverTime;
             tr.querySelector('.f-orig').value = serverTime;
+            const to = tr.querySelector('.f-to');
+            if (to && document.activeElement !== to && r.ends && key in r.ends) to.value = r.ends[key];
         }
         for (const tr of rows.children) {
             const key = tr.dataset.key, err = (r.rowErrors || {})[key];
@@ -376,6 +385,7 @@
                 tr.querySelector('.f-issue').value = f.issue || '';
                 tr.querySelector('.f-time').value = f.time || '';
                 tr.querySelector('.f-desc').value = f.desc || '';
+                if (tr.querySelector('.f-from')) { tr.querySelector('.f-from').value = f.from || ''; tr.querySelector('.f-to').value = f.to || ''; }
             }
             if (!rows.children.length) add(false);
             banner.hidden = true;
@@ -433,6 +443,7 @@
             tr.querySelector('.tbtn').textContent = on ? '❚❚' : '▶';
             tr.querySelector('.tbtn').title = on ? 'Zatrzymaj stoper' : 'Włącz stoper';
             tr.querySelector('.f-time').readOnly = on;
+            if (tr.querySelector('.f-to')) tr.querySelector('.f-to').readOnly = on;
             if (!on) tr.querySelector('.live').textContent = '';
         }
         if (s.stopped && s.stopped.date === DATE) {
@@ -440,6 +451,7 @@
             if (tr) {
                 tr.querySelector('.f-time').value = fmt(s.stopped.minutes);
                 tr.querySelector('.f-orig').value = fmt(s.stopped.minutes);
+                fillHours(tr, 'time');
                 refreshPanels();
             }
         }
@@ -448,6 +460,36 @@
         const s = ev.detail; if (!s.running || s.date !== DATE) return;
         const tr = rowById(s.entryId);
         if (tr) tr.querySelector('.live').textContent = '⏱ ' + clock(s.baseSeconds + s.elapsedNow);
+    });
+
+    // ---------- od–do: z godziny rozpoczęcia i czasu wylicza koniec, z rozpoczęcia i końca – czas ----------
+    // Liczy tak jak serwer (TimeFormat::parse); przy czymś niejasnym nic nie zmienia, serwer i tak to oceni.
+    const parseClock = (s) => { const m = String(s).trim().match(/^([01]?\d|2[0-3])[:.]([0-5]\d)$/); return m ? m[1] * 60 + Number(m[2]) : null; };
+    const toClock = (m) => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+    const parseDur = (raw) => {
+        const s = String(raw).trim().toLowerCase().replace(',', '.');
+        let m, min = null;
+        if ((m = s.match(/^(\d{1,2}):([0-5]\d)$/))) min = m[1] * 60 + Number(m[2]);
+        else if (/^\d+(\.\d+)?$/.test(s)) min = /^\d+$/.test(s) && Number(s) > 12 ? null : Math.round(parseFloat(s) * 60);
+        else if ((m = s.match(/^(?:(\d+(?:\.\d+)?)\s*(?:h|g|godz\.?)\s*)?(?:(\d+)\s*(?:m|min\.?)?)?$/)) && (m[1] || m[2])) min = Math.round(parseFloat(m[1] || 0) * 60) + Number(m[2] || 0);
+        return min > 0 && min <= 1440 ? min : null;
+    };
+    function fillHours(tr, changedField) {
+        const fromEl = tr.querySelector('.f-from'), toEl = tr.querySelector('.f-to'), timeEl = tr.querySelector('.f-time');
+        if (!fromEl) return;
+        const from = parseClock(fromEl.value), to = parseClock(toEl.value), dur = parseDur(timeEl.value);
+        if (from === null) { if (changedField === 'from' && fromEl.value.trim() === '') toEl.value = ''; return; }
+        if (changedField === 'to' || (changedField === 'from' && dur === null)) {
+            if (to !== null && to > from) timeEl.value = fmt(to - from);
+        } else if (dur !== null) {
+            toEl.value = toClock(from + dur);
+        } else if (changedField === 'time' && timeEl.value.trim() === '') {
+            toEl.value = '';
+        }
+    }
+    rows.addEventListener('input', (ev) => {
+        const field = ev.target.classList.contains('f-from') ? 'from' : ev.target.classList.contains('f-to') ? 'to' : ev.target.classList.contains('f-time') ? 'time' : null;
+        if (field) fillHours(ev.target.closest('tr'), field);
     });
 
     // ---------- tytuł ticketu pod numerem (z podpowiedzi: pamięć tytułów z Jiry) ----------

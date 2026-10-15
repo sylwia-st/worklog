@@ -186,6 +186,8 @@ steps(
     f'wypełniasz tylko, gdy była jeszcze inna przerwa.',
     'W każdym wierszu: numer ticketu (podpowiada się po kilku znakach), czas, opis. Opis trafia jako komentarz do '
     'worklogu w Jirze i do wiadomości na Slacku.',
+    f'Kolumna {B("Od–do")} nie jest obowiązkowa. Wpisz w niej, o której zaczęło się zadanie, a potem czas – koniec '
+    f'wyliczy się sam – albo godzinę zakończenia – wtedy wyliczy się czas. Godziny wpisujesz jako 9:30 albo 9.30.',
     f'{B("+ Dodaj wiersz")} albo Enter w ostatnim wierszu dodaje kolejny.',
     'Nic nie musisz klikać – zmiany zapisują się same po sekundzie (status przy przyciskach: „✓ zapisano 14:32”). '
     'Do Jiry nic jeszcze nie idzie.')
@@ -255,7 +257,8 @@ table(['Pasek przy wierszu', 'Znaczenie', 'Co zrobić'], [
 ], [40, 80, 50])
 p('Godziny rozpoczęcia worklogów w Jirze ustawiają się kolejno od początku dnia, według kolejności wierszy '
   '(np. 8:00–10:00, 10:00–12:00, 13:00–15:00…) i omijają przerwę 12:00–13:00. Jeśli wpis wypada w trakcie obiadu, '
-  'kolejne startują po nim. Godziny nie zależą od tego, kiedy klikniesz wysyłkę, więc możesz wysłać dzień także '
+  'kolejne startują po nim. Wpis z godziną w kolumnie Od–do startuje dokładnie o niej (także w porze obiadu), '
+  'a pozostałe omijają jego czas. Godziny nie zależą od tego, kiedy klikniesz wysyłkę, więc możesz wysłać dzień także '
   'następnego dnia – trafi pod właściwą datę.')
 
 h('5. Poprawianie i usuwanie wpisów')

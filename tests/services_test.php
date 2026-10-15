@@ -247,6 +247,25 @@ namespace {
     $sync->sync($day4);
     check('godziny przerw: worklogi omijają przerwy', array_map(fn ($c) => substr($c[2]['started'], 11, 5), $http->calls), ['08:00', '13:50', '14:50', '16:00']);
 
+    // ręczna godzina rozpoczęcia: wpis startuje dokładnie o niej, pozostałe omijają jego czas
+    $day5 = new WorkDay(new DateTimeImmutable('2026-10-19'));
+    $day5->setStartTime('08:00');
+    $v1 = new WorklogEntry($day5, 'ABC-1', 60, '', 0);   // 8:00 → 9:00
+    $v2 = new WorklogEntry($day5, 'ABC-2', 90, '', 1);   // ręcznie 9:30 → 11:00
+    $v2->setStartClock('09:30');
+    $v3 = new WorklogEntry($day5, 'ABC-3', 60, '', 2);   // 9:00 → 9:30, przeskakuje 9:30–11:00, → 11:30
+    $v4 = new WorklogEntry($day5, 'ABC-4', 30, '', 3);   // ręcznie w obiedzie 12:15
+    $v4->setStartClock('12:15');
+    foreach ([$v1, $v2, $v3, $v4] as $n => $v) { setId($v, 50 + $n); }
+    check('koniec z godziny i czasu', [$v2->getEndClock(), $v1->getEndClock()], ['11:00', null]);
+    $http->calls = [];
+    $sync->sync($day5);
+    check('ręczny start', array_map(fn ($c) => basename(dirname($c[1])).' '.substr($c[2]['started'], 11, 5), $http->calls),
+        ['ABC-1 08:00', 'ABC-2 09:30', 'ABC-3 09:00', 'ABC-4 12:15']);
+    check('ręczny start: bez zmian po wysłaniu', array_values($sync->statuses($day5)), ['synced', 'synced', 'synced', 'synced']);
+    $v2->setStartClock('10:00');
+    check('zmiana godziny = do ponownego wysłania', array_values($sync->statuses($day5)), ['synced', 'changed', 'synced', 'synced']);
+
     // --- stoper: pełne minuty, bez zaokrąglania, sekundy przechodzą na kolejną sesję ---
     $tday = new WorkDay(new DateTimeImmutable('2026-10-20'));
     $t = new WorklogEntry($tday, 'TIM-1', 0, '', 0);

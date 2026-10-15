@@ -198,11 +198,13 @@
         .entries td.st .dot.none, .entries td.st .dot.new, .entries td.st .dot.empty { background: var(--line); }
         .entries td.issue { width: 150px; }
         .entries td.time { width: 104px; text-align: right; }
+        .entries td.fromto { width: 132px; white-space: nowrap; color: var(--muted); }
+        .entries td.fromto input { width: 58px; padding: 7px 4px; text-align: center; font-variant-numeric: tabular-nums; }
         .entries td.tm { width: 46px; text-align: center; }
         .entries td.del { width: 38px; text-align: center; padding-top: 7px; }
-        .entries :is(.f-issue, .f-time, .f-desc) { background: transparent; border-color: transparent; }
-        .entries :is(.f-issue, .f-time, .f-desc):hover { border-color: var(--line); }
-        .entries :is(.f-issue, .f-time, .f-desc):focus { background: var(--panel); border-color: var(--accent); }
+        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc) { background: transparent; border-color: transparent; }
+        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc):hover { border-color: var(--line); }
+        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc):focus { background: var(--panel); border-color: var(--accent); }
         .entries .f-issue { font: 650 14px var(--mono); }
         .entries .f-time { font-size: 16px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
         .entries .f-desc { resize: none; field-sizing: content; min-height: 36px; line-height: 1.4; }
@@ -219,8 +221,8 @@
         .entries tr.running .tbtn { background: var(--ok); border-color: var(--ok); color: var(--panel); }
         .entries tr.running .tfrom { visibility: hidden; }
         .entries tr.running .f-time { color: var(--ok); }
-        .entries tr.has-error :is(.f-issue, .f-time) { border-color: var(--err); }
-        .entries tr.marked-delete :is(.f-issue, .f-time, .f-desc) { text-decoration: line-through; opacity: .55; }
+        .entries tr.has-error :is(.f-issue, .f-from, .f-to, .f-time) { border-color: var(--err); }
+        .entries tr.marked-delete :is(.f-issue, .f-from, .f-to, .f-time, .f-desc) { text-decoration: line-through; opacity: .55; }
         .delbox { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; margin: 0; border-radius: 8px; color: var(--muted); cursor: pointer; opacity: .6; }
         .entries tr:hover .delbox, .delbox:has(:focus-visible), .delbox:has(:checked) { opacity: 1; }
         .delbox:hover { color: var(--err); background: var(--err-bg); }
@@ -249,6 +251,7 @@
             .entries td { display: block; }
             .entries td.st { grid-row: 1 / span 2; }
             .entries td.desc { grid-column: 2 / -1; grid-row: 2; }
+            .entries td.fromto { grid-column: 2 / -1; grid-row: 3; width: auto; }
             .entries td.issue, .entries td.time { width: auto; }
             .addrow .hint { margin-left: 0; }
         }

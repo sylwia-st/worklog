@@ -20,6 +20,7 @@ const row = (i, r) => `<tr data-key="${i}"><td class="st"><span class="dot ${r.s
  <td class="issue"><input type="hidden" name="entries[${i}][id]" value="${r.id}" class="f-id"><input type="hidden" name="entries[${i}][orig]" value="${r.time}" class="f-orig">
  <input type="text" name="entries[${i}][issue]" value="${r.issue}" class="f-issue"></td>
  <td class="tm"><button type="button" class="tbtn">▶</button><button type="button" class="tfrom">od…</button></td>
+ <td class="fromto"><input name="entries[${i}][from]" value="${r.from || ''}" class="f-from"><input name="entries[${i}][to]" value="${r.to || ''}" class="f-to"></td>
  <td class="time"><input type="text" name="entries[${i}][time]" value="${r.time}" class="f-time"><div class="live"></div></td>
  <td><textarea name="entries[${i}][desc]" class="f-desc">${r.desc}</textarea><div class="rowerr"></div></td>
  <td class="del"><input type="checkbox" name="entries[${i}][delete]" value="1" class="f-del"></td></tr>`;
@@ -318,6 +319,32 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     check('długi mail na Linuksie bez zmian', [longLinux.opened.length > 2000, longLinux.copied, longLinux.note], [true, null, false]);
     const shortWin = await mailCase(WIN, 3);
     check('krótki mail na Windowsie bez zmian', [shortWin.opened.includes('body='), shortWin.copied, shortWin.note], [true, null, false]);
+
+    // 14. od–do: start + czas → koniec, start + koniec → czas, zmiana startu przesuwa koniec
+    {
+        const w = page([{id: 7, issue: 'ABC-1', time: '', desc: 'a'}]);
+        await sleep(50);
+        const tr = w.document.querySelector('[data-key="0"]');
+        const [from, to, time] = ['.f-from', '.f-to', '.f-time'].map(s => tr.querySelector(s));
+        const type = (el, v) => { el.value = v; fire(w, el, 'input'); };
+        type(from, '9:30'); type(time, '1h 30m');
+        check('start + czas → koniec', to.value, '11:00');
+        type(to, '12:15');
+        check('start + koniec → czas', time.value, '2h 45m');
+        type(from, '10:00');
+        check('zmiana startu przesuwa koniec', [to.value, time.value], ['12:45', '2h 45m']);
+        type(time, '20');
+        check('niejasny czas – koniec bez zmian', to.value, '12:45');
+        type(time, '');
+        check('wyczyszczony czas czyści koniec', to.value, '');
+        type(to, '9:00');
+        check('koniec przed startem – czas bez zmian', time.value, '');
+        type(to, '10:30');
+        type(from, '');
+        check('wyczyszczony start czyści koniec', [to.value, time.value], ['', '30m']);
+        type(from, '10:00'); type(to, '9:00');
+        check('godziny w autozapisie', await (async () => { await sleep(1300); const b = w.calls.filter(c => c.url.includes('autosave')).pop()?.body; return [b?.['entries[0][from]'], b?.['entries[0][to]']]; })(), ['10:00', '9:00']);
+    }
 
     console.log(fails ? `\n${fails} błędów` : 'OK – wszystkie testy przeglądarkowe przeszły');
     process.exit(fails ? 1 : 0);

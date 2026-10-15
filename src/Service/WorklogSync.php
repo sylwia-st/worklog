@@ -136,19 +136,30 @@ final class WorklogSync
         if (null !== $bf && null !== $bt && $bt > $bf && !$day->hasWorkedThroughFixedBreak()) {
             $windows[] = [$bf, $bt];
         }
-        $windows = DaySummary::mergeRanges($windows);
-
+        // Wpisy z ręcznie podaną godziną rozpoczęcia startują dokładnie o niej (także w przerwie),
+        // a pozostałe omijają zajęty przez nie czas tak jak przerwy.
         $midnight = $day->getDate()->setTime(0, 0);
-        $cursor = $startMinutes;
         $plan = [];
         foreach ($day->getActiveEntries() as $entry) {
+            $fixed = null !== $entry->getStartClock() ? TimeFormat::clockToMinutes($entry->getStartClock()) : null;
+            if (null !== $fixed) {
+                $plan[spl_object_id($entry)] = self::planned($entry, $midnight->modify(sprintf('+%d minutes', $fixed)));
+                if ($entry->getMinutes() > 0) {
+                    $windows[] = [$fixed, $fixed + $entry->getMinutes()];
+                }
+            }
+        }
+        $windows = DaySummary::mergeRanges($windows);
+
+        $cursor = $startMinutes;
+        foreach ($day->getActiveEntries() as $entry) {
             /** @var WorklogEntry $entry */
+            if (isset($plan[spl_object_id($entry)])) {
+                continue;
+            }
             $cursor = self::skipBreaks($cursor, $windows);
             $started = $midnight->modify(sprintf('+%d minutes', $cursor));
-            $plan[spl_object_id($entry)] = [
-                'started' => $started,
-                'hash' => sha1(implode("\0", [$entry->getIssueKey(), $entry->getMinutes(), $entry->getDescription(), $started->format(\DATE_ATOM)])),
-            ];
+            $plan[spl_object_id($entry)] = self::planned($entry, $started);
 
             // przesuwamy kursor o czas pracy, przeskakując przerwy, które wypadają w trakcie wpisu
             $remaining = $entry->getMinutes();
@@ -166,6 +177,15 @@ final class WorklogSync
         }
 
         return $plan;
+    }
+
+    /** @return array{started: \DateTimeImmutable, hash: string} */
+    private static function planned(WorklogEntry $entry, \DateTimeImmutable $started): array
+    {
+        return [
+            'started' => $started,
+            'hash' => sha1(implode("\0", [$entry->getIssueKey(), $entry->getMinutes(), $entry->getDescription(), $started->format(\DATE_ATOM)])),
+        ];
     }
 
     /** @param list<array{0: int, 1: int}> $windows posortowane, scalone */

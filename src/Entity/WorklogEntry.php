@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Domain\TimeFormat;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -29,6 +30,10 @@ class WorklogEntry
 
     #[ORM\Column(type: Types::TEXT)]
     private string $description = '';
+
+    /** Godzina rozpoczęcia podana ręcznie („GG:MM”); null = worklog dostaje kolejną wolną godzinę dnia. */
+    #[ORM\Column(length: 5, nullable: true)]
+    private ?string $startClock = null;
 
     /** Wpis usunięty lokalnie, który trzeba jeszcze skasować w Jirze. */
     #[ORM\Column]
@@ -155,6 +160,24 @@ class WorklogEntry
         $this->minutes = max(0, $minutes);
         $this->description = $description;
         $this->position = $position;
+    }
+
+    public function getStartClock(): ?string
+    {
+        return $this->startClock;
+    }
+
+    public function setStartClock(?string $startClock): void
+    {
+        $this->startClock = $startClock;
+    }
+
+    /** Godzina zakończenia wyliczona z godziny rozpoczęcia i czasu; null bez godziny rozpoczęcia albo czasu. */
+    public function getEndClock(): ?string
+    {
+        $start = null !== $this->startClock ? TimeFormat::clockToMinutes($this->startClock) : null;
+
+        return null !== $start && $this->minutes > 0 ? TimeFormat::minutesToClock($start + $this->minutes) : null;
     }
 
     public function getIssueKey(): string
