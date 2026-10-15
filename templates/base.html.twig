@@ -202,14 +202,14 @@
         .entries td.fromto input { width: 58px; padding: 7px 4px; text-align: center; font-variant-numeric: tabular-nums; }
         .entries td.tm { width: 46px; text-align: center; }
         .entries td.del { width: 38px; text-align: center; padding-top: 7px; }
-        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc) { background: transparent; border-color: transparent; }
-        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc):hover { border-color: var(--line); }
-        .entries :is(.f-issue, .f-from, .f-to, .f-time, .f-desc):focus { background: var(--panel); border-color: var(--accent); }
+        .entries :is(.f-issue, .f-title, .f-from, .f-to, .f-time, .f-desc) { background: transparent; border-color: transparent; }
+        .entries :is(.f-issue, .f-title, .f-from, .f-to, .f-time, .f-desc):hover { border-color: var(--line); }
+        .entries :is(.f-issue, .f-title, .f-from, .f-to, .f-time, .f-desc):focus { background: var(--panel); border-color: var(--accent); }
         .entries .f-issue { font: 650 14px var(--mono); }
         .entries .f-time { font-size: 16px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
         .entries .f-desc { resize: none; field-sizing: content; min-height: 36px; line-height: 1.4; }
-        .ititle { display: block; padding-left: 11px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-        .ititle:empty { display: none; }
+        .entries .f-title { margin-top: 2px; padding: 3px 10px; font-size: 12px; color: var(--muted); text-overflow: ellipsis; }
+        .entries .f-title:focus { color: var(--ink); }
         .rowerr { color: var(--err); font-size: 12px; padding-left: 10px; }
         .rowerr:empty { display: none; }
         .live { color: var(--ok); font: 600 12px var(--mono); padding-right: 10px; }

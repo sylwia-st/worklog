@@ -103,7 +103,8 @@ Jeśli nie widzisz tej opcji, admin wyłączył tokeny – poproś go o Personal
 
 1. **Dzień** → godziny od–do (domyślne są już wpisane) + wiersze: ticket, czas (`1h 30m`, `1.5`, `90m`, `1:30`; sama liczba to godziny, najwyżej 12 – przy `20` aplikacja zapyta, czy chodzi o minuty), opis.
    „Skopiuj tickety z poprzedniego dnia” przenosi same numery.
-   Kolumna **Od–do** (nieobowiązkowa) ustala, o której zaczął się worklog: wpisz start i czas – koniec wyliczy się sam, albo start i koniec – wyliczy się czas.
+   Tytuł ticketu wpisujesz razem z numerem („ABC-123 Produkcja nie działa”) – numer zostaje w polu ticketu, tytuł przechodzi do linii pod nim i trafia na Slacka, do `{lista}` w mailu i do CSV. Przy kolejnych dniach podpowiada się sam.
+   Kolumna **Od–do** (nieobowiązkowa) ustala, o której zaczął się worklog: wpisz start i czas – koniec wyliczy się sam, albo start i koniec – wyliczy się czas. Obiad i przerwy wpisane godzinami się nie liczą (11:00–14:00 z obiadem 12–13 = 2h).
 2. **Zapisz i wyślij do Jiry.** Pasek z lewej strony wiersza: zielony = w Jirze, żółty = zmieniony po wysłaniu, czerwony = błąd (najedź, żeby zobaczyć treść).
 3. **Kopiuj na Slacka** → wklej w kanał.
 4. Jeśli pojawi się panel maila → **Otwórz w programie pocztowym** → Wyślij.

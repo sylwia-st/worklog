@@ -73,4 +73,29 @@ class WorkDayRepository extends ServiceEntityRepository
 
         return array_column($rows, 'k');
     }
+
+    /**
+     * Tytuły ticketów wpisane przy wpisach (najnowszy wygrywa) – podpowiedź przy kolejnych dniach.
+     *
+     * @return array<string, string> klucz → tytuł
+     */
+    public function knownIssueTitles(?\DateTimeImmutable $since = null): array
+    {
+        $qb = $this->getEntityManager()->createQueryBuilder()
+            ->select('e.issueKey AS k, e.issueTitle AS t')
+            ->from(WorklogEntry::class, 'e')
+            ->innerJoin('e.day', 'd')
+            ->andWhere("e.issueTitle <> ''")
+            ->orderBy('d.date', 'ASC')
+            ->addOrderBy('e.position', 'ASC');
+        if (null !== $since) {
+            $qb->andWhere('d.date >= :since')->setParameter('since', $since->setTime(0, 0), Types::DATE_IMMUTABLE);
+        }
+        $out = [];
+        foreach ($qb->getQuery()->getArrayResult() as $r) {
+            $out[$r['k']] = $r['t'];
+        }
+
+        return $out;
+    }
 }

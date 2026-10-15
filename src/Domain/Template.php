@@ -89,4 +89,10 @@ final class Template
     {
         return preg_match('/\b([A-Z][A-Z0-9_]+-\d+)\b/', mb_strtoupper(trim($raw)), $m) ? $m[1] : null;
     }
+
+    /** Tekst wpisany za numerem ticketu – „ABC-123 Produkcja nie działa” → „Produkcja nie działa”. */
+    public static function issueTitleAfterKey(string $raw): string
+    {
+        return preg_match('/^\s*[A-Za-z][A-Za-z0-9_]+-\d+\b\s*[-–—:|]?\s*(.*)$/su', $raw, $m) ? trim($m[1]) : '';
+    }
 }

@@ -68,6 +68,19 @@ check('spec mieszany', TimeFormat::parseBreakSpec('13.30-13.50 + 40m'), ['minute
 check('spec suma', TimeFormat::parseBreak('13:30-13:50, 15:00-15:40'), 60);
 check('spec odwrotny', TimeFormat::parseBreakSpec('14:00-13:00'), null);
 check('merge', DaySummary::mergeRanges([[780, 800], [720, 780], [900, 910]]), [[720, 800], [900, 910]]);
+
+// przerwy dnia, praca między godzinami i koniec pracy z przeskakiwaniem przerw
+$ws = DaySummary::breakWindows([[810, 830]], false, '12:00', '13:00');   // obiad + 13:30–13:50
+check('przerwy dnia', $ws, [[720, 780], [810, 830]]);
+check('przerwy dnia: praca w obiedzie', DaySummary::breakWindows([[810, 830]], true, '12:00', '13:00'), [[810, 830]]);
+check('od–do bez przerw w środku', DaySummary::workedBetween(540, 660, $ws), 120);           // 9:00–11:00
+check('od–do przez obiad', DaySummary::workedBetween(660, 840, $ws), 100);                   // 11:00–14:00 − 1h − 20m
+check('od–do z początkiem w obiedzie', DaySummary::workedBetween(750, 840, $ws), 40);        // 12:30–14:00
+check('od–do sama przerwa', DaySummary::workedBetween(720, 780, $ws), 0);
+check('koniec bez przerw', DaySummary::advance(540, 120, $ws), 660);
+check('koniec przez obiad i przerwę', DaySummary::advance(660, 100, $ws), 840);              // odwrotność workedBetween
+check('koniec z początkiem w obiedzie', DaySummary::advance(750, 40, $ws), 840);
+check('koniec tuż przed obiadem', DaySummary::advance(660, 60, $ws), 720);
 $s = DaySummary::calculate([], '08:00', '16:00', 0, 420, 10, null, null, [[810, 830], [900, 940]]);
 check('przerwy godzinami', [$s->presenceMinutes, $s->breakMinutes], [420, 60]);
 $s = DaySummary::calculate([], '08:00', '16:00', 0, 420, 10, '12:00', '13:00', [[750, 790]]);
@@ -93,6 +106,11 @@ check('addr invalid', Template::invalidAddresses('a@x.pl, zly'), ['zly']);
 check('key', Template::extractIssueKey('abc-123 – Poprawka logowania'), 'ABC-123');
 check('key2', Template::extractIssueKey('PROJ2_X-7'), 'PROJ2_X-7');
 check('key none', Template::extractIssueKey('123'), null);
+check('tytuł za numerem', Template::issueTitleAfterKey('abc-123 Produkcja nie działa'), 'Produkcja nie działa');
+check('tytuł za numerem z myślnikiem', Template::issueTitleAfterKey('ABC-123 – Produkcja: nie działa'), 'Produkcja: nie działa');
+check('tytuł za numerem z dwukropkiem', Template::issueTitleAfterKey('ABC-123: Awaria'), 'Awaria');
+check('sam numer bez tytułu', Template::issueTitleAfterKey(' ABC-123 '), '');
+check('numer w środku – bez tytułu', Template::issueTitleAfterKey('zobacz ABC-123'), '');
 
 $m = new MailDraft(['a@x.pl', 'b@x.pl'], ['c@x.pl'], 'Nadgodziny – 13.10', "Linia 1\nZażółć & ?");
 check('mailto', $m->mailtoUrl(), 'mailto:a@x.pl,b@x.pl?cc=c@x.pl&subject=Nadgodziny%20%E2%80%93%2013.10&body=Linia%201%0D%0AZa%C5%BC%C3%B3%C5%82%C4%87%20%26%20%3F');

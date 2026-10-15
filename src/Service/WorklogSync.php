@@ -127,17 +127,12 @@ final class WorklogSync
     {
         $startClock = $day->getStartTime() ?? $this->settings->get('default_start');
         $startMinutes = TimeFormat::clockToMinutes($startClock) ?? 8 * 60;
-        // Przerwy, które worklogi omijają: stały obiad (chyba że tego dnia była w nim praca)
-        // oraz przerwy wpisane godzinami, np. 13:30–13:50. Żaden worklog nie zaczyna się w przerwie,
-        // a wpis, na który przerwa wypada, „przeskakuje” ją – kolejne wpisy startują później.
-        $windows = $day->getBreakRanges();
-        $bf = TimeFormat::clockToMinutes($this->settings->get('lunch_from'));
-        $bt = TimeFormat::clockToMinutes($this->settings->get('lunch_to'));
-        if (null !== $bf && null !== $bt && $bt > $bf && !$day->hasWorkedThroughFixedBreak()) {
-            $windows[] = [$bf, $bt];
-        }
+        // Żaden worklog nie zaczyna się w przerwie, a wpis, na który przerwa wypada, „przeskakuje” ją –
+        // kolejne wpisy startują później.
+        $breaks = $this->dayBreakWindows($day);
         // Wpisy z ręcznie podaną godziną rozpoczęcia startują dokładnie o niej (także w przerwie),
         // a pozostałe omijają zajęty przez nie czas tak jak przerwy.
+        $windows = $breaks;
         $midnight = $day->getDate()->setTime(0, 0);
         $plan = [];
         foreach ($day->getActiveEntries() as $entry) {
@@ -145,7 +140,7 @@ final class WorklogSync
             if (null !== $fixed) {
                 $plan[spl_object_id($entry)] = self::planned($entry, $midnight->modify(sprintf('+%d minutes', $fixed)));
                 if ($entry->getMinutes() > 0) {
-                    $windows[] = [$fixed, $fixed + $entry->getMinutes()];
+                    $windows[] = [$fixed, DaySummary::advance($fixed, $entry->getMinutes(), $breaks)];
                 }
             }
         }
@@ -162,21 +157,41 @@ final class WorklogSync
             $plan[spl_object_id($entry)] = self::planned($entry, $started);
 
             // przesuwamy kursor o czas pracy, przeskakując przerwy, które wypadają w trakcie wpisu
-            $remaining = $entry->getMinutes();
-            foreach ($windows as [$wf, $wt]) {
-                if ($wt <= $cursor) {
-                    continue;
-                }
-                if ($wf >= $cursor + $remaining) {
-                    break;
-                }
-                $remaining -= $wf - $cursor;
-                $cursor = $wt;
-            }
-            $cursor += $remaining;
+            $cursor = DaySummary::advance($cursor, $entry->getMinutes(), $windows);
         }
 
         return $plan;
+    }
+
+    /**
+     * Przerwy dnia, które omijają worklogi: stały obiad (chyba że tego dnia była w nim praca)
+     * oraz przerwy wpisane godzinami, np. 13:30–13:50.
+     *
+     * @param list<array{0: int, 1: int}> $breakRanges
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public function breakWindows(array $breakRanges, bool $workedThroughFixedBreak): array
+    {
+        return DaySummary::breakWindows($breakRanges, $workedThroughFixedBreak,
+            $this->settings->get('lunch_from') ?: null, $this->settings->get('lunch_to') ?: null);
+    }
+
+    /** @return list<array{0: int, 1: int}> */
+    public function dayBreakWindows(WorkDay $day): array
+    {
+        return $this->breakWindows($day->getBreakRanges(), $day->hasWorkedThroughFixedBreak());
+    }
+
+    /** Godzina zakończenia wpisu z ręczną godziną rozpoczęcia – przerwy po drodze ją przesuwają; null bez godziny lub czasu. */
+    public function endClock(WorklogEntry $entry): ?string
+    {
+        $start = null !== $entry->getStartClock() ? TimeFormat::clockToMinutes($entry->getStartClock()) : null;
+        if (null === $start || 0 === $entry->getMinutes()) {
+            return null;
+        }
+
+        return TimeFormat::minutesToClock(DaySummary::advance($start, $entry->getMinutes(), $this->dayBreakWindows($entry->getDay())));
     }
 
     /** @return array{started: \DateTimeImmutable, hash: string} */

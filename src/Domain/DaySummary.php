@@ -91,6 +91,63 @@ final class DaySummary
         return $out;
     }
 
+    /**
+     * Przerwy dnia, które omija praca w ticketach: stały obiad (chyba że tego dnia była w nim praca)
+     * oraz przerwy wpisane godzinami, np. 13:30–13:50. Posortowane i scalone.
+     *
+     * @param list<array{0: int, 1: int}> $breakRanges
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public static function breakWindows(array $breakRanges, bool $workedThroughFixedBreak, ?string $fixedBreakFrom, ?string $fixedBreakTo): array
+    {
+        $bf = null !== $fixedBreakFrom ? TimeFormat::clockToMinutes($fixedBreakFrom) : null;
+        $bt = null !== $fixedBreakTo ? TimeFormat::clockToMinutes($fixedBreakTo) : null;
+        if (null !== $bf && null !== $bt && $bt > $bf && !$workedThroughFixedBreak) {
+            $breakRanges[] = [$bf, $bt];
+        }
+
+        return self::mergeRanges($breakRanges);
+    }
+
+    /**
+     * Ile pracy mieści się między godzinami from i to (minuty od północy) po odjęciu przerw.
+     *
+     * @param list<array{0: int, 1: int}> $windows posortowane, scalone
+     */
+    public static function workedBetween(int $from, int $to, array $windows): int
+    {
+        $worked = $to - $from;
+        foreach ($windows as [$wf, $wt]) {
+            $worked -= max(0, min($to, $wt) - max($from, $wf));
+        }
+
+        return max(0, $worked);
+    }
+
+    /**
+     * Godzina końca pracy trwającej $minutes od $from, gdy przerwy po drodze się przeskakuje
+     * (odwrotność workedBetween). Wynik może przekroczyć 1440 (po północy).
+     *
+     * @param list<array{0: int, 1: int}> $windows posortowane, scalone
+     */
+    public static function advance(int $from, int $minutes, array $windows): int
+    {
+        $cursor = $from;
+        foreach ($windows as [$wf, $wt]) {
+            if ($wt <= $cursor) {
+                continue;
+            }
+            if ($wf >= $cursor + $minutes) {
+                break;
+            }
+            $minutes -= max(0, $wf - $cursor);
+            $cursor = $wt;
+        }
+
+        return $cursor + $minutes;
+    }
+
     /** Część przedziału [from, to) (w minutach od północy) pokrywająca się ze stałą przerwą. */
     public static function overlap(int $from, int $to, ?string $breakFrom, ?string $breakTo): int
     {

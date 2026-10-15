@@ -42,12 +42,13 @@ final class ReportBuilder
         $vars = $this->dayVars($day, $this->summary($day));
         $lines = [];
         foreach ($this->groupedEntries($day) as $key => $g) {
-            $lines[] = Template::render($this->settings->get('slack_line'), $vars + [
+            $line = Template::render($this->settings->get('slack_line'), $vars + [
                 'ticket' => $key,
                 'czas' => TimeFormat::format($g['minutes']),
                 'opis' => implode('; ', $g['descriptions']),
-                'tytul' => $this->settings->issueCache()[$key] ?? '',
+                'tytul' => $g['title'],
             ]);
+            $lines[] = preg_replace('/ {2,}/', ' ', $line); // pusty {tytul} zostawia podwójną spację
         }
 
         $parts = array_filter([
@@ -109,7 +110,7 @@ final class ReportBuilder
         $date = $day->getDate();
         $lista = [];
         foreach ($this->groupedEntries($day) as $k => $g) {
-            $lista[] = sprintf('%s – %s – %s', $k, TimeFormat::format($g['minutes']), implode('; ', $g['descriptions']));
+            $lista[] = sprintf('%s – %s – %s', trim($k.' '.$g['title']), TimeFormat::format($g['minutes']), implode('; ', $g['descriptions']));
         }
 
         return [
@@ -128,7 +129,7 @@ final class ReportBuilder
         ];
     }
 
-    /** @return array<string, array{minutes: int, descriptions: string[]}> */
+    /** @return array<string, array{minutes: int, descriptions: string[], title: string}> tytuł: wpisany przy wpisie, inaczej z Jiry */
     private function groupedEntries(WorkDay $day): array
     {
         $out = [];
@@ -137,10 +138,20 @@ final class ReportBuilder
                 continue; // wpis bez czasu nie trafia na Slacka ani do maila
             }
             $k = $e->getIssueKey();
-            $out[$k] ??= ['minutes' => 0, 'descriptions' => []];
+            $out[$k] ??= ['minutes' => 0, 'descriptions' => [], 'title' => ''];
             $out[$k]['minutes'] += $e->getMinutes();
+            if ('' === $out[$k]['title']) {
+                $out[$k]['title'] = $e->getIssueTitle();
+            }
             if ('' !== trim($e->getDescription()) && !in_array(trim($e->getDescription()), $out[$k]['descriptions'], true)) {
                 $out[$k]['descriptions'][] = trim($e->getDescription());
+            }
+        }
+
+        $cache = $this->settings->issueCache();
+        foreach ($out as $k => $g) {
+            if ('' === $g['title']) {
+                $out[$k]['title'] = $cache[$k] ?? '';
             }
         }
 

@@ -82,7 +82,7 @@
         <div class="panel-h entries-h"><h2>Czas w ticketach</h2></div>
         <table class="entries">
             <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th>Opis – komentarz w Jirze i na Slacku</th><th>Od–do</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
-            <tbody id="rows">
+            <tbody id="rows" data-lunch="{{ lunch }}">
             {% for row in form.rows %}
                 {{ _self.entry_row(loop.index0, row, issueOptions) }}
             {% endfor %}
@@ -141,7 +141,7 @@
     {% for key, title in issueOptions %}<option value="{{ key }}">{{ key }}{{ title ? ' – ' ~ title }}</option>{% endfor %}
 </datalist>
 
-<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', from: '', to: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
+<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', title: '', from: '', to: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
 {% endblock %}
 
 {% macro entry_row(i, row, titles) %}
@@ -154,7 +154,7 @@
             <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
             <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
             <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue" aria-label="Ticket">
-            <small class="ititle">{{ titles[row.issue]|default('') }}</small>
+            <input type="text" name="entries[{{ i }}][title]" value="{{ row.title|default('') }}" placeholder="{{ titles[row.issue]|default('') ?: 'tytuł' }}" autocomplete="off" class="f-title" aria-label="Tytuł ticketu" title="Tytuł ticketu – na Slacka, do maila i do eksportu CSV">
         </td>
         <td class="desc">
             <textarea name="entries[{{ i }}][desc]" rows="1" placeholder="Co zostało zrobione" class="f-desc" aria-label="Opis">{{ row.desc }}</textarea>
@@ -221,8 +221,8 @@
         for (const tr of rows.children) {
             if (tr.querySelector('.f-del').checked) continue;
             const issue = tr.querySelector('.f-issue').value.trim(), time = tr.querySelector('.f-time').value.trim(), desc = tr.querySelector('.f-desc').value.trim();
-            const from = val(tr, '.f-from'), to = val(tr, '.f-to');
-            if (issue || time || desc || from || to) out.rows.push([issue, from, to, time, desc]);
+            const from = val(tr, '.f-from'), to = val(tr, '.f-to'), title = val(tr, '.f-title');
+            if (issue || time || desc || from || to || title) out.rows.push([issue, title, from, to, time, desc]);
         }
         return JSON.stringify(out);
     };
@@ -337,7 +337,7 @@
     function showDelConfirm(action) {
         document.getElementById('delconfirm-list').replaceChildren(...markedRows().map(tr => {
             const li = document.createElement('li');
-            li.textContent = ['.f-issue', '.f-time', '.f-desc'].map(s => tr.querySelector(s).value.trim()).filter(Boolean).join(' – ');
+            li.textContent = [[val(tr, '.f-issue'), val(tr, '.f-title')].filter(Boolean).join(' '), val(tr, '.f-time'), val(tr, '.f-desc')].filter(Boolean).join(' – ');
             return li;
         }));
         delGo.value = action;
@@ -385,6 +385,7 @@
                 tr.querySelector('.f-issue').value = f.issue || '';
                 tr.querySelector('.f-time').value = f.time || '';
                 tr.querySelector('.f-desc').value = f.desc || '';
+                if (tr.querySelector('.f-title')) tr.querySelector('.f-title').value = f.title || '';
                 if (tr.querySelector('.f-from')) { tr.querySelector('.f-from').value = f.from || ''; tr.querySelector('.f-to').value = f.to || ''; }
             }
             if (!rows.children.length) add(false);
@@ -474,30 +475,81 @@
         else if ((m = s.match(/^(?:(\d+(?:\.\d+)?)\s*(?:h|g|godz\.?)\s*)?(?:(\d+)\s*(?:m|min\.?)?)?$/)) && (m[1] || m[2])) min = Math.round(parseFloat(m[1] || 0) * 60) + Number(m[2] || 0);
         return min > 0 && min <= 1440 ? min : null;
     };
+    // Przerwy, które pomija czas między godzinami (jak DaySummary::breakWindows): obiad, chyba że zaznaczono
+    // pracę w przerwie, i przerwy wpisane godzinami (13:30-13:50, 15:00-15:40).
+    const breakWindows = () => {
+        const out = [];
+        const lunch = (rows.dataset.lunch || '').split('–').map(parseClock), lw = document.getElementById('lunch_worked');
+        if (lunch.length === 2 && lunch[0] !== null && lunch[1] > lunch[0] && !(lw && lw.checked)) out.push(lunch);
+        const brk = form.elements['break'];
+        for (const part of (brk ? brk.value : '').split(/[,;+\n]/)) {
+            const m = part.trim().match(/^(\d{1,2}[:.]\d{2})\s*[-–]\s*(\d{1,2}[:.]\d{2})$/);
+            const a = m && parseClock(m[1]), b = m && parseClock(m[2]);
+            if (m && a !== null && b !== null && b > a) out.push([a, b]);
+        }
+        out.sort((x, y) => x[0] - y[0]);
+        return out.reduce((acc, r) => { const l = acc[acc.length - 1]; if (l && r[0] <= l[1]) l[1] = Math.max(l[1], r[1]); else acc.push([...r]); return acc; }, []);
+    };
+    // jak DaySummary::workedBetween i DaySummary::advance
+    const workedBetween = (from, to, ws) => Math.max(0, ws.reduce((m, [a, b]) => m - Math.max(0, Math.min(to, b) - Math.max(from, a)), to - from));
+    const advance = (from, minutes, ws) => {
+        let cur = from;
+        for (const [a, b] of ws) {
+            if (b <= cur) continue;
+            if (a >= cur + minutes) break;
+            minutes -= Math.max(0, a - cur);
+            cur = b;
+        }
+        return cur + minutes;
+    };
     function fillHours(tr, changedField) {
         const fromEl = tr.querySelector('.f-from'), toEl = tr.querySelector('.f-to'), timeEl = tr.querySelector('.f-time');
         if (!fromEl) return;
         const from = parseClock(fromEl.value), to = parseClock(toEl.value), dur = parseDur(timeEl.value);
         if (from === null) { if (changedField === 'from' && fromEl.value.trim() === '') toEl.value = ''; return; }
+        const ws = breakWindows();
         if (changedField === 'to' || (changedField === 'from' && dur === null)) {
-            if (to !== null && to > from) timeEl.value = fmt(to - from);
+            const worked = to !== null && to > from ? workedBetween(from, to, ws) : 0;
+            if (worked > 0) timeEl.value = fmt(worked);
         } else if (dur !== null) {
-            toEl.value = toClock(from + dur);
+            toEl.value = toClock(advance(from, dur, ws));
         } else if (changedField === 'time' && timeEl.value.trim() === '') {
             toEl.value = '';
         }
     }
+    // zmiana przerw dnia przesuwa koniec wpisów z godziną rozpoczęcia (czas zostaje)
+    const refillAll = (ev) => { if (ev.target.id === 'break' || ev.target.id === 'lunch_worked') for (const tr of rows.children) fillHours(tr, 'time'); };
+    form.addEventListener('input', refillAll);
+    form.addEventListener('change', refillAll);
     rows.addEventListener('input', (ev) => {
         const field = ev.target.classList.contains('f-from') ? 'from' : ev.target.classList.contains('f-to') ? 'to' : ev.target.classList.contains('f-time') ? 'time' : null;
         if (field) fillHours(ev.target.closest('tr'), field);
     });
 
-    // ---------- tytuł ticketu pod numerem (z podpowiedzi: pamięć tytułów z Jiry) ----------
+    // ---------- tytuł ticketu pod numerem ----------
+    // „ABC-123 Produkcja nie działa” wpisane (albo wklejone) w pole ticketu rozdziela się na numer i tytuł,
+    // a przy znanym numerze tytuł podpowiada się sam (wpisany wcześniej albo z Jiry).
     const titles = Object.fromEntries([...document.querySelectorAll('#issues option')].map(o => [o.value, o.textContent.split(' – ').slice(1).join(' – ')]));
     rows.addEventListener('input', (ev) => {
+        const tr = ev.target.closest('tr'), titleEl = tr && tr.querySelector('.f-title');
+        if (!titleEl) return;
+        if (ev.target === titleEl) { titleEl.dataset.auto = ''; return; }
         if (!ev.target.classList.contains('f-issue')) return;
-        const box = ev.target.closest('tr').querySelector('.ititle');
-        if (box) box.textContent = titles[ev.target.value.trim().toUpperCase()] || '';
+        const m = ev.target.value.match(/^\s*([A-Za-z][A-Za-z0-9_]+-\d+)\s*[-–—:|]?\s+(\S[\s\S]*)$/);
+        if (m) {
+            ev.target.value = m[1].toUpperCase();
+            titleEl.value = m[2];
+            titleEl.dataset.auto = '';
+            titleEl.focus();
+            titleEl.setSelectionRange(titleEl.value.length, titleEl.value.length);
+            return;
+        }
+        const known = titles[ev.target.value.trim().toUpperCase()] || '';
+        titleEl.placeholder = known || 'tytuł';
+        if (!titleEl.value.trim() || titleEl.dataset.auto === '1') {
+            titleEl.value = known;
+            titleEl.dataset.auto = known ? '1' : '';
+        }
     });
 
     // ---------- przerwa obiadowa ----------

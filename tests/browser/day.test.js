@@ -18,14 +18,14 @@ function scripts(file) {
 }
 const row = (i, r) => `<tr data-key="${i}"><td class="st"><span class="dot ${r.status || 'none'}"></span></td>
  <td class="issue"><input type="hidden" name="entries[${i}][id]" value="${r.id}" class="f-id"><input type="hidden" name="entries[${i}][orig]" value="${r.time}" class="f-orig">
- <input type="text" name="entries[${i}][issue]" value="${r.issue}" class="f-issue"></td>
+ <input type="text" name="entries[${i}][issue]" value="${r.issue}" class="f-issue"><input name="entries[${i}][title]" value="${r.title || ''}" class="f-title"></td>
  <td class="tm"><button type="button" class="tbtn">▶</button><button type="button" class="tfrom">od…</button></td>
  <td class="fromto"><input name="entries[${i}][from]" value="${r.from || ''}" class="f-from"><input name="entries[${i}][to]" value="${r.to || ''}" class="f-to"></td>
  <td class="time"><input type="text" name="entries[${i}][time]" value="${r.time}" class="f-time"><div class="live"></div></td>
  <td><textarea name="entries[${i}][desc]" class="f-desc">${r.desc}</textarea><div class="rowerr"></div></td>
  <td class="del"><input type="checkbox" name="entries[${i}][delete]" value="1" class="f-del"></td></tr>`;
 
-function page(rows, storage) {
+function page(rows, storage, extraHtml = '') {
     const html = `<!doctype html><body>
  <div id="timerbar" hidden><b id="tb-issue"></b><span id="tb-date"></span><span id="tb-since"></span><span id="tb-time"></span><button id="tb-stop"></button><a id="tb-link"></a></div>
  <div id="timerstale" hidden><strong id="ts-msg"></strong><input id="ts-at"><button id="ts-stop-at"></button><button id="ts-stop-now"></button><button id="ts-keep"></button></div>
@@ -37,6 +37,7 @@ function page(rows, storage) {
   <button type="button" id="addrow"></button><button type="submit" name="action" value="sync" id="syncbtn"></button><span id="savestate"></span>
   <div id="delconfirm" hidden><ul id="delconfirm-list"></ul><button type="submit" name="confirm_delete" value="save" id="delconfirm-go"></button><button type="button" id="delconfirm-cancel"></button></div></form>
  <div id="panels"></div>
+ ${extraHtml}
  <template id="rowtpl">${row('__i__', {id: 0, issue: '', time: '', desc: ''})}</template></body>`;
     const dom = new JSDOM(html, {runScripts: 'outside-only', url: 'http://127.0.0.1:8765/day/2026-10-20'});
     const w = dom.window;
@@ -344,6 +345,59 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
         check('wyczyszczony start czyści koniec', [to.value, time.value], ['', '30m']);
         type(from, '10:00'); type(to, '9:00');
         check('godziny w autozapisie', await (async () => { await sleep(1300); const b = w.calls.filter(c => c.url.includes('autosave')).pop()?.body; return [b?.['entries[0][from]'], b?.['entries[0][to]']]; })(), ['10:00', '9:00']);
+    }
+
+    // 15. od–do przez przerwy: obiad i przerwy wpisane godzinami się nie liczą, koniec je przeskakuje
+    {
+        const w = page([{id: 7, issue: 'ABC-1', time: '', desc: 'a'}]);
+        await sleep(50);
+        w.document.getElementById('rows').dataset.lunch = '12:00–13:00';
+        const tr = w.document.querySelector('[data-key="0"]');
+        const [from, to, time] = ['.f-from', '.f-to', '.f-time'].map(s => tr.querySelector(s));
+        const type = (el, v) => { el.value = v; fire(w, el, 'input'); };
+        type(from, '11:00'); type(to, '14:00');
+        check('od–do bez obiadu', time.value, '2h');
+        type(time, '2h 30m');
+        check('start + czas przeskakuje obiad', to.value, '14:30');
+        const brk = w.document.getElementById('break');
+        type(brk, '13:30-13:50');
+        check('przerwa godzinami przesuwa koniec', [to.value, time.value], ['14:50', '2h 30m']);
+        const lw = w.document.getElementById('lunch_worked');
+        lw.checked = true; fire(w, lw, 'change');
+        check('praca w obiedzie – obiad się nie liczy', to.value, '13:30');
+        type(to, '13:40');
+        check('koniec w przerwie – przerwa się nie liczy', time.value, '2h 30m');
+        type(from, '13:30'); type(to, '13:50');
+        check('od–do sama przerwa nie zmienia czasu', time.value, '2h 30m');
+    }
+
+    // 16. tytuł ticketu: „ABC-123 Tytuł” rozdziela się na numer i tytuł, znany numer podpowiada tytuł
+    {
+        const w = page([{id: 7, issue: '', time: '', desc: ''}]);
+        await sleep(50);
+        const tr = w.document.querySelector('[data-key="0"]');
+        const [issue, title] = ['.f-issue', '.f-title'].map(s => tr.querySelector(s));
+        const type = (el, v) => { el.value = v; fire(w, el, 'input'); };
+        type(issue, 'abc-123 Produkcja nie działa');
+        check('numer i tytuł rozdzielone', [issue.value, title.value], ['ABC-123', 'Produkcja nie działa']);
+        check('dalsze pisanie trafia do tytułu', w.document.activeElement === title, true);
+        type(issue, 'ABC-123 ');
+        check('sama spacja za numerem nic nie rozdziela', [issue.value, title.value], ['ABC-123 ', 'Produkcja nie działa']);
+        check('tytuł w autozapisie', await (async () => { await sleep(1300); return w.calls.filter(c => c.url.includes('autosave')).pop()?.body['entries[0][title]']; })(), 'Produkcja nie działa');
+    }
+    {
+        // znane tytuły – z datalisty (w szablonie: tytuły wpisane wcześniej i z Jiry)
+        const w = page([{id: 7, issue: '', time: '', desc: ''}], null, '<datalist id="issues"><option value="ABC-1">ABC-1 – Logowanie</option></datalist>');
+        await sleep(50);
+        const tr = w.document.querySelector('[data-key="0"]');
+        const [issue, title] = ['.f-issue', '.f-title'].map(s => tr.querySelector(s));
+        const type = (el, v) => { el.value = v; fire(w, el, 'input'); };
+        type(issue, 'ABC-1');
+        check('znany numer podpowiada tytuł', title.value, 'Logowanie');
+        type(issue, 'ABC-12');
+        check('podpowiedź znika przy innym numerze', title.value, '');
+        type(issue, 'ABC-1'); type(title, 'Moje SSO'); type(issue, 'ABC-1');
+        check('wpisany tytuł się nie nadpisuje', title.value, 'Moje SSO');
     }
 
     console.log(fails ? `\n${fails} błędów` : 'OK – wszystkie testy przeglądarkowe przeszły');

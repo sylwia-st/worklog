@@ -53,7 +53,7 @@ final class Settings
 
         // Slack
         'slack_header' => 'Raport z {data} ({dzien}):',
-        'slack_line' => '• {ticket} – {czas} – {opis}',
+        'slack_line' => '• {ticket} {tytul} – {czas} – {opis}',
         'slack_footer' => 'Razem: {zalogowane}',
 
         // Mail: nadgodziny
@@ -87,6 +87,11 @@ final class Settings
         'theme_custom' => '',
     ];
 
+    /** Dawne domyślne teksty – zapisane bez zmian traktujemy jak domyślne, więc przechodzą na obecne. */
+    private const OLD_DEFAULTS = [
+        'slack_line' => ['• {ticket} – {czas} – {opis}'],
+    ];
+
     /** @var array<string, string>|null */
     private ?array $cache = null;
 
@@ -115,7 +120,8 @@ final class Settings
         if (null === $this->cache) {
             $stored = [];
             foreach ($this->em->getRepository(Setting::class)->findAll() as $s) {
-                if (array_key_exists($s->getName(), self::DEFAULTS)) {
+                if (array_key_exists($s->getName(), self::DEFAULTS)
+                    && !in_array($s->getValue(), self::OLD_DEFAULTS[$s->getName()] ?? [], true)) {
                     $stored[$s->getName()] = $s->getValue();
                 }
             }

@@ -123,6 +123,9 @@ final class MonthReport
                 $k = $e->getIssueKey();
                 $tickets[$k] ??= ['minutes' => 0, 'days' => 0, 'title' => $titles[$k] ?? ''];
                 $tickets[$k]['minutes'] += $e->getMinutes();
+                if ('' !== $e->getIssueTitle()) {
+                    $tickets[$k]['title'] = $e->getIssueTitle(); // wpisany tytuł ma pierwszeństwo przed tytułem z Jiry
+                }
                 if (!isset($seen[$k])) {
                     $seen[$k] = true;
                     ++$tickets[$k]['days'];
@@ -188,7 +191,7 @@ final class MonthReport
                 $lines[] = [
                     $r['date']->format('Y-m-d'),
                     $e->getIssueKey(),
-                    $report['tickets'][$e->getIssueKey()]['title'] ?? '',
+                    '' !== $e->getIssueTitle() ? $e->getIssueTitle() : ($report['tickets'][$e->getIssueKey()]['title'] ?? ''),
                     self::clock($e->getMinutes()),
                     (string) $e->getMinutes(),
                     $e->getDescription(),

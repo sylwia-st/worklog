@@ -127,6 +127,29 @@ namespace {
 
     check('slack', $reports->slackText($day), "Raport z 13.10.2026 (wtorek):\n• ABC-1 – 6h – Logowanie SSO; Testy SSO\n• ABC-2 – 3h – Code review\nRazem: 9h");
 
+    // tytuł wpisany przy wpisie: na Slacku i w {lista}; bez tytułu bez podwójnej spacji
+    $c->setIssueTitle('  Logowanie przez SSO ');
+    check('tytuł przycięty', $c->getIssueTitle(), 'Logowanie przez SSO');
+    check('slack z tytułem', $reports->slackText($day), "Raport z 13.10.2026 (wtorek):\n• ABC-1 Logowanie przez SSO – 6h – Logowanie SSO; Testy SSO\n• ABC-2 – 3h – Code review\nRazem: 9h");
+    $saved = $values;
+    $values['mail_over_body'] = '{lista}';
+    (new ReflectionProperty(Settings::class, 'cache'))->setValue($settings, $values);
+    check('lista z tytułem', $reports->presenceMail($day)?->body, "ABC-1 Logowanie przez SSO – 6h – Logowanie SSO; Testy SSO\nABC-2 – 3h – Code review");
+    $values = $saved;
+    (new ReflectionProperty(Settings::class, 'cache'))->setValue($settings, $values);
+    $c->setIssueTitle('');
+
+    // linia Slacka zapisana w bazie jako dawny domyślny tekst przechodzi na nowy (z tytułem); własna zostaje
+    $fakeEm = new class implements Doctrine\ORM\EntityManagerInterface {
+        public array $rows = [];
+        public function getRepository($class) { return new class($this->rows) { public function __construct(private array $r) {} public function findAll(): array { return $this->r; } }; }
+        public function getConnection() { return new class { public function getParams(): array { return []; } }; }
+    };
+    $fakeEm->rows = [new App\Entity\Setting('slack_line', '• {ticket} – {czas} – {opis}')];
+    check('stara domyślna linia Slacka → nowa', (new Settings($fakeEm))->get('slack_line'), '• {ticket} {tytul} – {czas} – {opis}');
+    $fakeEm->rows = [new App\Entity\Setting('slack_line', '{ticket}: {opis}')];
+    check('własna linia Slacka zostaje', (new Settings($fakeEm))->get('slack_line'), '{ticket}: {opis}');
+
     $mail = $reports->presenceMail($day);
     check('mail over', $mail?->subject, 'Nadgodziny – 13.10.2026');
     check('mail to', $mail?->to, ['szef@firma.pl', 'hr@firma.pl']);
@@ -257,7 +280,7 @@ namespace {
     $v4 = new WorklogEntry($day5, 'ABC-4', 30, '', 3);   // ręcznie w obiedzie 12:15
     $v4->setStartClock('12:15');
     foreach ([$v1, $v2, $v3, $v4] as $n => $v) { setId($v, 50 + $n); }
-    check('koniec z godziny i czasu', [$v2->getEndClock(), $v1->getEndClock()], ['11:00', null]);
+    check('koniec z godziny i czasu', [$sync->endClock($v2), $sync->endClock($v1)], ['11:00', null]);
     $http->calls = [];
     $sync->sync($day5);
     check('ręczny start', array_map(fn ($c) => basename(dirname($c[1])).' '.substr($c[2]['started'], 11, 5), $http->calls),
@@ -265,6 +288,18 @@ namespace {
     check('ręczny start: bez zmian po wysłaniu', array_values($sync->statuses($day5)), ['synced', 'synced', 'synced', 'synced']);
     $v2->setStartClock('10:00');
     check('zmiana godziny = do ponownego wysłania', array_values($sync->statuses($day5)), ['synced', 'changed', 'synced', 'synced']);
+
+    // ręczny start przez obiad: 11:00 + 2h kończy się o 14:00, a kolejny wpis startuje po nim
+    $day6 = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $day6->setStartTime('08:00');
+    $u1 = new WorklogEntry($day6, 'ABC-1', 180, '', 0);  // 8:00 → 11:00
+    $u2 = new WorklogEntry($day6, 'ABC-2', 120, '', 1);  // ręcznie 11:00, obiad w środku → 14:00
+    $u2->setStartClock('11:00');
+    $u3 = new WorklogEntry($day6, 'ABC-3', 30, '', 2);   // 14:00
+    check('koniec ręcznego wpisu przez obiad', $sync->endClock($u2), '14:00');
+    $http->calls = [];
+    $sync->sync($day6);
+    check('po ręcznym przez obiad', array_map(fn ($c) => substr($c[2]['started'], 11, 5), $http->calls), ['08:00', '11:00', '14:00']);
 
     // --- stoper: pełne minuty, bez zaokrąglania, sekundy przechodzą na kolejną sesję ---
     $tday = new WorkDay(new DateTimeImmutable('2026-10-20'));

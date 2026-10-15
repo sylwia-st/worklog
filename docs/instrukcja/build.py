@@ -186,8 +186,13 @@ steps(
     f'wypełniasz tylko, gdy była jeszcze inna przerwa.',
     'W każdym wierszu: numer ticketu (podpowiada się po kilku znakach), czas, opis. Opis trafia jako komentarz do '
     'worklogu w Jirze i do wiadomości na Slacku.',
+    'Tytuł ticketu wpisz razem z numerem, np. „ABC-123 Produkcja nie działa” – numer zostanie w polu ticketu, a tytuł '
+    'przejdzie do linii pod nim. Tytuł trafia na Slacka, do listy w mailu i do eksportu CSV, a przy kolejnych dniach '
+    'podpowiada się sam po wpisaniu numeru.',
     f'Kolumna {B("Od–do")} nie jest obowiązkowa. Wpisz w niej, o której zaczęło się zadanie, a potem czas – koniec '
-    f'wyliczy się sam – albo godzinę zakończenia – wtedy wyliczy się czas. Godziny wpisujesz jako 9:30 albo 9.30.',
+    f'wyliczy się sam – albo godzinę zakończenia – wtedy wyliczy się czas. Godziny wpisujesz jako 9:30 albo 9.30. '
+    f'Obiad i przerwy wpisane godzinami się nie liczą: 11:00–14:00 przy obiedzie 12:00–13:00 to 2h, a 11:00 + 2h '
+    f'kończy się o 14:00.',
     f'{B("+ Dodaj wiersz")} albo Enter w ostatnim wierszu dodaje kolejny.',
     'Nic nie musisz klikać – zmiany zapisują się same po sekundzie (status przy przyciskach: „✓ zapisano 14:32”). '
     'Do Jiry nic jeszcze nie idzie.')

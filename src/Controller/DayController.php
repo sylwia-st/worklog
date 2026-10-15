@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Domain\DayAxis;
+use App\Domain\DaySummary;
 use App\Domain\Template;
 use App\Domain\TimeFormat;
 use App\Entity\PlannedChange;
@@ -53,7 +54,7 @@ final class DayController extends AbstractController
             $prev = $this->days->findPreviousWithEntries($d);
             if (null !== $prev) {
                 $form['rows'] = array_map(static fn (WorklogEntry $e) => [
-                    'id' => 0, 'issue' => $e->getIssueKey(), 'from' => '', 'to' => '', 'time' => '', 'desc' => '', 'status' => null, 'error' => null,
+                    'id' => 0, 'issue' => $e->getIssueKey(), 'title' => $e->getIssueTitle(), 'from' => '', 'to' => '', 'time' => '', 'desc' => '', 'status' => null, 'error' => null,
                 ], $prev->getActiveEntries());
                 $this->addFlash('info', 'Skopiowano tickety z '.$prev->getDate()->format('d.m.Y').' – uzupełnij czas i opisy, potem zapisz.');
             }
@@ -226,6 +227,7 @@ final class DayController extends AbstractController
                 $created[$row['key']] = $entry;
             }
             $entry->setStartClock($row['from']);
+            $entry->setIssueTitle($row['title']);
             ++$position;
         }
         $this->em->flush();
@@ -238,7 +240,7 @@ final class DayController extends AbstractController
             if (null !== $entry && !$row['delete'] && null !== $entry->getId()) {
                 $ids[$row['key']] = (int) $entry->getId();
                 $minutes[$row['key']] = $entry->getMinutes();
-                $ends[$row['key']] = $entry->getEndClock() ?? '';
+                $ends[$row['key']] = $this->sync->endClock($entry) ?? '';
             }
         }
 
@@ -304,6 +306,10 @@ final class DayController extends AbstractController
         foreach ($this->days->recentIssueKeys($d->modify('-60 days')) as $key) {
             $issueOptions[$key] ??= '';
         }
+        // tytuły wpisane przy wpisach mają pierwszeństwo przed tytułami z Jiry
+        foreach ($this->days->knownIssueTitles() as $key => $title) {
+            $issueOptions[$key] = $title;
+        }
 
         return $this->render('day/show.html.twig', $this->panelVars($d, $day) + [
             'prev' => $d->modify('-1 day'),
@@ -339,11 +345,12 @@ final class DayController extends AbstractController
             'end' => $day->getEndTime(),
             'break' => $day->getBreakText() ?? ($day->getBreakMinutes() > 0 ? TimeFormat::format($day->getBreakMinutes()) : ''),
             'lunchWorked' => $day->hasWorkedThroughFixedBreak(),
-            'rows' => array_map(static fn (WorklogEntry $e) => [
+            'rows' => array_map(fn (WorklogEntry $e) => [
                 'id' => (int) $e->getId(),
                 'issue' => $e->getIssueKey(),
+                'title' => $e->getIssueTitle(),
                 'from' => $e->getStartClock() ?? '',
-                'to' => $e->getEndClock() ?? '',
+                'to' => $this->sync->endClock($e) ?? '',
                 'time' => $e->getMinutes() > 0 ? TimeFormat::format($e->getMinutes()) : '',
                 'desc' => $e->getDescription(),
                 'status' => $statuses[(int) $e->getId()] ?? null,
@@ -402,6 +409,8 @@ final class DayController extends AbstractController
             $breakMinutes = $breakSpec['minutes'];
         }
         $lunchWorked = $p->getBoolean('lunch_worked');
+        // przerwy z formularza – czas z godzin od–do i godzina zakończenia je pomijają
+        $windows = $this->sync->breakWindows($breakSpec['ranges'] ?? [], $lunchWorked);
 
         $errors = $dayErrors;
         $rows = [];
@@ -413,6 +422,7 @@ final class DayController extends AbstractController
                 'key' => (string) $key,
                 'id' => (int) ($raw['id'] ?? 0),
                 'issue' => trim((string) ($raw['issue'] ?? '')),
+                'title' => trim((string) ($raw['title'] ?? '')),
                 'from' => trim((string) ($raw['from'] ?? '')),
                 'to' => trim((string) ($raw['to'] ?? '')),
                 'time' => trim((string) ($raw['time'] ?? '')),
@@ -424,7 +434,7 @@ final class DayController extends AbstractController
                 'status' => null,
                 'error' => null,
             ];
-            if (0 === $row['id'] && '' === $row['issue'] && '' === $row['from'] && '' === $row['to'] && '' === $row['time'] && '' === $row['desc']) {
+            if (0 === $row['id'] && '' === $row['issue'] && '' === $row['title'] && '' === $row['from'] && '' === $row['to'] && '' === $row['time'] && '' === $row['desc']) {
                 continue; // pusty wiersz
             }
             if (!$row['delete']) {
@@ -443,17 +453,24 @@ final class DayController extends AbstractController
                 } elseif (null !== $to && '' === $row['time'] && $to <= $from) {
                     $row['error'] = 'Godzina zakończenia musi być późniejsza niż rozpoczęcia.';
                 } else {
-                    // czas ma pierwszeństwo; z samych godzin od–do wyliczamy go
+                    // czas ma pierwszeństwo; z samych godzin od–do wyliczamy go (bez przerw w środku)
                     if (0 === $minutes && null !== $to) {
-                        $minutes = $to - $from;
+                        $minutes = DaySummary::workedBetween($from, $to, $windows);
                     }
-                    if (null !== $from && $from + $minutes > 24 * 60) {
+                    $rowEnd = null !== $from ? DaySummary::advance($from, $minutes, $windows) : null;
+                    if (null !== $to && 0 === $minutes) {
+                        $row['error'] = 'Między tymi godzinami jest sama przerwa – popraw godziny.';
+                    } elseif (null !== $rowEnd && $rowEnd > 24 * 60) {
                         $row['error'] = 'Wpis kończyłby się po północy – skróć czas albo zmień godzinę rozpoczęcia.';
                     } else {
+                        // „ABC-123 Produkcja nie działa” w polu ticketu → numer + tytuł
+                        if ('' === $row['title']) {
+                            $row['title'] = Template::issueTitleAfterKey($row['issue']);
+                        }
                         $row['issue'] = $issue;
                         $row['minutes'] = $minutes;
                         $row['from'] = null !== $from ? TimeFormat::minutesToClock($from) : null;
-                        $row['to'] = null !== $from && $minutes > 0 ? TimeFormat::minutesToClock($from + $minutes) : '';
+                        $row['to'] = null !== $rowEnd && $minutes > 0 ? TimeFormat::minutesToClock($rowEnd) : '';
                         $row['time'] = $minutes > 0 ? TimeFormat::format($minutes) : '';
                     }
                 }

@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use App\Domain\TimeFormat;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -30,6 +29,10 @@ class WorklogEntry
 
     #[ORM\Column(type: Types::TEXT)]
     private string $description = '';
+
+    /** Tytuł ticketu wpisany obok numeru („ABC-123 Produkcja nie działa”) – na Slacka, do maila i CSV. */
+    #[ORM\Column(length: 255, options: ['default' => ''])]
+    private string $issueTitle = '';
 
     /** Godzina rozpoczęcia podana ręcznie („GG:MM”); null = worklog dostaje kolejną wolną godzinę dnia. */
     #[ORM\Column(length: 5, nullable: true)]
@@ -162,6 +165,16 @@ class WorklogEntry
         $this->position = $position;
     }
 
+    public function getIssueTitle(): string
+    {
+        return $this->issueTitle;
+    }
+
+    public function setIssueTitle(string $issueTitle): void
+    {
+        $this->issueTitle = mb_substr(trim($issueTitle), 0, 255);
+    }
+
     public function getStartClock(): ?string
     {
         return $this->startClock;
@@ -170,14 +183,6 @@ class WorklogEntry
     public function setStartClock(?string $startClock): void
     {
         $this->startClock = $startClock;
-    }
-
-    /** Godzina zakończenia wyliczona z godziny rozpoczęcia i czasu; null bez godziny rozpoczęcia albo czasu. */
-    public function getEndClock(): ?string
-    {
-        $start = null !== $this->startClock ? TimeFormat::clockToMinutes($this->startClock) : null;
-
-        return null !== $start && $this->minutes > 0 ? TimeFormat::minutesToClock($start + $this->minutes) : null;
     }
 
     public function getIssueKey(): string
