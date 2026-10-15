@@ -1,327 +1,290 @@
-"""Generuje pixel-art osadników do motywu Osadnicy (public/img/osadnicy-*.svg).
+"""Generuje grafiki do motywu Osadnicy (public/img/osadnicy-*): postaci, budynki, drzewa i tekstury trawy i żwiru.
 
-Każdy plik to pasek klatek animacji (klatka obok klatki), rysowany z liter – kolory w COLORS.
-Własne rysunki w duchu The Settlers II (nie grafiki z gry). Po zmianie uruchom:
+Własne rysunki w stylu The Settlers II (małe postaci bez obrysu, niebieskie koszule w kolorze gracza, żółtozielona trawa
+z kwiatkami, żwirowe drogi, niebieskie chorągiewki) – nie grafiki z gry. Postaci rysowane z liter (kolory w COLORS),
+każdy plik SVG to pasek klatek animacji; trawa i żwir to kafle PNG losowane z ziarna (zawsze takie same). Po zmianie:
 
     python3 docs/grafika/osadnicy.py
 
-CSS w templates/base.html.twig (sekcja motywu Osadnicy) zakłada rozmiary klatek z SPRITES – po zmianie rozmiaru popraw też tam.
+CSS w templates/base.html.twig (sekcja motywu Osadnicy) zakłada rozmiary z tego pliku (×2) – po zmianie popraw też tam.
 """
 
+import random
+import struct
+import zlib
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent.parent.parent / 'public' / 'img'
 
 COLORS = {
-    'k': '#1c1309',  # obrys
-    'h': '#6b3a17', 'H': '#4a280f',  # włosy
-    's': '#f2c294', 'd': '#c98a5c',  # skóra, cień
-    'b': '#5b3a17',  # pasek
-    'f': '#4a2c12',  # sandały
-    'w': '#d9a752', 'W': '#a5762c',  # tunika tragarza
-    'c': '#2c5bc4', 'C': '#1d3f8f',  # kolor gracza (lamówka, chorągiewka)
-    'g': '#6a86a8', 'G': '#4a6280',  # tunika drwala
-    'r': '#b8352a', 'R': '#842116',  # tunika budowniczego
-    'a': '#d5d8dc', 'A': '#8a8f96',  # ostrze, metal
-    'm': '#8a5a2a', 'M': '#5e3b18',  # drewno
-    'y': '#e0b26c',  # słoje na przekroju
-    'q': '#b3afa5', 'Q': '#77736b',  # kamień
-    'n': '#e2c78a', 'N': '#b39555',  # worek
-    'e': '#3f8a2a', 'E': '#2a6a1c', 'x': '#6fbf45',  # liście
+    'h': '#6b3e1c', 'H': '#4a2a12',  # włosy
+    's': '#ecb98e', 'S': '#c48a62', 'e': '#2a1a0e',  # skóra, cień, oczy
+    'b': '#2a78d8', 'B': '#1a4c9a', 'l': '#5ab4f0',  # koszula w kolorze gracza
+    'p': '#efe6d4', 'P': '#b8ad98',  # jasne nogi
+    'k': '#4a3420',  # buty
+    'm': '#9a6a34', 'M': '#6a4420', 'y': '#e0b26c',  # drewno
+    'q': '#c4c0b4', 'Q': '#86827a',  # kamień
+    'n': '#e8d8a8', 'N': '#b8a474',  # worek
+    'a': '#dfe3e8', 'A': '#8a9098',  # metal
+    'g': '#3f7a1c', 'G': '#2a5a12', 'x': '#6aa32a', 'X': '#9cc83e',  # liście
+    'w': '#a8743c', 'W': '#7a5028', 'v': '#c99256',  # ściana z desek
+    'r': '#8a5a30', 'R': '#5e3c1c', 'o': '#b07a44',  # dach z desek
+    'd': '#2e1e10',  # drzwi, okna
+    't': '#c0452e', 'T': '#8a2c1c', 'u': '#de6a48',  # dachówka
+    'c': '#ece4d0', 'C': '#b9b09c',  # biały mur
+    'z': '#e8b840',  # złota gałka
 }
 
-# --- części postaci (szerokość 16, postać patrzy w prawo) ---------------------------------------------------------
+# --- osadnik: 9×17, idzie w prawo, widziany z góry pod kątem -----------------------------------------------------
 
-HEAD = [
-    '......kkkk......',
-    '.....khhhhkk....',
-    '....khhhhhhhk...',
-    '....khHhhssssk..',
-    '....khHhssksk...',
-    '....khhsssssk...',
-    '.....kssssdk....',
-    '......kddk......',
+HEAD = [  # duża twarz z wąsem, brązowe włosy
+    '..hhhhh..',
+    '.hhhhhhH.',
+    '.hsssssH.',
+    '.hesssesH',
+    '..sSeeSs.',
+    '..sssss..',
 ]
-
-
-def torso(t, T, band='', arm=()):
-    """Tunika (t – kolor, T – cień), opcjonalna lamówka w kolorze gracza i ręka: lista (wiersz, kolumna, znak)."""
-    rows = [
-        f'.....k{t*4}k.....',
-        f'....k{t*6}k....',
-        f'....k{T}{t*5}k....',
-        '....kbbbbbbk....',
-        f'....k{T}{t*5}k....',
-        f'....k{T}{t*4}{T}k....',
-    ]
-    if band:
-        rows[5] = f'....k{band*6}k....'
-    rows = [list(r) for r in rows]
-    for r, col, ch in arm:
-        rows[r][col] = ch
-    return [''.join(r) for r in rows]
-
-
-HEM = '.....kkkkkk.....'
-
-LEGS_STRIDE = [  # krok: dalsza noga z tyłu, bliższa z przodu
-    '.....kdk.ksk....',
-    '....kdk...ksk...',
-    '....kdk...ksk...',
-    '...kffk...kffk..',
-    '...kkk.....kkk..',
+TORSO = [  # niebieska koszula, u dołu granat
+    '.lbbbbbB.',
+    'lbbbbbbBB',
+    'lbbbbbbBB',
+    'sbbbbbbBs',
+    '.BBBBBBB.',
 ]
-LEGS_STRIDE_2 = [  # krok z drugą nogą z przodu
-    '.....ksk.kdk....',
-    '....ksk...kdk...',
-    '....ksk...kdk...',
-    '...kffk...kffk..',
-    '...kkk.....kkk..',
+LEGS_A = [  # krok: bliższa noga z przodu
+    '..ppppP..',
+    '.ppp..PP.',
+    '.pp...PP.',
+    '.pP....PP',
+    'kk.....kk',
 ]
-LEGS_PASS = [  # nogi razem (ciało o piksel wyżej)
-    '......kssk......',
-    '......ksdk......',
-    '......ksdk......',
-    '......ksdk......',
-    '......kfffk.....',
-    '......kkkkk.....',
+LEGS_B = [  # krok: dalsza noga z przodu
+    '..pPPPp..',
+    '.PPP..pp.',
+    '.PP...pp.',
+    '.PP....pp',
+    'kk.....kk',
+]
+LEGS_PASS = [  # nogi razem, ciało o piksel wyżej
+    '..ppppP..',
+    '..pp.PP..',
+    '..pp.PP..',
+    '..pp.PP..',
+    '..pP.PP..',
+    '..kk.kk..',
 ]
 LEGS_STAND = [
-    '......ksdk......',
-    '......ksdk......',
-    '......ksdk......',
-    '......kfffk.....',
-    '......kkkkk.....',
+    '..ppppP..',
+    '..pp.PP..',
+    '..pp.PP..',
+    '..pP.PP..',
+    '..kk.kk..',
 ]
+W, H = 9, 17
 
 
-def figure(height, body, legs, lift=0):
-    """Składa postać w klatce o wysokości height: głowa + tułów + rąbek + nogi, dosunięta do dołu (lift – o ile wyżej)."""
-    rows = HEAD + body + [HEM] + legs
-    pad = height - len(rows) - lift
-    return ['.' * 16] * pad + rows + ['.' * 16] * lift
+def man(legs, torso=TORSO):
+    rows = HEAD + torso + legs
+    return ['.' * W] * (H - len(rows)) + rows
 
 
-def overlay(base, top, dx=0, dy=0):
-    """Nakłada rysunek top na base (kropka = przezroczyste)."""
-    out = [list(r) for r in base]
-    for y, row in enumerate(top):
-        for x, ch in enumerate(row):
-            if ch != '.' and 0 <= y + dy < len(out) and 0 <= x + dx < len(out[0]):
-                out[y + dy][x + dx] = ch
-    return [''.join(r) for r in out]
-
-
-H = 24  # wysokość klatki postaci
-
-# ręce (wiersz, kolumna w tułowiu): rękaw, potem skóra; kołyszą się przy chodzie
-def arm(rows, sleeve):
-    return [(r, c, sleeve if i == 0 else 's') for i, (r, c) in enumerate(rows)]
-
-
-def arm_mid(t):
-    return arm([(1, 7), (2, 7), (3, 7), (4, 7)], t)
-
-
-def arm_fwd(t):
-    return arm([(1, 8), (2, 9), (3, 9), (4, 10)], t)
-
-
-def arm_back(t):
-    return arm([(1, 6), (2, 5), (3, 5), (4, 4)], t)
-
-
-# tragarz bez towaru (z powrotem); z towarem – niżej, po towarach
-carrier_empty = [
-    figure(H, torso('w', 'W', 'c', arm_back('W')), LEGS_STRIDE),
-    figure(H, torso('w', 'W', 'c', arm_mid('W')), LEGS_PASS),
-    figure(H, torso('w', 'W', 'c', arm_fwd('W')), LEGS_STRIDE_2),
-    figure(H, torso('w', 'W', 'c', arm_mid('W')), LEGS_PASS),
-]
-
-# postać stojąca (głowa w wierszach 4–11, tułów 12–17) z ręką i narzędziem dorysowanymi w całej klatce
-STAND_PAD = H - (len(HEAD) + 6 + 1 + len(LEGS_STAND))
-
-
-def standing(t, T, band=''):
-    return figure(H, torso(t, T, band), LEGS_STAND)
-
-
-def draw(frame, pixels):
+def put(frame, pixels):
+    """pixels: (wiersz, kolumna, znak) – liczone od góry klatki."""
     out = [list(r) for r in frame]
     for r, c, ch in pixels:
-        out[r][c] = ch
+        if 0 <= r < len(out) and 0 <= c < len(out[0]):
+            out[r][c] = ch
     return [''.join(r) for r in out]
 
 
-# drwal: siekiera uniesiona nad ramieniem → uderzenie przed sobą (w drzewo po prawej)
-woodcutter = [
-    draw(standing('g', 'G'), [
-        (12, 10, 'G'), (11, 11, 's'), (11, 12, 's'), (10, 13, 's'), (9, 14, 's'),  # ręka w górę
-        (8, 14, 'm'), (7, 14, 'm'), (6, 14, 'M'), (5, 14, 'm'), (4, 14, 'm'),  # trzonek
-        (3, 12, 'k'), (3, 13, 'a'), (4, 12, 'A'), (4, 13, 'a'), (5, 12, 'k'), (5, 13, 'k'), (2, 13, 'k'), (3, 14, 'k'),  # ostrze
-    ]),
-    draw(standing('g', 'G'), [
-        (13, 10, 'G'), (13, 11, 's'), (14, 12, 's'),  # ręka przed siebie
-        (14, 13, 'm'), (14, 14, 'M'),  # trzonek
-        (13, 15, 'a'), (14, 15, 'a'), (15, 15, 'A'), (12, 15, 'k'), (16, 15, 'k'),  # ostrze
-    ]),
-]
+def overlay(frame, art, dx, dy):
+    return put(frame, [(dy + y, dx + x, ch) for y, row in enumerate(art) for x, ch in enumerate(row) if ch != '.'])
 
-# budowniczy: młotek w górze → w dół
-builder = [
-    draw(standing('r', 'R'), [
-        (12, 10, 'R'), (11, 11, 's'), (11, 12, 's'), (10, 13, 's'), (9, 14, 's'),  # ręka w górę
-        (8, 14, 'm'), (7, 14, 'm'), (6, 13, 'A'), (6, 14, 'A'), (6, 15, 'A'), (5, 13, 'A'), (5, 14, 'A'), (5, 15, 'A'), (4, 13, 'k'), (4, 14, 'k'), (4, 15, 'k'),  # młotek
-    ]),
-    draw(standing('r', 'R'), [
-        (13, 10, 'R'), (13, 11, 's'), (14, 12, 's'),  # ręka w dół
-        (14, 13, 'm'), (14, 14, 'm'), (13, 15, 'A'), (14, 15, 'A'), (15, 15, 'A'), (12, 15, 'k'), (16, 15, 'k'),  # młotek
-    ]),
-]
 
-# osadnik machający ręką (puste listy)
-waver = [
-    draw(standing('w', 'W', 'c'), [(12, 10, 'W'), (11, 11, 's'), (11, 12, 's'), (10, 13, 's'), (9, 14, 's'), (8, 14, 's'), (8, 15, 's')]),
-    draw(standing('w', 'W', 'c'), [(12, 10, 'W'), (11, 11, 's'), (11, 12, 's'), (10, 13, 's'), (9, 13, 's'), (8, 13, 's'), (7, 13, 's')]),
-]
+def top(legs):
+    """Pierwszy wiersz tułowia w klatce z danymi nogami."""
+    return H - len(TORSO) - len(legs)
 
-# towary niesione przez tragarzy (8×6)
-log = [[
-    '........',
-    '.kkkkkk.',
-    'kymmmmMk',
-    'kyMmmmMk',
-    '.kkkkkk.',
-    '........',
-]]
-stone = [[
-    '........',
-    '..kkkk..',
-    '.kqqqQk.',
-    'kqqqQQQk',
-    '.kkkkkk.',
-    '........',
-]]
-sack = [[
-    '...kk...',
-    '..knnk..',
-    '.knnnNk.',
-    'knnnnNNk',
-    '.kkkkkk.',
-    '........',
-]]
 
-# chorągiewka na skrzyżowaniu dróg (8×14, łopocze)
-flag = [
-    [
-        '.mcccc..',
-        '.mcccCc.',
-        '.mccCcc.',
-        '.mcccc..',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.M......',
-        'kMk.....',
-        '........',
-    ],
-    [
-        '.mccc...',
-        '.mccCcc.',
-        '.mcCccc.',
-        '.mcccc..',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.m......',
-        '.M......',
-        'kMk.....',
-        '........',
-    ],
-]
+def swing(legs, front):
+    """Tragarz bez towaru: ręce kołyszą się przy chodzie."""
+    t = top(legs)
+    f = man(legs, put(TORSO, [(3, 0, 'b'), (3, 8, 'B')]))  # bez dłoni przy bokach
+    return put(f, [(t + 2, 8, 's'), (t + 4, 0, 's')] if front else [(t + 4, 8, 's'), (t + 2, 0, 's')])
 
-# drzewo liściaste (16×24)
-tree = [[
-    '.....kkkkk......',
-    '...kkexxeekk....',
-    '..kexxxeeeeek...',
-    '.kexxeeeeeEeek..',
-    '.kexeeeeeeEEek..',
-    'kexxeeeeeeeEEek.',
-    'keeeeeeeEeeEEek.',
-    'keeeeeeEEeeeEek.',
-    'keeEeeeeeeeeEEk.',
-    '.keEEeeeeeeEEk..',
-    '.kkeEEeeeEEEek..',
-    '..kkEEEEEEEkk...',
-    '....kkmMkkk.....',
-    '......mMk.......',
-    '......mMk.......',
-    '......mMk.......',
-    '......mMk.......',
-    '......mMk.......',
-    '.....kmMMk......',
-    '....kmmMMMk.....',
-    '................',
-    '................',
-    '................',
-    '................',
-]]
 
-# plac budowy: rusztowanie z desek (24×20)
-site = [[
-    '........................',
-    '...........kk...........',
-    '..........kmMk..........',
-    '.........kmk.Mk.........',
-    '........kmk...Mk........',
-    '.......kmk.....Mk.......',
-    '......kmk.......Mk......',
-    '.....kmmmmmmmmmmmMk.....',
-    '.....km..........Mk.....',
-    '.....km..........Mk.....',
-    '.....kmmmmmmmmmmmMk.....',
-    '.....km..........Mk.....',
-    '.....km..........Mk.....',
-    '.....km..........Mk.....',
-    '..kkkkkkkkkkkkkkkkkkkk..',
-    '.kyMmmyMmmyMmmyMmmyMmk..',
-    '.kkkkkkkkkkkkkkkkkkkkk..',
-    '.kqqQ.kqQQk..kyMmmMk....',
-    'kqqqQQkqqQQk.kkkkkkk....',
-    'kkkkkkkkkkkk............',
-]]
+walking_legs = [LEGS_A, LEGS_PASS, LEGS_B, LEGS_PASS]
+carrier_empty = [swing(LEGS_A, True), swing(LEGS_PASS, False), swing(LEGS_B, False), swing(LEGS_PASS, True)]
 
+WARES = {
+    'kloda': ['.mmmmy', 'mMmmMy', '.MMMM.'],
+    'kamien': ['..qq..', '.qqqQ.', 'qqQQQQ'],
+    'worek': ['..nn..', '.nnnN.', 'nnnnNN'],
+}
 
 
 def carrying(ware):
     """Tragarz niesie towar przed sobą obiema rękami; towar podskakuje razem z krokiem."""
     frames = []
-    for legs in (LEGS_STRIDE, LEGS_PASS, LEGS_STRIDE_2, LEGS_PASS):
-        frame = figure(H, torso('w', 'W', 'c', arm_fwd('W')), legs)
-        top = H - (len(HEAD) + 6 + 1 + len(legs)) + len(HEAD)  # pierwszy wiersz tułowia
-        frames.append(overlay(frame, ware[0], 8, top + 1))
+    for legs in walking_legs:
+        t = top(legs)
+        f = overlay(man(legs), ware, 3, t)
+        frames.append(put(f, [(t + 2, 3, 's'), (t + 2, 8, 's')]))
     return frames
 
 
+T = top(LEGS_STAND)
+# drwal: siekiera w górze → uderzenie w drzewo po prawej
+woodcutter = [
+    put(man(LEGS_STAND), [(T, 8, 's'), (T - 1, 8, 'm'), (T - 2, 8, 'm'), (T - 3, 8, 'm'), (T - 4, 7, 'a'), (T - 4, 8, 'a'), (T - 5, 7, 'A'), (T - 5, 8, 'a')]),
+    put(man(LEGS_STAND), [(T + 3, 8, 's'), (T + 3, 7, 'B'), (T + 4, 8, 'm'), (T + 5, 8, 'a'), (T + 6, 8, 'A')]),
+]
+# budowniczy: młotek w górze → w dół
+builder = [
+    put(man(LEGS_STAND), [(T, 8, 's'), (T - 1, 8, 'm'), (T - 2, 8, 'm'), (T - 3, 7, 'A'), (T - 3, 8, 'A'), (T - 2, 7, 'A')]),
+    put(man(LEGS_STAND), [(T + 2, 8, 's'), (T + 3, 8, 'm'), (T + 4, 7, 'A'), (T + 4, 8, 'A')]),
+]
+# osadnik machający ręką (puste listy)
+waver = [
+    put(man(LEGS_STAND), [(T + 3, 8, 'B'), (T, 8, 'B'), (T - 1, 8, 's'), (T - 2, 8, 's')]),
+    put(man(LEGS_STAND), [(T + 3, 8, 'B'), (T, 8, 'B'), (T - 1, 7, 's'), (T - 2, 7, 's')]),
+]
+
+# --- otoczenie --------------------------------------------------------------------------------------------------
+
+# chorągiewka (8×18): niebieska, zwisa z drzewca z gałką, łopocze
+FLAG_POLE = ['.MM.....', '.zM.....'] + ['.M......'] * 15 + ['MMm.....']
+flag = [
+    overlay(FLAG_POLE, ['bbbl..', 'blbbb.', 'bblbbB', 'bbbbBB', 'bBbBB.', 'BBB...'], 2, 2),
+    overlay(FLAG_POLE, ['bbl...', 'blbbb.', 'bbblbB', 'bbbbBB', '.bBBBB', '..BB..'], 2, 2),
+]
+
+# drzewo liściaste (16×22) – bez obrysu, cień z prawej i u dołu
+tree = [[
+    '......xxx.......',
+    '....xxXXxgg.....',
+    '...xXXXxxggg....',
+    '..xxXXxxgggGg...',
+    '.xxXxxxggggGGg..',
+    '.xXXxxgggggGGg..',
+    'xxXxxggggggGGGg.',
+    'xxxxggxggggGGGg.',
+    'gxxgggxxgggGGGG.',
+    'ggxggggggGGGGGg.',
+    '.gggggggGGGGGG..',
+    '.GggggGGGGGGGG..',
+    '..GGgGGGGGGGG...',
+    '....GGMmGGG.....',
+    '......Mm........',
+    '......Mm........',
+    '......Mm........',
+    '......Mm........',
+    '.....MMmm.......',
+    '................',
+    '................',
+    '................',
+]]
+
+# świerk (10×22)
+pine = [[
+    '....g.....',
+    '....gg....',
+    '...xgg....',
+    '...xggG...',
+    '..xggGG...',
+    '...xgG....',
+    '..xxggG...',
+    '.xxgggGG..',
+    '..xggGG...',
+    '.xxgggGGG.',
+    'xxggggGGGG',
+    '..xggGGG..',
+    '.xgggGGGG.',
+    'xxggggGGGG',
+    'gggggGGGGG',
+    '...MmM....',
+    '....Mm....',
+    '....Mm....',
+    '..........',
+    '..........',
+    '..........',
+    '..........',
+]]
+
+# chata drwala (24×16): ściany z desek, dach z desek, drzwi
+hut = [[
+    '........................',
+    '.......oooooooooo.......',
+    '......oorrrrrrrrrR......',
+    '.....oorrrrrrrrrrRR.....',
+    '....oorrrrrrrrrrrrRR....',
+    '...oorrrrrrrrrrrrrrRR...',
+    '..oorrrrrrrrrrrrrrrrRR..',
+    '.ooRRRRRRRRRRRRRRRRRRRR.',
+    '..vwWvwWvwWvwWvwWvwWWW..',
+    '..vwWvwWvwWvwWvwWvwWWW..',
+    '..vwWvwWvddddwWvwWvWWW..',
+    '..vwWvwWvddddwWvwWvWWW..',
+    '..vwWvwWvddddwWvwWvWWW..',
+    '..vwWvwWvddddwWvwWvWWW..',
+    '..WWWWWWWddddWWWWWWWWW..',
+    '........................',
+]]
+
+# dom z czerwoną dachówką (24×16): biały mur, ciemne okna
+house = [[
+    '..........uuuuu.........',
+    '........uuttttttt.......',
+    '......uutttttttttT......',
+    '....uuttttttttttttTT....',
+    '..uutttttttttttttttTT...',
+    '.uTTTTTTTTTTTTTTTTTTTT..',
+    '..cccccccccccccccccCCC..',
+    '..ccddcccddcccddcccCCC..',
+    '..ccddcccddcccddcccCCC..',
+    '..cccccccccccccccccCCC..',
+    '..ccccccddddcccccccCCC..',
+    '..ccccccddddcccccccCCC..',
+    '..ccccccddddcccccccCCC..',
+    '..CCCCCCddddCCCCCCCCCC..',
+    '........................',
+    '........................',
+]]
+
+# plac budowy (24×16): deski i kamienie, zaczęta rama
+site = [[
+    '........................',
+    '...M..........M.........',
+    '...Mm.........Mm........',
+    '...MmmmmmmmmmmMm........',
+    '...Mm.........Mm........',
+    '...Mm.........Mm........',
+    '...Mm.........Mm........',
+    '...MmmmmmmmmmmMm........',
+    '...Mm.........Mm........',
+    '...Mm.........Mm..yMmMm.',
+    '.qqQ..........Mm.yMmmMm.',
+    'qqqQQ.qqQ.....Mm.MMMMMM.',
+    '.QQQQ.QQQ...............',
+    '........................',
+    '........................',
+    '........................',
+]]
+
 SPRITES = {
-    'tragarz-kloda': carrying(log),
-    'tragarz-kamien': carrying(stone),
-    'tragarz-worek': carrying(sack),
+    'tragarz-kloda': carrying(WARES['kloda']),
+    'tragarz-kamien': carrying(WARES['kamien']),
+    'tragarz-worek': carrying(WARES['worek']),
     'tragarz-pusty': carrier_empty,
     'drwal': woodcutter,
     'budowniczy': builder,
     'machajacy': waver,
     'choragiewka': flag,
     'drzewo': tree,
+    'swierk': pine,
+    'chata': hut,
+    'dom': house,
     'budowa': site,
 }
 
@@ -347,8 +310,74 @@ def svg(frames):
             f'shape-rendering="crispEdges">{"".join(rects)}</svg>\n')
 
 
+# --- tekstury: kafle PNG (bezszwowe), w CSS powiększane ×2 z image-rendering: pixelated --------------------------
+
+def png(path, pixels):
+    h, w = len(pixels), len(pixels[0])
+    raw = b''.join(b'\x00' + bytes(c for px in row for c in px) for row in pixels)
+
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                     + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
+
+
+def rgb(hex_):
+    return tuple(int(hex_[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def smooth_noise(size, cell, rnd):
+    """Bezszwowy szum o dużych plamach: losowa siatka co `cell` pikseli, interpolowana."""
+    n = size // cell
+    grid = [[rnd.random() for _ in range(n)] for _ in range(n)]
+    out = []
+    for y in range(size):
+        row = []
+        for x in range(size):
+            gx, gy = x / cell, y / cell
+            x0, y0 = int(gx) % n, int(gy) % n
+            x1, y1 = (x0 + 1) % n, (y0 + 1) % n
+            fx, fy = gx - int(gx), gy - int(gy)
+            fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+            upper = grid[y0][x0] * (1 - fx) + grid[y0][x1] * fx
+            lower = grid[y1][x0] * (1 - fx) + grid[y1][x1] * fx
+            row.append(upper * (1 - fy) + lower * fy)
+        out.append(row)
+    return out
+
+
+def texture(size, shades, seed, streak=3, flowers=(), flower_rate=0.0):
+    """Ziarnista tekstura z poziomymi smużkami (jak trawa w grze): odcień z plam + losowy rozrzut, kropki kwiatów."""
+    rnd = random.Random(seed)
+    blobs = smooth_noise(size, 16, rnd)
+    pal = [rgb(c) for c in shades]
+    px = [[None] * size for _ in range(size)]
+    for y in range(size):
+        x = 0
+        while x < size:
+            level = blobs[y][x] * 0.6 + rnd.random() * 0.55 - 0.08
+            idx = max(0, min(len(pal) - 1, int(level * len(pal))))
+            run = rnd.randint(1, streak)  # smużka kilku pikseli w tym samym odcieniu
+            for k in range(run):
+                px[y][(x + k) % size] = pal[idx]
+            x += run
+    for _ in range(int(size * size * flower_rate)):
+        x, y = rnd.randrange(size), rnd.randrange(size)
+        px[y][x] = rgb(rnd.choice(flowers))
+    return px
+
+
 if __name__ == '__main__':
     OUT.mkdir(parents=True, exist_ok=True)
+    for old in OUT.glob('osadnicy-*'):
+        old.unlink()
     for name, frames in SPRITES.items():
         (OUT / f'osadnicy-{name}.svg').write_text(svg(frames))
         print(f'osadnicy-{name}.svg  {len(frames[0][0])}×{len(frames[0])} × {len(frames)} klatek')
+    grass = texture(64, ['#3a7a1a', '#4a8c22', '#5a9e2a', '#6aae32', '#7cbc3a', '#94c84a'], seed=7,
+                    flowers=['#f4e47a', '#fbf3d6', '#f0a050', '#e8c8e0'], flower_rate=0.006)
+    png(OUT / 'osadnicy-trawa.png', grass)
+    gravel = texture(32, ['#7e6e60', '#9a8a78', '#b0a090', '#c4b4a2', '#d6c8b6'], seed=3, streak=2)
+    png(OUT / 'osadnicy-zwir.png', gravel)
+    print('osadnicy-trawa.png 64×64, osadnicy-zwir.png 32×32')
