@@ -42,15 +42,18 @@
                     {% elseif type == 'themes' %}
                         {% set current = themes[values[key]] is defined ? values[key] : 'aurora' %}
                         <div class="themes" role="radiogroup" aria-label="{{ label }}">
-                            {% for id, name in themes %}
-                                {% set c = id == 'custom' ? customColors : palettes[id] %}
-                                <label class="theme-card" data-id="{{ id }}" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
-                                    <input type="radio" name="{{ key }}" value="{{ id }}" {{ id == current ? 'checked' }}>
-                                    <span class="tc-preview" aria-hidden="true">
-                                        <span class="tc-panel"><i class="tc-l1"></i><i class="tc-l2"></i><span class="tc-bars"><i style="height:55%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:95%"></i></span><i class="tc-btn"></i></span>
-                                    </span>
-                                    <span class="tc-name">{{ name }}</span>
-                                </label>
+                            {% for group, ids in themeGroups %}
+                                <span class="themes-h">{{ group }}</span>
+                                {% for id in ids %}
+                                    {% set c = id == 'custom' ? customColors : palettes[id] %}
+                                    <label class="theme-card" data-id="{{ id }}" style="--t-bg:{{ c.bg }}; --t-panel:{{ c.panel }}; --t-ink:{{ c.ink }}; --t-muted:{{ c.muted }}; --t-a:{{ c.accent }}; --t-a2:{{ c['accent-2'] }}">
+                                        <input type="radio" name="{{ key }}" value="{{ id }}" {{ id == current ? 'checked' }}>
+                                        <span class="tc-preview" aria-hidden="true">
+                                            <span class="tc-panel"><i class="tc-l1"></i><i class="tc-l2"></i><span class="tc-bars"><i style="height:55%"></i><i style="height:80%"></i><i style="height:65%"></i><i style="height:95%"></i></span><i class="tc-btn"></i></span>
+                                        </span>
+                                        <span class="tc-name">{{ themes[id] }}</span>
+                                    </label>
+                                {% endfor %}
                             {% endfor %}
                         </div>
                     {% elseif type == 'colors' %}
@@ -87,11 +90,12 @@
 {% block scripts %}
 <script>
     // Podgląd motywu na żywo: kliknięty motyw albo zmiana koloru Własnego od razu przemalowuje stronę (zostaje po zapisaniu).
-    // Jasne tło przełącza kolory stanów i ticketów na wersję dla jasnego tła – jak App\Domain\Theme::css().
+    // Jasne tło przełącza kolory stanów, ticketów i cienie na wersję dla jasnego tła – jak App\Domain\Theme::css().
     (() => {
         const PALETTES = {{ palettes|json_encode|raw }};
         const STATES = {{ states|json_encode|raw }};
         const SERIES = {{ series|json_encode|raw }};
+        const SHADES = {{ shades|json_encode|raw }};
         const root = document.documentElement.style;
         const radios = [...document.querySelectorAll('input[name="theme"]')];
         const inputs = [...document.querySelectorAll('input[type=color][data-var]')];
@@ -111,6 +115,7 @@
         const apply = (colors) => {
             const light = isLight(colors.bg);
             root.setProperty('color-scheme', light ? 'light' : 'dark');
+            root.setProperty('--shade', SHADES[light ? 'light' : 'dark']);
             for (const [name, value] of Object.entries({...colors, ...STATES[light ? 'light' : 'dark']})) root.setProperty('--' + name, value);
             SERIES[isLight(colors.panel) ? 'light' : 'dark'].forEach((hex, i) => root.setProperty('--s' + (i + 1), hex));
         };

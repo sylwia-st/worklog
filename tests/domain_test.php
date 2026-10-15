@@ -158,12 +158,11 @@ $contrast = static function (string $a, string $b) use ($luminance): float {
 
     return ($hi + 0.05) / ($lo + 0.05);
 };
-check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'custom']);
+check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'dawn', 'mint', 'peach', 'lavender', 'paper', 'custom']);
+check('motywy: grupy', Theme::groups(), ['Ciemne' => ['aurora', 'ocean', 'sunset', 'neon', 'mono'], 'Jasne' => ['dawn', 'mint', 'peach', 'lavender', 'paper'], 'Własny' => ['custom']]);
 $names = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-2', 'accent-ink', 'ok', 'ok-bg', 'warn', 'warn-bg', 'err', 'err-bg', 'info', 'info-bg'];
-// wbudowane motywy z kolorami stanów dla ciemnego tła + przykładowy Własny z jasnym tłem (kolory stanów dla jasnego tła)
-$cases = array_map(static fn (array $c): array => $c + Theme::STATES_DARK, Theme::palettes());
-$cases['Własny z jasnym tłem'] = ['bg' => '#f6f5f2', 'panel' => '#ffffff', 'ink' => '#1d1d1b', 'muted' => '#6b6a66', 'line' => '#e2e0da',
-    'accent' => '#2f5d50', 'accent-2' => '#3c5a8a', 'accent-ink' => '#ffffff'] + Theme::STATES_LIGHT;
+// wbudowane motywy z kolorami stanów, które dostaną (dla jasnego albo ciemnego tła)
+$cases = array_map(static fn (array $c): array => $c + (Theme::isLight($c['bg']) ? Theme::STATES_LIGHT : Theme::STATES_DARK), Theme::palettes());
 foreach ($cases as $id => $c) {
     check("motyw $id: komplet kolorów", [array_diff($names, array_keys($c)), array_diff(array_keys($c), $names)], [[], []]);
     check("motyw $id: same #rrggbb", array_filter($c, static fn (string $v) => 1 !== preg_match('/^#[0-9a-f]{6}$/', $v)), []);
@@ -185,7 +184,8 @@ check('css: kolory motywu', [str_contains(Theme::css('ocean'), '--accent: #2dd4b
 check('css: nieznany motyw (np. dawny „auto”) = domyślny', Theme::css('auto'), Theme::css(Theme::DEFAULT));
 $own = Theme::css('custom', (string) json_encode(['bg' => '#FFFFFF', 'panel' => '#f0f0f0', 'ink' => '#111111']));
 check('Własny: kolory z ustawień, reszta z domyślnego', [str_contains($own, '--bg: #ffffff;'), str_contains($own, '--ink: #111111;'), str_contains($own, '--accent: #8b7dff;')], [true, true, true]);
-check('Własny z jasnym tłem: jasne kontrolki, stany i tickety dla jasnego tła', [str_contains($own, 'color-scheme: light;'), str_contains($own, '--ok: #2d794d;'), str_contains($own, '--s1: #2a78d6;')], [true, true, true]);
+check('Własny z jasnym tłem: jasne kontrolki, stany, tickety i cienie dla jasnego tła', [str_contains($own, 'color-scheme: light;'), str_contains($own, '--ok: #2d794d;'), str_contains($own, '--s1: #2a78d6;'), str_contains($own, '--shade: rgb(40 40 70 / .16);')], [true, true, true, true]);
+check('jasny motyw wbudowany: stany dla jasnego tła', [str_contains(Theme::css('mint'), '--ok: #2d794d;'), str_contains(Theme::css('mint'), 'color-scheme: light;')], [true, true]);
 check('Własny: śmieci zamiast koloru → domyślne', Theme::custom((string) json_encode(['bg' => 'red; } body { display:none', 'line' => '#12345'])), Theme::palettes()[Theme::DEFAULT]);
 check('Własny: pusty zapis → domyślne', Theme::custom(''), Theme::palettes()[Theme::DEFAULT]);
 check('kolor: format', [Theme::isColor('#a1B2c3'), Theme::isColor('#123'), Theme::isColor('#12345g'), Theme::isColor('a1b2c3')], [true, false, false, false]);

@@ -10,7 +10,8 @@ const src = fs.readFileSync(require('path').join(__dirname, '../../templates/set
 const script = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n')
     .replace('{{ palettes|json_encode|raw }}', JSON.stringify(PALETTES))
     .replace('{{ states|json_encode|raw }}', JSON.stringify(STATES))
-    .replace('{{ series|json_encode|raw }}', JSON.stringify(SERIES));
+    .replace('{{ series|json_encode|raw }}', JSON.stringify(SERIES))
+    .replace('{{ shades|json_encode|raw }}', JSON.stringify({dark: 'cień-ciemny', light: 'cień-jasny'}));
 
 let fails = 0;
 const check = (name, actual, expected) => {
@@ -46,7 +47,7 @@ check('pola kolorów schowane przy motywie wbudowanym', field.hidden, true);
 pick('custom');
 check('Własny: pola kolorów widoczne, podgląd z pól', [field.hidden, v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1')], [false, '#0a0b10', 'dark', '#4ade80', '#dark1']);
 color('bg', '#ffffff'); color('panel', '#f4f4f4');
-check('Własny z jasnym tłem: jasne kontrolki, stany i tickety', [v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1')], ['#ffffff', 'light', '#2d794d', '#light1']);
+check('Własny z jasnym tłem: jasne kontrolki, stany, tickety i cienie', [v('bg'), d.documentElement.style.getPropertyValue('color-scheme'), v('ok'), v('s1'), v('shade')], ['#ffffff', 'light', '#2d794d', '#light1', 'cień-jasny']);
 check('słaby kontrast: jasny tekst na jasnym tle → ostrzeżenie', [warn.hidden, warn.textContent.startsWith('Słabo czytelne: Tekst na tle paneli')], [false, true]);
 color('ink', '#111111'); color('muted', '#555555'); color('accent', '#2f5d50'); color('accent-ink', '#ffffff');
 check('dobry kontrast → bez ostrzeżenia', warn.hidden, true);

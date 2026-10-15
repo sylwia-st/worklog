@@ -3,9 +3,9 @@
 namespace App\Domain;
 
 /**
- * Motywy – wbudowane są ciemne, z poświatą; różnią się tłem i parą akcentów (--accent, --accent-2: przyciski, gradienty,
- * poświata). Kolory stanów (ok, warn, err, info) i ticketów są wspólne, żeby „nadgodziny” czy „krócej” wyglądały zawsze
- * tak samo – tylko przy jasnym tle (motyw Własny) przechodzą na wersję dla jasnego tła.
+ * Motywy – ciemne i jasne, wszystkie z poświatą; różnią się tłem i parą akcentów (--accent, --accent-2: przyciski,
+ * gradienty, poświata). Kolory stanów (ok, warn, err, info), ticketów i cieni zależą tylko od tego, czy tło jest jasne,
+ * żeby „nadgodziny” czy „krócej” wyglądały w każdym motywie tak samo.
  * Efekty (szkło, krawędzie, gradienty) są w base.html.twig i liczą się z tych zmiennych.
  */
 final class Theme
@@ -34,6 +34,9 @@ final class Theme
         'ok' => '#2d794d', 'ok-bg' => '#e7f3ec', 'warn' => '#996000', 'warn-bg' => '#fbf1dc',
         'err' => '#b3261e', 'err-bg' => '#fbe7e5', 'info' => '#3c5a8a', 'info-bg' => '#e8eef8',
     ];
+
+    /** Kolor cieni kart: na ciemnym tle głęboki, na jasnym delikatny. */
+    public const SHADES = ['dark' => 'rgb(0 0 0 / .7)', 'light' => 'rgb(40 40 70 / .16)'];
 
     /**
      * Kolory ticketów na osi dnia – stała kolejność, sprawdzona pod kątem daltonizmu (kolejne pary rozróżnialne);
@@ -64,12 +67,44 @@ final class Theme
             'bg' => '#09090b', 'panel' => '#131316', 'ink' => '#f4f4f5', 'muted' => '#93939c', 'line' => '#27272c',
             'accent' => '#e4e4e7', 'accent-2' => '#a1a1aa', 'accent-ink' => '#111113',
         ]],
+        // jasne
+        'dawn' => ['Świt', [
+            'bg' => '#f4f2ee', 'panel' => '#ffffff', 'ink' => '#1d1d1b', 'muted' => '#6b6a66', 'line' => '#e2e0da',
+            'accent' => '#5b4bd6', 'accent-2' => '#2266c4', 'accent-ink' => '#ffffff',
+        ]],
+        'mint' => ['Mięta', [
+            'bg' => '#eef5f4', 'panel' => '#ffffff', 'ink' => '#10201f', 'muted' => '#5a6c6a', 'line' => '#d5e4e2',
+            'accent' => '#0f766e', 'accent-2' => '#0e7490', 'accent-ink' => '#ffffff',
+        ]],
+        'peach' => ['Brzoskwinia', [
+            'bg' => '#faf3ee', 'panel' => '#fffbf8', 'ink' => '#2a1a14', 'muted' => '#78604f', 'line' => '#eedfd5',
+            'accent' => '#c2410c', 'accent-2' => '#be185d', 'accent-ink' => '#ffffff',
+        ]],
+        'lavender' => ['Lawenda', [
+            'bg' => '#f5f3fb', 'panel' => '#ffffff', 'ink' => '#1e1b2e', 'muted' => '#68627e', 'line' => '#e4e0f0',
+            'accent' => '#7c3aed', 'accent-2' => '#a21caf', 'accent-ink' => '#ffffff',
+        ]],
+        'paper' => ['Papier', [
+            'bg' => '#f5f5f4', 'panel' => '#ffffff', 'ink' => '#18181b', 'muted' => '#63636b', 'line' => '#e4e4e7',
+            'accent' => '#27272a', 'accent-2' => '#52525b', 'accent-ink' => '#ffffff',
+        ]],
     ];
 
     /** @return array<string, string> id → nazwa (wbudowane i Własny) */
     public static function choices(): array
     {
         return array_map(static fn (array $theme): string => $theme[0], self::BUILT_IN) + [self::CUSTOM => 'Własny'];
+    }
+
+    /** @return array<string, list<string>> nagłówek → id motywów (kafelki w Ustawieniach) */
+    public static function groups(): array
+    {
+        $out = ['Ciemne' => [], 'Jasne' => []];
+        foreach (self::palettes() as $id => $colors) {
+            $out[self::isLight($colors['bg']) ? 'Jasne' : 'Ciemne'][] = $id;
+        }
+
+        return $out + ['Własny' => [self::CUSTOM]];
     }
 
     /** @return array<string, array<string, string>> id → kolory wbudowanych motywów (bez kolorów stanów) */
@@ -83,7 +118,7 @@ final class Theme
     {
         $colors = self::CUSTOM === $theme ? self::custom($customJson) : (self::palettes()[$theme] ?? self::palettes()[self::DEFAULT]);
         $light = self::isLight($colors['bg']);
-        $declarations = ['color-scheme: '.($light ? 'light' : 'dark').';'];
+        $declarations = ['color-scheme: '.($light ? 'light' : 'dark').';', '--shade: '.self::SHADES[$light ? 'light' : 'dark'].';'];
         foreach ($colors + ($light ? self::STATES_LIGHT : self::STATES_DARK) as $name => $value) {
             $declarations[] = sprintf('--%s: %s;', $name, $value);
         }
