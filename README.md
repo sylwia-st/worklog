@@ -1,3 +1,5 @@
+<img src="docs/logo.svg" width="72" height="72" alt="Logo: stoper, którego wskazówki tworzą ptaszek">
+
 # Raport czasu pracy
 
 Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineBundle 3.3, SQLite) do codziennego raportowania:

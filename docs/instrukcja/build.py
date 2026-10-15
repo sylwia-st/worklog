@@ -18,7 +18,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (ListFlowable, ListItem, Paragraph, Preformatted, SimpleDocTemplate,
+from reportlab.platypus import (Flowable, ListFlowable, ListItem, Paragraph, Preformatted, SimpleDocTemplate,
                                 Spacer, Table, TableStyle)
 
 FONTS = Path(sys.argv[1] if len(sys.argv) > 1 else '/usr/share/fonts/truetype/dejavu')
@@ -115,6 +115,42 @@ def cmd(text):
     story.append(Spacer(1, 6))
 
 
+class Logo(Flowable):
+    """Znak aplikacji jak docs/logo.svg: stoper, którego wskazówki tworzą ptaszek."""
+
+    def __init__(self, size):
+        super().__init__()
+        self.width = self.height = size
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.scale(self.width / 32, self.height / 32)
+        c.translate(0, 32)
+        c.scale(1, -1)  # układ jak w SVG: y w dół
+        frame = c.beginPath()
+        frame.roundRect(0, 0, 32, 32, 8)
+        c.clipPath(frame, stroke=0, fill=0)
+        c.linearGradient(0, 0, 32, 32, (colors.HexColor('#0f766e'), colors.HexColor('#0e7490')), extend=True)
+        c.translate(16, 16)
+        c.scale(.84, .84)
+        c.translate(-16, -16)
+        c.setStrokeColor(colors.white)
+        c.setLineCap(1)
+        c.setLineJoin(1)
+        c.setLineWidth(2.4)
+        c.circle(16, 17.5, 9.5, stroke=1, fill=0)
+        c.line(13.6, 3.8, 18.4, 3.8)
+        c.line(16, 3.8, 16, 8)
+        c.setLineWidth(2.8)
+        hands = c.beginPath()
+        hands.moveTo(11.9, 13.9)
+        hands.lineTo(16, 17.5)
+        hands.lineTo(21.2, 12.2)
+        c.drawPath(hands, stroke=1, fill=0)
+        c.restoreState()
+
+
 B = lambda s: f'<b>{s}</b>'  # noqa: E731
 G = lambda s: f'<font color="#2e5e4e"><b>{s}</b></font>'  # noqa: E731
 M = lambda s: f'<font name="DV-M" size="8.5">{s}</font>'  # noqa: E731
@@ -123,8 +159,12 @@ DOT = lambda color: f'<font color="{color}">▌</font>'  # noqa: E731
 
 # ---------------------------------------------------------------- treść
 
-p('Raport czasu', title)
-p('Mini instrukcja: Jira, Slack i maile o czasie pracy', subtitle)
+head = Table([[Logo(17 * mm), [Paragraph('Raport czasu', title), Paragraph('Mini instrukcja: Jira, Slack i maile o czasie pracy', subtitle)]]],
+             colWidths=[22 * mm, 148 * mm])
+head.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                          ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0)]))
+story.append(head)
+story.append(Spacer(1, 6))
 
 box('Codziennie w 5 krokach',
     f'1. Otwórz {B("Raport czasu")} z menu aplikacji (albo http://127.0.0.1:8765).',

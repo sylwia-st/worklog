@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>{% block title %}Raport czasu{% endblock %}</title>
+    {% import '_icons.html.twig' as icons %}{% set tc = theme_colors() %}
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{{ icons.logo_badge(tc.accent, tc['accent-2'], tc['accent-ink'])|url_encode }}">
     <style>
         @font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
             src: url(/fonts/inter-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
@@ -521,9 +523,8 @@
 <body>
 <header>
     <div class="wrap">
-        {% import '_icons.html.twig' as icons %}
         <a class="brand" href="{{ path('today') }}">
-            <span class="mark">{{ icons.i('timer', 17) }}</span>
+            <span class="mark">{{ icons.logo(24) }}</span>
             Raport czasu
         </a>
         {% set r = app.request.attributes.get('_route') %}

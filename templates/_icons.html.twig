@@ -26,6 +26,18 @@
 <svg width="{{ size }}" height="{{ size }}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths[name]|raw }}</svg>
 {%- endmacro %}
 
+{# Znak aplikacji: tarcza stopera, wskazówki układają się w ptaszek (czas zaraportowany) – w kolorze tekstu #}
+{% macro logo(size = 24) %}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ _self.logo_paths() }}</svg>
+{%- endmacro %}
+
+{# Logo z tłem (favicona, docs/logo.svg): gradient dwóch akcentów, znak w kolorze ink #}
+{% macro logo_badge(a, a2, ink) %}
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{{ a }}"/><stop offset="1" stop-color="{{ a2 }}"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#g)"/><g fill="none" stroke="{{ ink }}" stroke-linecap="round" stroke-linejoin="round" transform="translate(16 16) scale(.84) translate(-16 -16)">{{ _self.logo_paths() }}</g></svg>
+{%- endmacro %}
+
+{% macro logo_paths() %}<circle cx="16" cy="17.5" r="9.5" stroke-width="2.4"/><path d="M13.6 3.8h4.8M16 3.8V8" stroke-width="2.4"/><path d="M11.9 13.9 16 17.5l5.2-5.3" stroke-width="2.8"/>{% endmacro %}
+
 {# Kafelek daty: dzień i skrót miesiąca #}
 {% macro datechip(d) %}
 <span class="datechip"><b>{{ d|date('j') }}</b><small>{{ ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'][d|date('n') - 1] }}</small></span>

@@ -128,11 +128,22 @@ final class Theme
         return array_map(static fn (array $theme): array => $theme[1], self::BUILT_IN);
     }
 
+    /**
+     * Kolory motywu (Własny – z ustawień). Nieznany motyw = domyślny.
+     *
+     * @return array<string, string>
+     */
+    public static function colors(string $theme, string $customJson = ''): array
+    {
+        $theme = self::id($theme);
+
+        return self::CUSTOM === $theme ? self::custom($customJson) : self::palettes()[$theme];
+    }
+
     /** Reguła CSS z kolorami motywu – do <style> w base.html.twig. Nieznany motyw = domyślny. */
     public static function css(string $theme, string $customJson = ''): string
     {
-        $theme = self::id($theme);
-        $colors = self::CUSTOM === $theme ? self::custom($customJson) : self::palettes()[$theme];
+        $colors = self::colors($theme, $customJson);
         $light = self::isLight($colors['bg']);
         $declarations = ['color-scheme: '.($light ? 'light' : 'dark').';', '--shade: '.self::SHADES[$light ? 'light' : 'dark'].';'];
         foreach ($colors + ($light ? self::STATES_LIGHT : self::STATES_DARK) as $name => $value) {

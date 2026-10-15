@@ -39,6 +39,8 @@ final class AppExtension extends AbstractExtension
             // zmienne CSS z kolorami wybranego motywu
             // id motywu do <html data-theme> – motywy z gier mają własny wygląd
             new TwigFunction('theme_id', fn (): string => Theme::id($this->settings->get('theme'))),
+            // kolory motywu – np. do favicony w kolorach akcentu
+            new TwigFunction('theme_colors', fn (): array => Theme::colors($this->settings->get('theme'), $this->settings->get('theme_custom'))),
             new TwigFunction('theme_css', fn (): string => Theme::css($this->settings->get('theme'), $this->settings->get('theme_custom')), ['is_safe' => ['html']]),
         ];
     }

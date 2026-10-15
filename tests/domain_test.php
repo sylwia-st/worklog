@@ -191,6 +191,7 @@ check('Własny z jasnym tłem: jasne kontrolki, stany, tickety i cienie dla jasn
 check('jasny motyw wbudowany: stany dla jasnego tła', [str_contains(Theme::css('mint'), '--ok: #2d794d;'), str_contains(Theme::css('mint'), 'color-scheme: light;')], [true, true]);
 check('Własny: śmieci zamiast koloru → domyślne', Theme::custom((string) json_encode(['bg' => 'red; } body { display:none', 'line' => '#12345'])), Theme::palettes()[Theme::DEFAULT]);
 check('Własny: pusty zapis → domyślne', Theme::custom(''), Theme::palettes()[Theme::DEFAULT]);
+check('kolory motywu (favicona): wbudowany, Własny, nieznany', [Theme::colors('settlers')['accent'], Theme::colors('custom', (string) json_encode(['accent' => '#123456']))['accent'], Theme::colors('auto')], ['#f4c233', '#123456', Theme::palettes()['paper']]);
 check('kolor: format', [Theme::isColor('#a1B2c3'), Theme::isColor('#123'), Theme::isColor('#12345g'), Theme::isColor('a1b2c3')], [true, false, false, false]);
 
 // --- oś dnia ---
