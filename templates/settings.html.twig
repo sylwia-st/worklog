@@ -2,12 +2,20 @@
 
 {% block title %}Ustawienia – Raport czasu{% endblock %}
 
+{% import '_icons.html.twig' as icons %}
 {% block body %}
+<span class="eyebrow">Konfiguracja</span>
 <h1>Ustawienia</h1>
 <p class="sub">Wszystko zapisuje się lokalnie w wolumenie Dockera <code>worklog-data</code>. Jedyne połączenie wychodzące to Twoja Jira.</p>
 
-<div class="panel">
-    <h2>Połączenie z Jirą</h2>
+<div class="settings-layout">
+<nav class="settings-nav" aria-label="Sekcje ustawień">
+    <a href="#sec-jira-conn">Połączenie z Jirą</a>
+    {% for section, fields in form %}<a href="#sec-{{ loop.index }}">{{ section }}</a>{% endfor %}
+</nav>
+<div>
+<div class="panel" id="sec-jira-conn" style="scroll-margin-top:86px">
+    <h2>{{ icons.i('jira') }}Połączenie z Jirą</h2>
     <div class="actions" style="margin-top:0">
         <form method="post" action="{{ path('settings_jira_test') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Sprawdź połączenie</button></form>
         <form method="post" action="{{ path('settings_jira_issues') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Pobierz moje tickety do podpowiedzi</button></form>
@@ -17,11 +25,13 @@
 
 <form method="post" action="{{ path('settings_save') }}">
     {% for section, fields in form %}
-        <fieldset>
+        <fieldset id="sec-{{ loop.index }}">
             <legend>{{ section }}</legend>
+            <div class="fields">
             {% for key, f in fields %}
                 {% set label = f[0] %}{% set type = f[1] %}{% set help = f[2] %}
-                <div class="field" id="field-{{ key }}" {{ type == 'colors' and values.theme != 'custom' ? 'hidden' }}>
+                {% set wide = type in ['textarea', 'colors'] or key starts with 'slack_' or key ends with '_subject' or key starts with 'plan_phrase' or key in ['jira_jql', 'forma', 'theme'] %}
+                <div class="field{{ wide ? ' wide' }}" id="field-{{ key }}" {{ type == 'colors' and values.theme != 'custom' ? 'hidden' }}>
                     <label {% if type != 'colors' %}for="{{ key }}"{% endif %}>{{ label }}</label>
                     {% if type == 'textarea' %}
                         <textarea id="{{ key }}" name="{{ key }}" rows="{{ key ends with '_body' ? 7 : 2 }}" class="{{ key ends with '_body' ? 'mono' }}">{{ values[key] }}</textarea>
@@ -50,17 +60,32 @@
                     {% if help %}<div class="help">{{ help }}</div>{% endif %}
                 </div>
             {% endfor %}
+            </div>
         </fieldset>
     {% endfor %}
-    <div class="actions"><button type="submit" class="primary">Zapisz ustawienia</button></div>
+    <div class="savefloat"><span class="muted small" style="margin-right:auto">Zmiany obowiązują po zapisaniu.</span><button type="submit" class="primary">{{ icons.i('check') }}Zapisz ustawienia</button></div>
 </form>
+</div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // menu sekcji: podświetla sekcję widoczną na ekranie
+    (() => {
+        const links = [...document.querySelectorAll('.settings-nav a')];
+        const byId = Object.fromEntries(links.map(a => [a.hash.slice(1), a]));
+        const io = new IntersectionObserver((entries) => {
+            for (const e of entries) if (e.isIntersecting) { links.forEach(a => a.classList.remove('on')); byId[e.target.id]?.classList.add('on'); }
+        }, {rootMargin: '-90px 0px -65% 0px'});
+        Object.keys(byId).forEach(id => { const el = document.getElementById(id); if (el) io.observe(el); });
+    })();
+</script>
+<script>
     // Podgląd motywu na żywo: wybór z listy albo zmiana koloru od razu przemalowuje stronę (zapis – przyciskiem).
     (() => {
         const PALETTES = {{ palettes|json_encode|raw }};
+        const SERIES = {light: {{ constant('App\\Domain\\Theme::SERIES_LIGHT')|json_encode|raw }}, dark: {{ constant('App\\Domain\\Theme::SERIES_DARK')|json_encode|raw }}};
         const select = document.getElementById('theme');
         const field = document.getElementById('field-theme_custom');
         const inputs = [...document.querySelectorAll('input[type=color][data-var]')];
@@ -72,6 +97,7 @@
         const apply = (colors) => {
             for (const [name, value] of Object.entries(colors)) root.setProperty('--' + name, value);
             root.setProperty('color-scheme', luminance(colors.bg) < 0.18 ? 'dark' : 'light');
+            SERIES[luminance(colors.panel || colors.bg) < 0.18 ? 'dark' : 'light'].forEach((hex, i) => root.setProperty('--s' + (i + 1), hex));
         };
         const custom = () => Object.fromEntries(inputs.map(i => [i.dataset.var, i.value]));
         const preview = () => {

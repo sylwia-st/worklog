@@ -64,6 +64,13 @@ final class Theme
         ]],
     ];
 
+    /**
+     * Kolory ticketów na wykresach (oś dnia) – stała kolejność, sprawdzona pod kątem daltonizmu
+     * (kolejne pary rozróżnialne); osobne odcienie dla jasnego i ciemnego tła paneli.
+     */
+    public const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+    public const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+
     /** @return array<string, string> id → nazwa, do listy w Ustawieniach */
     public static function choices(): array
     {
@@ -135,6 +142,9 @@ final class Theme
         }
         // ciemne tło → ciemne także kontrolki przeglądarki (kalendarz w polu daty, paski przewijania)
         $declarations[] = 'color-scheme: '.(self::luminance($colors['bg']) < 0.18 ? 'dark' : 'light').';';
+        foreach (self::luminance($colors['panel']) < 0.18 ? self::SERIES_DARK : self::SERIES_LIGHT as $i => $hex) {
+            $declarations[] = sprintf('--s%d: %s;', $i + 1, $hex);
+        }
 
         return ':root { '.implode(' ', $declarations).' }';
     }

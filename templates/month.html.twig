@@ -1,57 +1,132 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block title %}{{ title|capitalize }} – Raport czasu{% endblock %}
 
 {% block body %}
 {% set t = report.totals %}
-<h1>{{ title|capitalize }}</h1>
-<p class="sub">Bilans liczy dni z raportem. Dni robocze bez raportu są wyliczone osobno, bo nie wiadomo, ile wtedy pracowano.</p>
+<div class="dayhead">
+    <div>
+        <span class="eyebrow">Podsumowanie miesiąca</span>
+        <h1>{{ title|capitalize }}</h1>
+        <p class="sub" style="margin:0">Bilans liczy dni z raportem. Dni robocze bez raportu są wyliczone osobno, bo nie wiadomo, ile wtedy pracowano.</p>
+    </div>
+    <form method="get" action="{{ path('month_current') }}" class="daynav" style="margin:0">
+        <a class="btn iconbtn" href="{{ path('month', {month: prev|date('Y-m')}) }}" title="{{ prev|date('m.Y') }}" aria-label="Poprzedni miesiąc">{{ icons.i('left') }}</a>
+        <input type="month" name="m" value="{{ month|date('Y-m') }}" aria-label="Miesiąc" onchange="this.form.requestSubmit()">
+        <a class="btn iconbtn" href="{{ path('month', {month: next|date('Y-m')}) }}" title="{{ next|date('m.Y') }}" aria-label="Następny miesiąc">{{ icons.i('right') }}</a>
+        {% if not isCurrent %}<a class="pill-today" href="{{ path('month_current') }}">bieżący miesiąc</a>{% endif %}
+        <noscript><button type="submit">Pokaż</button></noscript>
+    </form>
+</div>
 
-<form method="get" action="{{ path('month_current') }}" class="daynav">
-    <a class="btn" href="{{ path('month', {month: prev|date('Y-m')}) }}">← {{ prev|date('m.Y') }}</a>
-    <input type="month" name="m" value="{{ month|date('Y-m') }}" aria-label="Miesiąc">
-    <button type="submit">Pokaż</button>
-    <a class="btn" href="{{ path('month', {month: next|date('Y-m')}) }}">{{ next|date('m.Y') }} →</a>
-    {% if not isCurrent %}<a class="btn" href="{{ path('month_current') }}">Bieżący miesiąc</a>{% endif %}
-</form>
-
-<div class="grid">
-<div>
-    <div class="panel">
-        <h2>Dzień po dniu</h2>
-        <table>
-            <thead><tr><th>Dzień</th><th>Godziny</th><th>Czas pracy</th><th>W ticketach</th><th>Bilans</th></tr></thead>
-            <tbody>
-            {% for r in report.rows %}
-                {% set s = r.summary %}
-                {% set offLabel = r.off and r.off.kind != 'weekend' ? r.off.label : null %}
-                <tr class="{{ r.off ? 'weekend' }}">
-                    <td style="white-space:nowrap"><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a>
-                        <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="badge">dziś</span>{% endif %}
-                        {% if offLabel and s %} <span class="badge">{{ offLabel }}</span>{% endif %}</td>
-                    {% if s %}
-                        <td>{{ r.day.startTime and r.day.endTime ? r.day.startTime ~ '–' ~ r.day.endTime : '—' }}</td>
-                        <td>{{ s.basisMinutes|hm }}</td>
-                        <td>{{ s.loggedMinutes|hm }}</td>
-                        <td class="{{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</td>
-                    {% elseif r.status == 'missing' %}
-                        <td colspan="4"><span class="badge warn">brak raportu</span></td>
-                    {% else %}
-                        <td colspan="4" class="muted">{{ offLabel }}</td>
-                    {% endif %}
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+{% set balanceKind = t.balance > 0 ? 'over' : (t.balance < 0 ? 'under' : 'okc') %}
+<div class="tiles">
+    <div class="tile {{ balanceKind }}">
+        <span class="lbl">{{ icons.i('balance') }}Bilans</span>
+        <span class="v {{ balanceKind }}">{{ t.balance == 0 ? '±0' : t.balance|signed_hm }}</span>
+        <span class="d">nadgodziny {{ t.over|hm }} · krócej {{ t.under|hm }}</span>
+    </div>
+    <div class="tile">
+        <span class="lbl">{{ icons.i('timer') }}Czas pracy</span>
+        <span class="v">{{ t.worked|hm }}</span>
+        <span class="d">norma za te dni {{ t.normReported|hm }}</span>
+    </div>
+    <div class="tile">
+        <span class="lbl">{{ icons.i('day') }}Dni z raportem</span>
+        <span class="v">{{ t.reported }} <small>/ {{ t.workingDays }}</small></span>
+        <span class="d">dni roboczych, norma miesiąca {{ t.normMonth|hm }}</span>
+    </div>
+    <div class="tile {{ t.missing ? 'over' : 'okc' }}">
+        <span class="lbl">{{ icons.i(t.missing ? 'alert' : 'check') }}Bez raportu</span>
+        <span class="v">{{ t.missing }}</span>
+        <span class="d">{{ t.missing ? 'do uzupełnienia' : 'wszystko uzupełnione' }}</span>
     </div>
 </div>
 
+{# kalendarz: kolor dnia = bilans (cieplej – nadgodziny, chłodniej – krócej, im mocniej, tym większa różnica) #}
+{% set byDate = {} %}
+{% for r in report.rows %}{% set byDate = byDate|merge({(r.date|date('Y-m-d')): r}) %}{% endfor %}
+{% set first = month|date_modify('first day of this month') %}
+{% set daysInMonth = first|date('t') %}
+<section class="panel">
+    <div class="panel-h">
+        <h2>{{ icons.i('day') }}Kalendarz</h2>
+        <div class="legend-row" style="margin:0">
+            <span><i style="background:color-mix(in srgb, var(--info) 38%, var(--panel))"></i>krócej</span>
+            <span><i style="background:color-mix(in srgb, var(--ok) 20%, var(--panel))"></i>w normie</span>
+            <span><i style="background:color-mix(in srgb, var(--warn) 38%, var(--panel))"></i>nadgodziny</span>
+            <span><i style="border:1px dashed var(--warn); background:var(--panel)"></i>brak raportu</span>
+        </div>
+    </div>
+    <div class="cal">
+        {% for wd in ['pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nd'] %}<span class="wd">{{ wd }}</span>{% endfor %}
+        {% if first|date('N') > 1 %}{% for i in 1..(first|date('N') - 1) %}<span class="pad"></span>{% endfor %}{% endif %}
+        {% for n in 1..daysInMonth %}
+            {% set d = first|date_modify('+' ~ (n - 1) ~ ' days') %}
+            {% set r = byDate[d|date('Y-m-d')] ?? null %}
+            {% set s = r ? r.summary : null %}
+            {% set offLabel = r and r.off and r.off.kind != 'weekend' ? r.off.label : null %}
+            {% if s %}
+                {% set diff = s.difference %}
+                {% set mag = diff|abs <= 30 ? 1 : (diff|abs <= 90 ? 2 : 3) %}
+                {% set cls = s.kind == 'over' ? 'd-over' ~ mag : (s.kind == 'under' ? 'd-under' ~ mag : 'd-ok') %}
+            {% elseif r and r.status == 'missing' %}{% set cls = 'd-missing' %}
+            {% elseif offLabel %}{% set cls = 'd-off' %}
+            {% elseif r is null %}{% set cls = 'd-weekend' %}
+            {% else %}{% set cls = 'd-future' %}{% endif %}
+            <a class="{{ cls }}{{ d == today ? ' today' }}" href="{{ path('day', {date: d|date('Y-m-d')}) }}">
+                <span class="n">{{ n }}</span>
+                {% if s %}
+                    <span class="h">{{ s.basisMinutes|hm }}</span>
+                    <span class="x {{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</span>
+                {% elseif cls == 'd-missing' %}<span class="tag" style="color:var(--warn)">brak raportu</span>
+                {% elseif offLabel %}<span class="tag">{{ offLabel }}</span>{% endif %}
+                <span class="tip">{{ d|pl_day|capitalize }} {{ d|date('d.m') }}{% if s %} – {{ s.basisMinutes|hm }}, bilans {{ s.difference == 0 ? '±0' : s.difference|signed_hm }}{% elseif offLabel %} – {{ offLabel }}{% elseif cls == 'd-missing' %} – brak raportu{% endif %}</span>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="grid">
 <div>
-    <div class="panel">
-        <h2>Podsumowanie</h2>
+    <section class="panel">
+        <details>
+            <summary style="cursor:pointer; font-weight:650">Tabela dzień po dniu</summary>
+            <div class="tablewrap" style="margin-top:12px">
+            <table>
+                <thead><tr><th>Dzień</th><th>Godziny</th><th>Czas pracy</th><th>W ticketach</th><th>Bilans</th></tr></thead>
+                <tbody>
+                {% for r in report.rows %}
+                    {% set s = r.summary %}
+                    {% set offLabel = r.off and r.off.kind != 'weekend' ? r.off.label : null %}
+                    <tr class="{{ r.off ? 'weekend' }}">
+                        <td style="white-space:nowrap"><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a>
+                            <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="pill-today">dziś</span>{% endif %}
+                            {% if offLabel and s %} <span class="badge">{{ offLabel }}</span>{% endif %}</td>
+                        {% if s %}
+                            <td>{{ r.day.startTime and r.day.endTime ? r.day.startTime ~ '–' ~ r.day.endTime : '—' }}</td>
+                            <td>{{ s.basisMinutes|hm }}</td>
+                            <td>{{ s.loggedMinutes|hm }}</td>
+                            <td><span class="delta {{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</span></td>
+                        {% elseif r.status == 'missing' %}
+                            <td colspan="4"><span class="badge warn">brak raportu</span></td>
+                        {% else %}
+                            <td colspan="4" class="muted">{{ offLabel }}</td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </details>
+    </section>
+
+    <section class="panel">
+        <h2>{{ icons.i('balance') }}Szczegóły</h2>
         <dl class="stats">
             <dt>Bilans</dt>
-            <dd class="{{ t.balance > 0 ? 'over' : (t.balance < 0 ? 'under' : 'okc') }}"><strong>{{ t.balance == 0 ? '±0' : t.balance|signed_hm }}</strong></dd>
+            <dd class="{{ balanceKind }}">{{ t.balance == 0 ? '±0' : t.balance|signed_hm }}</dd>
             <dt>Nadgodziny</dt>
             <dd>{{ t.over|hm }}{% if t.overDays %} <span class="muted small">({{ plural(t.overDays, 'dzień', 'dni', 'dni') }})</span>{% endif %}</dd>
             <dt>Krócej</dt>
@@ -64,33 +139,34 @@
             <dt>Dni robocze</dt><dd>{{ t.workingDays }} <span class="muted small">(norma {{ t.normMonth|hm }})</span></dd>
             {% for label, n in report.offCounts %}<dt>{{ label }}</dt><dd>{{ plural(n, 'dzień', 'dni', 'dni') }}</dd>{% endfor %}
         </dl>
-        <p class="muted small" style="margin:12px 0 0">Nadgodziny i „krócej” to sumy z poszczególnych dni, bilans – ich różnica.
+        <p class="muted small" style="margin:14px 0 0">Nadgodziny i „krócej” to sumy z poszczególnych dni, bilans – ich różnica.
             Dzień wolny ma normę 0, więc praca w weekend, święto czy urlop to w całości nadgodziny.</p>
-        <div class="actions" style="margin-top:12px">
-            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'dni'}) }}">CSV – dni</a>
-            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'wpisy'}) }}">CSV – wpisy</a>
+        <div class="actions">
+            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'dni'}) }}">{{ icons.i('download') }}CSV – dni</a>
+            <a class="btn" href="{{ path('month_csv', {month: month|date('Y-m'), kind: 'wpisy'}) }}">{{ icons.i('download') }}CSV – wpisy</a>
         </div>
-    </div>
+    </section>
+</div>
 
-    <div class="panel">
-        <h2>Tickety</h2>
+<div>
+    <section class="panel">
+        <h2>{{ icons.i('jira') }}Tickety</h2>
         {% if report.tickets is empty %}
-            <p class="muted">Brak wpisów w tym miesiącu.</p>
+            <div class="empty">{{ icons.i('jira', 28) }}Brak wpisów w tym miesiącu.</div>
         {% else %}
-            <table>
-                <thead><tr><th>Ticket</th><th>Czas</th><th>Dni</th></tr></thead>
-                <tbody>
-                {% for key, tk in report.tickets %}
-                    <tr>
-                        <td><strong>{{ key }}</strong>{% if tk.title %}<br><span class="muted small">{{ tk.title }}</span>{% endif %}</td>
-                        <td style="white-space:nowrap">{{ tk.minutes|hm }}</td>
-                        <td>{{ tk.days }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+            {% set top = (report.tickets|first).minutes %}
+            {% for key, tk in report.tickets %}
+                <div style="padding:9px 0{{ not loop.last ? '; border-bottom:1px solid var(--hair)' }}">
+                    <div style="display:flex; justify-content:space-between; gap:10px; align-items:baseline">
+                        <span style="min-width:0"><strong style="font-family:var(--mono); font-size:13.5px">{{ key }}</strong>
+                            {% if tk.title %}<span class="muted small"> {{ tk.title }}</span>{% endif %}</span>
+                        <span class="num" style="white-space:nowrap; font-weight:650">{{ tk.minutes|hm }} <span class="muted small" style="font-weight:450">· {{ plural(tk.days, 'dzień', 'dni', 'dni') }}</span></span>
+                    </div>
+                    <div class="tkbar"><i style="width:{{ (tk.minutes / top * 100)|round(1) }}%"></i></div>
+                </div>
+            {% endfor %}
         {% endif %}
-    </div>
+    </section>
 </div>
 </div>
 {% endblock %}

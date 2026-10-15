@@ -25,4 +25,4 @@ fi
 # Domyślnie 0.0.0.0:8080 wewnątrz kontenera – na hoście port jest wystawiony wyłącznie na 127.0.0.1 (compose.yaml).
 # W trybie network_mode: host ustaw WORKLOG_LISTEN=127.0.0.1:8765, żeby nie wystawić aplikacji do sieci.
 export PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-2}"
-exec php -S "${WORKLOG_LISTEN:-0.0.0.0:8080}" -t public public/index.php
+exec php -S "${WORKLOG_LISTEN:-0.0.0.0:8080}" -t public docker/router.php

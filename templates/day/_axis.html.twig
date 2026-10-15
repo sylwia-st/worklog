@@ -21,7 +21,8 @@
             <span class="lbl">W ticketach</span>
             <div class="stack">
                 {% for s in st.segments %}
-                    <div class="seg c{{ loop.index0 % 4 }}" style="width:{{ s.width }}%" title="{{ s.key }} – {{ s.minutes|hm }}">{{ s.width >= 16 ? s.key ~ ' · ' ~ s.minutes|hm : (s.width >= 8 ? s.key) }}</div>
+                    {# kolor ticketu: stała kolejność 8 kolorów, dalsze tickety szare; wiersze wpisów biorą ten sam kolor (JS w show) #}
+                    <div class="seg {{ loop.index0 < 8 ? 's' ~ loop.index : 's0' }}" data-key="{{ s.key }}" style="width:{{ s.width }}%" title="{{ s.key }} – {{ s.minutes|hm }}">{{ s.width >= 16 ? s.key ~ ' · ' ~ s.minutes|hm : (s.width >= 8 ? s.key) }}</div>
                 {% endfor %}
                 {% for m in st.markers %}<div class="marker {{ m.kind }}{{ m.left > 75 ? ' end' }}" style="left:{{ m.left }}%"><span>{{ m.label }}</span></div>{% endfor %}
             </div>

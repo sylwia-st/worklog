@@ -1,13 +1,14 @@
+{% import '_icons.html.twig' as icons %}
 {# Prawa kolumna dnia – renderowana w show.html.twig i odświeżana po autozapisie (GET /day/{date}/panels, razem z _live). #}
 <section class="panel" id="balance-panel">
     {% if summary is null or summary.kind == 'empty' %}
-        <div class="panel-h"><h2>Bilans</h2></div>
+        <div class="panel-h"><h2>{{ icons.i('balance') }}Bilans</h2></div>
         <p class="muted" style="margin:0">Pojawi się po wpisaniu godzin albo czasu w ticketach.</p>
     {% else %}
         {% set diff = summary.difference %}
         {% set kind = summary.kind == 'over' ? 'over' : (summary.kind == 'under' ? 'under' : 'okc') %}
         <div class="panel-h">
-            <h2>Bilans</h2>
+            <h2>{{ icons.i('balance') }}Bilans</h2>
             <span class="badge {{ summary.kind == 'over' ? 'warn' : (summary.kind == 'under' ? '' : 'ok') }}">{{ summary.kind == 'over' ? 'nadgodziny' : (summary.kind == 'under' ? 'krótszy dzień' : 'w normie') }}</span>
         </div>
         <div class="bignum">
@@ -43,7 +44,7 @@
 
 <section class="panel" id="slack-panel">
     <div class="panel-h">
-        <h2>Slack</h2>
+        <h2>{{ icons.i('slack') }}Slack</h2>
         {% if slack is not null %}
             {% if day.slackDoneAt %}<span id="slack-status" class="badge ok">✓ skopiowano {{ day.slackDoneAt|date('H:i') }}</span>
             {% else %}<span id="slack-status" class="badge">jeszcze nie</span>{% endif %}
@@ -55,7 +56,7 @@
         <textarea id="slack-text" class="mono" rows="{{ min(12, (slack|split("\n")|length) + 1) }}" readonly>{{ slack }}</textarea>
         <div class="actions">
             <button type="button" class="primary" data-copy="#slack-text" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'slack'}) }}" data-mark-label="#slack-status">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5"/><path d="M9.5 4.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>Kopiuj na Slacka</button>
+                {{ icons.i('copy') }}Kopiuj na Slacka</button>
         </div>
     {% endif %}
 </section>
@@ -63,7 +64,7 @@
 {% if mail %}
 <section class="panel" id="mail-panel">
     <div class="panel-h">
-        <h2>Mail: {{ summary.kind == 'over' ? 'nadgodziny' : 'krótszy dzień' }}</h2>
+        <h2>{{ icons.i('mail') }}Mail: {{ summary.kind == 'over' ? 'nadgodziny' : 'krótszy dzień' }}</h2>
         {% if day.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ day.mailDoneAt|date('H:i') }}</span>
         {% else %}<span id="mail-status" class="badge warn">do wysłania</span>{% endif %}
     </div>
@@ -78,7 +79,7 @@
     <pre id="mail-body">{{ mail.body }}</pre>
     <div class="actions">
         <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mailto-short="{{ mail.mailtoUrl(false) }}" data-mail-body="#mail-body" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="3" width="11" height="8" rx="1.5"/><path d="m2 4 5 4 5-4"/></svg>Otwórz w programie pocztowym</a>
+            {{ icons.i('mail') }}Otwórz w programie pocztowym</a>
         <button type="button" data-copy="#mail-body">Kopiuj treść</button>
         {% if not day.mailDoneAt %}
             <button type="button" class="link" data-mark="{{ path('day_mark', {date: date|date('Y-m-d'), what: 'mail'}) }}" data-mark-label="#mail-status" data-mark-hide

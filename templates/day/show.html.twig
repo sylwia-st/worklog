@@ -2,6 +2,7 @@
 
 {% block title %}{{ date|date('d.m.Y') }} – Raport czasu{% endblock %}
 
+{% import '_icons.html.twig' as icons %}
 {% block body %}
 <div class="dayhead">
     <div>
@@ -59,7 +60,7 @@
 
 {{ include('day/_axis.html.twig') }}
 
-<div class="grid">
+<div class="grid daygrid">
 <div>
     <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel dayform" id="dayform">
         <div class="hours">
@@ -79,9 +80,10 @@
             </p>
         {% endif %}
 
-        <div class="panel-h entries-h"><h2>Czas w ticketach</h2></div>
+        <div class="panel-h entries-h"><h2>{{ icons.i('timer') }}Czas w ticketach</h2></div>
         <table class="entries">
-            <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th>Opis – komentarz w Jirze i na Slacku</th><th>Od–do</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
+            <colgroup><col class="c-st"><col class="c-issue"><col><col class="c-fromto"><col class="c-time"><col class="c-tm"><col class="c-del"></colgroup>
+            <thead><tr><th><span class="vh">Stan w Jirze</span></th><th>Ticket</th><th title="Komentarz worklogu w Jirze i opis na Slacku">Opis</th><th>Od–do</th><th class="r">Czas</th><th><span class="vh">Stoper</span></th><th><span class="vh">Usuń</span></th></tr></thead>
             <tbody id="rows" data-lunch="{{ lunch }}">
             {% for row in form.rows %}
                 {{ _self.entry_row(loop.index0, row, issueOptions) }}
@@ -95,7 +97,7 @@
             <button type="button" id="startat-cancel">Anuluj</button>
         </div>
         <div class="addrow">
-            <button type="button" id="addrow" class="link"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 2v10M2 7h10"/></svg>Dodaj wpis</button>
+            <button type="button" id="addrow" class="link">{{ icons.i('plus') }}Dodaj wpis</button>
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
             {% endif %}
@@ -118,7 +120,7 @@
         <div class="savebar">
             <span id="savestate" class="badge" aria-live="polite">{{ day ? 'zapisane' : 'nic jeszcze nie zapisano' }}</span>
             <button type="submit" name="action" value="save">Zapisz</button>
-            <button type="submit" name="action" value="sync" class="primary" id="syncbtn">Zapisz i wyślij do Jiry</button>
+            <button type="submit" name="action" value="sync" class="primary" id="syncbtn">{{ icons.i('send') }}Zapisz i wyślij do Jiry</button>
         </div>
         {# Za przyciskami „Zapisz” – żeby Enter w polu (domyślny przycisk formularza) nigdy nie potwierdzał usunięcia. #}
         <div id="delconfirm" class="flash warning" {{ confirmDelete ? '' : 'hidden' }} style="margin-top:12px">
@@ -303,8 +305,20 @@
                 if (old) old.replaceWith(part); else part.remove();
             }
             document.getElementById('panels').replaceChildren(t.content);
+            paintTickets();
         } catch (e) {}
     }
+
+    // kolor ticketu z osi dnia (segmenty .seg[data-key]) – kropka przy numerze w wierszu
+    function paintTickets() {
+        const colors = {};
+        for (const seg of document.querySelectorAll('#dayaxis .seg[data-key]')) colors[seg.dataset.key] = getComputedStyle(seg).getPropertyValue('--c').trim();
+        for (const tr of rows.children) {
+            const c = colors[val(tr, '.f-issue').toUpperCase()];
+            if (c) tr.style.setProperty('--c', c); else tr.style.removeProperty('--c');
+        }
+    }
+    paintTickets();
 
     // zamknięcie karty / przejście dalej – ostatnia próba zapisu
     const flush = () => { if (dirty !== savedDirty && !saving && !submitting) navigator.sendBeacon(AUTOSAVE_URL, formData()); };

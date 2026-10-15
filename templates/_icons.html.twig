@@ -1,0 +1,32 @@
+{# Ikony (16×16, obrys w kolorze tekstu) i drobne elementy: {% import '_icons.html.twig' as icons %} … {{ icons.i('day') }}, {{ icons.datechip(date) }} #}
+{% macro i(name, size = 16) %}
+{%- set paths = {
+    day: '<rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/><path d="m5.8 10 1.5 1.4 2.9-2.9"/>',
+    overview: '<rect x="2" y="2" width="5" height="5" rx="1.3"/><rect x="9" y="2" width="5" height="5" rx="1.3"/><rect x="2" y="9" width="5" height="5" rx="1.3"/><rect x="9" y="9" width="5" height="5" rx="1.3"/>',
+    month: '<path d="M2.5 13.5V8M6.2 13.5V4.5M9.8 13.5V7M13.5 13.5V2.5"/>',
+    planned: '<circle cx="8" cy="8.5" r="5.5"/><path d="M8 5.5v3l2 1.3M6 1.5h4"/>',
+    off: '<circle cx="8" cy="8" r="2.6"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/>',
+    settings: '<path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/>',
+    timer: '<circle cx="8" cy="9" r="5.5"/><path d="M8 6v3l2 1.5M6.5 1.5h3"/>',
+    check: '<path d="m3.5 8.5 3 3 6-6.5"/>',
+    plus: '<path d="M8 3v10M3 8h10"/>',
+    left: '<path d="M10 3 5 8l5 5"/>',
+    right: '<path d="m6 3 5 5-5 5"/>',
+    copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/>',
+    mail: '<rect x="1.8" y="3.2" width="12.4" height="9.6" rx="1.8"/><path d="m2.4 4.4 5.6 4.4 5.6-4.4"/>',
+    slack: '<path d="M6 2v12M10 2v12M2 6h12M2 10h12"/>',
+    send: '<path d="M14 2 7 9M14 2l-4.5 12L7 9 2 6.5z"/>',
+    balance: '<path d="M8 2v12M3 14h10M4 5h8M4 5 2 9.5a2 2 0 0 0 4 0zM12 5l-2 4.5a2 2 0 0 0 4 0z"/>',
+    download: '<path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2.5 13.5h11"/>',
+    alert: '<path d="M8 1.8 14.5 13.5h-13z"/><path d="M8 6.3v3.2M8 11.6v.1"/>',
+    info: '<circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v4M8 4.8v.1"/>',
+    trash: '<path d="M2.5 4.5h11M6.5 4.5V2.8h3v1.7M4 4.5l.7 9h6.6l.7-9"/>',
+    jira: '<path d="M8 1.8 14.2 8 8 14.2 1.8 8z"/><path d="M8 5.2 10.8 8 8 10.8 5.2 8z"/>',
+} -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths[name]|raw }}</svg>
+{%- endmacro %}
+
+{# Kafelek daty: dzień i skrót miesiąca #}
+{% macro datechip(d) %}
+<span class="datechip"><b>{{ d|date('j') }}</b><small>{{ ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'][d|date('n') - 1] }}</small></span>
+{%- endmacro %}

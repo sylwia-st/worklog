@@ -331,7 +331,10 @@ bullets(
     f'Pomyłkę usuwasz linkiem {B("Usuń tę zmianę")} na stronie zgłoszenia (to nie wysyła żadnego maila).')
 
 h('9. Przegląd i zaległe dni')
-p(f'{B("Przegląd")} pokazuje ostatnie 4 tygodnie (dni robocze i weekendy, w które coś wpisano):')
+p(f'{B("Przegląd")} pokazuje ostatnie 4 tygodnie. Na górze są cztery liczby: czas pracy w bieżącym tygodniu wobec '
+  'normy, bilans, dni robocze bez raportu i maile czekające na wysłanie. Pod nimi wykres: słupek to czas pracy danego '
+  'dnia (pomarańczowy – nadgodziny, zakreskowany – brak raportu), przerywana linia to norma; najechanie pokazuje '
+  'szczegóły, kliknięcie otwiera dzień. Niżej tabela (dni robocze i weekendy, w które coś wpisano):')
 table(['Kolumna', 'Co znaczy'], [
     ['W ticketach / Bilans', 'Suma zalogowanego czasu i różnica względem normy.'],
     ['Jira', '✓ – wszystko wysłane; np. 2/4 – wysłano 2 z 4 wpisów (zaległość).'],
@@ -342,7 +345,9 @@ p(f'Domyślnie najnowsze dni są na górze. Kliknięcie nagłówka {B("Dzień �
 p('Zaległy dzień: kliknij jego datę, uzupełnij i wyślij jak zwykle – trafi pod właściwą datę.')
 
 sub('Podsumowanie miesiąca')
-p(f'Zakładka {B("Miesiąc")} pokazuje wybrany miesiąc dzień po dniu, a obok sumy:')
+p(f'Zakładka {B("Miesiąc")} pokazuje wybrany miesiąc jako kalendarz: kolor dnia to bilans (cieplejszy – nadgodziny, '
+  'chłodniejszy – krócej, im mocniejszy, tym większa różnica), zakreskowany – brak raportu. Kliknięcie dnia otwiera go. '
+  f'Pod kalendarzem jest {B("Tabela dzień po dniu")} (rozwijana), a obok sumy i czas per ticket:')
 bullets(
     f'{B("Bilans")} – nadgodziny minus „krócej”, liczone tylko z dni z raportem. Dni robocze bez raportu są wypisane '
     'osobno („Bez raportu”), bo nie wiadomo, ile wtedy pracowano.',

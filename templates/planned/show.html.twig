@@ -2,9 +2,10 @@
 
 {% block title %}{{ change.typeLabel }} {{ change.date|date('d.m.Y') }} – Raport czasu{% endblock %}
 
+{% import '_icons.html.twig' as icons %}
 {% block body %}
-<p><a href="{{ path('planned') }}">← Planowane zmiany</a></p>
-<h1>{{ change.typeLabel }}: {{ change.date|pl_day }}, {{ change.date|date('d.m.Y') }}</h1>
+<a class="eyebrow" href="{{ path('planned') }}" style="text-decoration:none">← Planowane zmiany</a>
+<h1>{{ change.typeLabel }} <span class="soft">{{ change.date|pl_day }}, {{ change.date|date('d.m.Y') }}</span></h1>
 <p class="sub">
     {% if change.fromTime %}od {{ change.fromTime }} {% endif %}{% if change.toTime %}do {{ change.toTime }}{% endif %}
     {% if change.reason %} · {{ change.reason }}{% endif %}
@@ -17,7 +18,7 @@
 {% endif %}
 
 <div class="panel" style="max-width:720px">
-    <h2>Mail</h2>
+    <h2>{{ icons.i('mail') }}Mail</h2>
     {% if mail.invalid %}<p class="flash warning small">Pominięto niepoprawne adresy: {{ mail.invalid|join(', ') }}</p>{% endif %}
     {% if not mail.hasRecipients %}
         <p class="flash warning small">Brak adresatów – uzupełnij je w <a href="{{ path('settings') }}">Ustawieniach</a> (sekcja „zaplanowana zmiana”).</p>
@@ -29,7 +30,7 @@
     </div>
     <pre id="mail-body">{{ mail.body }}</pre>
     <div class="actions">
-        <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mailto-short="{{ mail.mailtoUrl(false) }}" data-mail-body="#mail-body" data-mark="{{ path('planned_mark', {id: change.id}) }}" data-mark-label="#mail-status">Otwórz w programie pocztowym</a>
+        <a class="btn primary" href="{{ mail.mailtoUrl }}" data-mailto-short="{{ mail.mailtoUrl(false) }}" data-mail-body="#mail-body" data-mark="{{ path('planned_mark', {id: change.id}) }}" data-mark-label="#mail-status">{{ icons.i('mail') }}Otwórz w programie pocztowym</a>
         <button type="button" data-copy="#mail-body">Kopiuj treść</button>
         {% if change.mailDoneAt %}<span id="mail-status" class="badge ok">✓ otwarto {{ change.mailDoneAt|date('d.m H:i') }}</span>
         {% else %}<span id="mail-status" class="badge warn">do wysłania</span>
@@ -39,6 +40,6 @@
 </div>
 
 <form method="post" action="{{ path('planned_delete', {id: change.id}) }}" onsubmit="return confirm('Usunąć tę zmianę?')">
-    <button type="submit" class="link">Usuń tę zmianę</button>
+    <button type="submit" class="link" style="color:var(--err)">Usuń tę zmianę</button>
 </form>
 {% endblock %}

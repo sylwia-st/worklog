@@ -2,14 +2,16 @@
 
 {% block title %}Wolne – Raport czasu{% endblock %}
 
+{% import '_icons.html.twig' as icons %}
 {% block body %}
+<span class="eyebrow">Dni wolne</span>
 <h1>Urlopy i święta</h1>
 <p class="sub">W dni wolne nie ma przypomnienia o raporcie, a Przegląd zamiast „brak raportu” pokazuje powód.
     Jeśli tego dnia jednak pracujesz, wpisz czas jak zwykle – cały liczy się jako nadgodziny.</p>
 
 <div class="grid">
 <form method="post" action="{{ path('absence_add') }}" class="panel">
-    <h2>Dodaj dni wolne</h2>
+    <h2>{{ icons.i('plus') }}Dodaj dni wolne</h2>
     <div class="row">
         <div><label for="from">Od</label><input type="date" id="from" name="from" value="{{ form.from }}" required></div>
         <div><label for="to">Do (włącznie)</label><input type="date" id="to" name="to" value="{{ form.to }}"></div>
@@ -30,8 +32,8 @@
 
 <div>
     <div class="panel">
-        <h2>Zaplanowane i trwające</h2>
-        {% for a in upcoming %}{{ _self.item(a, workDays[a.id]) }}{% else %}<p class="muted">Brak.</p>{% endfor %}
+        <h2>{{ icons.i('off') }}Zaplanowane i trwające</h2>
+        {% for a in upcoming %}{{ _self.item(a, workDays[a.id]) }}{% else %}<div class="empty">{{ icons.i('off', 28) }}Brak zaplanowanych dni wolnych.</div>{% endfor %}
         {% if stats is not empty %}
             <p class="muted small" style="margin:10px 0 0">
                 W {{ year }}:
@@ -41,18 +43,16 @@
     </div>
 
     <div class="panel">
-        <h2>Najbliższe święta</h2>
-        <table>
-            {% set saturdays = [] %}
-            {% for day, name in holidays %}
-                {% set d = date(day) %}
-                {% if d|date('N') == 6 %}{% set saturdays = saturdays|merge([d|date('d.m')]) %}{% endif %}
-                <tr class="{{ d|date('N') >= 6 ? 'weekend' }}">
-                    <td style="white-space:nowrap">{{ d|date('d.m.Y') }} <span class="muted">{{ d|pl_day }}</span></td>
-                    <td>{{ name }}</td>
-                </tr>
-            {% endfor %}
-        </table>
+        <h2>{{ icons.i('day') }}Najbliższe święta</h2>
+        {% set saturdays = [] %}
+        {% for day, name in holidays %}
+            {% set d = date(day) %}
+            {% if d|date('N') == 6 %}{% set saturdays = saturdays|merge([d|date('d.m')]) %}{% endif %}
+            <div class="item" style="{{ d|date('N') >= 6 ? 'opacity:.6' }}">
+                {{ icons.datechip(d) }}
+                <span class="what"><b>{{ name }}</b><span>{{ d|pl_day }} {{ d|date('Y') }}{{ d|date('N') >= 6 ? ' · weekend' }}</span></span>
+            </div>
+        {% endfor %}
         {% if saturdays is not empty %}
             <p class="small" style="margin:10px 0 0">Święto w sobotę ({{ saturdays|join(', ') }}) daje prawo do innego dnia wolnego –
                 wskazuje go pracodawca. Dodaj go tutaj jako „Dzień wolny”.</p>
@@ -61,7 +61,7 @@
 
     {% if past is not empty %}
         <div class="panel">
-            <h2>Minione</h2>
+            <h2 class="muted">Minione</h2>
             {% for a in past %}{{ _self.item(a, workDays[a.id]) }}{% endfor %}
         </div>
     {% endif %}
@@ -70,9 +70,9 @@
 {% endblock %}
 
 {% macro item(a, days) %}
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)">
-        <span>{{ a.rangeLabel }} · <strong>{{ a.typeLabel }}</strong>{{ a.note ? ' – ' ~ a.note }}
-            <span class="muted small">({{ plural(days, 'dzień roboczy', 'dni robocze', 'dni roboczych') }})</span></span>
-        <form method="post" action="{{ path('absence_delete', {id: a.id}) }}"><button type="submit" class="link">Usuń</button></form>
+    <div class="item">
+        {{ icons.datechip(a.dateFrom) }}
+        <span class="what"><b>{{ a.typeLabel }}{{ a.note ? ' – ' ~ a.note }}</b><span>{{ a.rangeLabel }} · {{ plural(days, 'dzień roboczy', 'dni robocze', 'dni roboczych') }}</span></span>
+        <form method="post" action="{{ path('absence_delete', {id: a.id}) }}"><button type="submit" class="link" style="color:var(--muted)">Usuń</button></form>
     </div>
 {% endmacro %}

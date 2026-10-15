@@ -1,31 +1,98 @@
 {% extends 'base.html.twig' %}
+{% import '_icons.html.twig' as icons %}
 
 {% block body %}
-<h1>Przegląd</h1>
-<p class="sub">Ostatnie 4 tygodnie. Kliknij dzień, żeby go uzupełnić, a nagłówek „Dzień” – żeby odwrócić kolejność.</p>
-
-<div class="actions" style="margin:0 0 18px">
-    <a class="btn primary" href="{{ path('today') }}">Uzupełnij dzisiaj</a>
-    <a class="btn" href="{{ path('planned') }}">Zgłoś późniejsze przyjście / wcześniejsze wyjście</a>
-    <a class="btn" href="{{ path('month_current') }}">Podsumowanie miesiąca</a>
+<div class="dayhead">
+    <div>
+        <span class="eyebrow">Ostatnie 4 tygodnie</span>
+        <h1>Przegląd</h1>
+        <p class="sub" style="margin:0">Kliknij dzień albo słupek, żeby go uzupełnić.</p>
+    </div>
+    <div class="actions" style="margin:0">
+        <a class="btn" href="{{ path('planned') }}">{{ icons.i('planned') }}Zgłoś zmianę godzin</a>
+        <a class="btn primary" href="{{ path('today') }}">{{ icons.i('day') }}Uzupełnij dzisiaj</a>
+    </div>
 </div>
 
-{% if upcoming is not empty %}
-<div class="panel">
-    <h2>Nadchodzące zmiany</h2>
-    <table>
+{% set t = tiles %}
+<div class="tiles">
+    <div class="tile {{ t.week >= t.weekNorm and t.weekNorm > 0 ? 'okc' }}">
+        <span class="lbl">{{ icons.i('day') }}Ten tydzień</span>
+        <span class="v">{{ t.week|hm }}{% if t.weekNorm %} <small>/ {{ t.weekNorm|hm }}</small>{% endif %}</span>
+        <span class="d">czas pracy wobec normy do dziś</span>
+    </div>
+    <div class="tile {{ t.balance > 0 ? 'over' : (t.balance < 0 ? 'under' : 'okc') }}">
+        <span class="lbl">{{ icons.i('balance') }}Bilans</span>
+        <span class="v {{ t.balance > 0 ? 'over' : (t.balance < 0 ? 'under' : 'okc') }}">{{ t.balance == 0 ? '±0' : t.balance|signed_hm }}</span>
+        <span class="d">{{ t.balance > 0 ? 'nadgodziny' : (t.balance < 0 ? 'do odpracowania' : 'równo z normą') }} w dniach z raportem</span>
+    </div>
+    <div class="tile {{ t.missing ? 'over' : 'okc' }}">
+        <span class="lbl">{{ icons.i(t.missing ? 'alert' : 'check') }}Bez raportu</span>
+        <span class="v">{{ t.missing }} <small>{{ plural(t.missing, 'dzień', 'dni', 'dni')|split(' ')|last }}</small></span>
+        <span class="d">{{ t.missing ? 'dni robocze do uzupełnienia' : 'wszystko uzupełnione' }}</span>
+    </div>
+    <div class="tile {{ t.mails ? 'over' : 'okc' }}">
+        <span class="lbl">{{ icons.i('mail') }}Maile do wysłania</span>
+        <span class="v">{{ t.mails }}</span>
+        <span class="d">{{ t.mails ? 'nadgodziny, krótszy dzień, zmiany godzin' : 'nic nie czeka' }}</span>
+    </div>
+</div>
+
+<div class="grid">
+<div>
+    <section class="panel">
+        <div class="panel-h">
+            <h2>{{ icons.i('month') }}Czas pracy dzień po dniu</h2>
+            <a class="small" href="{{ path('month_current') }}">Podsumowanie miesiąca →</a>
+        </div>
+        <div class="bars" role="img" aria-label="Czas pracy w ostatnich 4 tygodniach na tle normy {{ chart.norm|hm }}">
+            {% for b in chart.bars %}
+                {% set s = b.summary %}
+                <a class="b {{ b.kind }}{{ b.date == today ? ' today' }}" href="{{ path('day', {date: b.date|date('Y-m-d')}) }}">
+                    <i class="{{ b.over ? 'over' }}" {% if b.kind == 'done' %}style="height:{{ b.pct }}%"{% endif %}></i>
+                    <span class="tip">{{ b.date|pl_day|capitalize }} {{ b.date|date('d.m') }} –
+                        {% if s %}{{ b.minutes|hm }} ({{ s.difference == 0 ? '±0' : s.difference|signed_hm }})
+                        {% elseif b.kind == 'missing' %}brak raportu
+                        {% elseif b.kind == 'off' %}{{ b.off.label }}
+                        {% else %}jeszcze nie{% endif %}</span>
+                </a>
+            {% endfor %}
+            {% if chart.normPct > 0 %}<div class="normline" style="bottom:{{ chart.normPct }}%"><span>norma {{ chart.norm|hm }}</span></div>{% endif %}
+        </div>
+        <div class="bars-x" aria-hidden="true">
+            {% for b in chart.bars %}<span class="{{ b.date|date('N') == 1 ? 'mon' }}">{{ b.date|date('j') }}</span>{% endfor %}
+        </div>
+        <div class="legend-row">
+            <span><i style="background:linear-gradient(180deg, var(--accent-2), var(--accent))"></i>czas pracy</span>
+            <span><i style="background:var(--warn)"></i>nadgodziny</span>
+            <span><i style="background:repeating-linear-gradient(-45deg, color-mix(in srgb, var(--muted) 45%, transparent) 0 2px, transparent 2px 5px); border:1px dashed var(--muted)"></i>brak raportu</span>
+            <span><i style="border-top:2px dashed var(--ink); border-radius:0; height:0; width:14px"></i>norma</span>
+        </div>
+    </section>
+
+</div>
+
+<div>
+    <section class="panel">
+        <div class="panel-h">
+            <h2>{{ icons.i('planned') }}Nadchodzące zmiany</h2>
+            <a class="small" href="{{ path('planned') }}">Dodaj</a>
+        </div>
         {% for p in upcoming %}
-            <tr>
-                <td>{{ p.date|date('d.m.Y') }} <span class="muted">{{ p.date|pl_day }}</span></td>
-                <td>{{ p.typeLabel }}{% if p.fromTime %} od {{ p.fromTime }}{% endif %}{% if p.toTime %} do {{ p.toTime }}{% endif %}</td>
-                <td>{% if p.mailDoneAt %}<span class="badge ok">mail ✓</span>{% else %}<a class="badge warn" href="{{ path('planned_show', {id: p.id}) }}">mail do wysłania</a>{% endif %}</td>
-            </tr>
+            <a class="item" href="{{ path('planned_show', {id: p.id}) }}">
+                {{ icons.datechip(p.date) }}
+                <span class="what"><b>{{ p.typeLabel }}</b><span>{{ p.date|pl_day }}{% if p.fromTime %} · od {{ p.fromTime }}{% endif %}{% if p.toTime %} · do {{ p.toTime }}{% endif %}</span></span>
+                {% if p.mailDoneAt %}<span class="badge ok">mail</span>{% else %}<span class="badge warn">mail</span>{% endif %}
+            </a>
+        {% else %}
+            <div class="empty">{{ icons.i('planned', 28) }}Brak zaplanowanych zmian godzin.</div>
         {% endfor %}
-    </table>
+    </section>
 </div>
-{% endif %}
+</div>
 
-<div class="panel">
+<section class="panel">
+    <div class="tablewrap">
     <table>
         <thead><tr><th aria-sort="{{ sort == 'asc' ? 'ascending' : 'descending' }}">
             <a class="sortlink" href="{{ path('dashboard', {sort: sort == 'asc' ? 'desc' : 'asc'}) }}"
@@ -35,25 +102,30 @@
         {% for r in rows %}
             {% set offLabel = r.off and r.off.kind != 'weekend' ? r.off.label : null %}
             <tr class="{{ r.weekend or offLabel ? 'weekend' }}">
-                <td><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a> <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="badge">dziś</span>{% endif %}
+                <td style="white-space:nowrap"><a href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">{{ r.date|date('d.m') }}</a> <span class="muted">{{ r.date|pl_day }}</span>{% if r.date == today %} <span class="pill-today">dziś</span>{% endif %}
                     {% if offLabel and r.summary is defined %} <span class="badge">{{ offLabel }}</span>{% endif %}</td>
                 {% if r.summary is defined %}
                     {% set s = r.summary %}
                     <td>{{ s.loggedMinutes|hm }}</td>
-                    <td class="{{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</td>
+                    <td><span class="delta {{ s.kind == 'over' ? 'over' : (s.kind == 'under' ? 'under' : 'okc') }}">{{ s.difference == 0 ? '±0' : s.difference|signed_hm }}</span></td>
                     <td>{% if not jiraConfigured %}<span class="muted small">—</span>{% elseif r.jiraDone %}<span class="badge ok">✓ {{ r.entries }}</span>{% else %}<span class="badge warn">{{ r.inJira }}/{{ r.entries }}</span>{% endif %}</td>
-                    <td>{% if r.day.slackDoneAt %}<span class="badge ok">✓</span>{% else %}<span class="badge warn">—</span>{% endif %}</td>
+                    <td>{% if r.day.slackDoneAt %}<span class="badge ok">✓</span>{% else %}<span class="badge">—</span>{% endif %}</td>
                     <td>
                         {% if not r.mailNeeded %}<span class="muted small">niepotrzebny</span>
                         {% elseif r.day.mailDoneAt %}<span class="badge ok">✓</span>
                         {% else %}<span class="badge warn">do wysłania</span>{% endif %}
                     </td>
+                {% elseif offLabel %}
+                    <td colspan="5" class="muted">{{ offLabel }}</td>
+                {% elseif r.date < today %}
+                    <td colspan="5"><a class="badge warn" href="{{ path('day', {date: r.date|date('Y-m-d')}) }}">brak raportu – uzupełnij</a></td>
                 {% else %}
-                    <td colspan="5" class="muted">{{ offLabel ?: (r.date > today ? '' : 'brak raportu') }}</td>
+                    <td colspan="5"></td>
                 {% endif %}
             </tr>
         {% endfor %}
         </tbody>
     </table>
-</div>
+    </div>
+</section>
 {% endblock %}

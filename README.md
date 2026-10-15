@@ -15,7 +15,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 
 - Port jest wystawiony tylko na `127.0.0.1` – aplikacja nie jest dostępna z sieci. Dodatkowo odrzuca żądania z obcym nagłówkiem `Host` i POST-y wysłane z innych stron.
 - Jedyne połączenie wychodzące z działającego kontenera to adres Twojej Jiry. Slack i maile nie są wysyłane przez aplikację – kopiujesz tekst / zatwierdzasz mail w swoim kliencie.
-- Strona nie ładuje nic z internetu (żadnych CDN, fontów, analityki).
+- Strona nie ładuje nic z internetu (żadnych CDN, fontów, analityki). Czcionka Inter jest dołączona do aplikacji (`public/fonts`, licencja SIL OFL).
 - Dane i token leżą w wolumenie Dockera `worklog-data` (pliki z uprawnieniami 600). Token jest w osobnym pliku, nie w bazie, więc kopie zapasowe go nie zawierają – po przywróceniu kopii na nowym komputerze wpisz go ponownie w Ustawieniach. Kontener działa jako zwykły użytkownik, bez uprawnień (`cap_drop: ALL`, `no-new-privileges`).
 - Internet (Docker Hub, packagist.org) jest potrzebny tylko przy budowaniu obrazu.
 

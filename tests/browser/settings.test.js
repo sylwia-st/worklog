@@ -5,7 +5,8 @@ const fs = require('fs');
 const PALETTES = {light: {bg: '#f6f5f2', ink: '#1d1d1b'}, dark: {bg: '#161716', ink: '#ecebe7'}, night: {bg: '#0f1724', ink: '#e6edf5'}};
 const src = fs.readFileSync(require('path').join(__dirname, '../../templates/settings.html.twig'), 'utf8');
 const script = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n')
-    .replace('{{ palettes|json_encode|raw }}', JSON.stringify(PALETTES));
+    .replace('{{ palettes|json_encode|raw }}', JSON.stringify(PALETTES))
+    .replace(/\{\{ constant\('App\\\\Domain\\\\Theme::SERIES_(LIGHT|DARK)'\)\|json_encode\|raw \}\}/g, (_, m) => JSON.stringify(m === 'LIGHT' ? ['#light1'] : ['#dark1']));
 
 let fails = 0;
 const check = (name, actual, expected) => {
@@ -20,6 +21,7 @@ const dom = new JSDOM(`<!doctype html><body>
  </div></body>`, {runScripts: 'outside-only'});
 const w = dom.window, d = w.document;
 w.matchMedia = () => ({matches: true});   // system w trybie ciemnym
+w.IntersectionObserver = class { observe() {} };
 w.eval(script);
 
 const v = (name) => d.documentElement.style.getPropertyValue('--' + name);
@@ -28,8 +30,11 @@ const field = d.getElementById('field-theme_custom'), bg = d.querySelector('[dat
 
 pick('night');
 check('Nocny: podgląd od razu, bez pól kolorów', [v('bg'), v('ink'), field.hidden], ['#0f1724', '#e6edf5', true]);
+check('Nocny: ciemne kolory ticketów', v('s1'), '#dark1');
 pick('auto');
 check('Automatyczny przy ciemnym systemie = ciemny', v('bg'), '#161716');
+pick('light');
+check('Jasny: jasne kolory ticketów', v('s1'), '#light1');
 pick('custom');
 check('Własny: kolory z pól, pola widoczne', [v('bg'), v('ink'), field.hidden], ['#ffffff', '#000000', false]);
 bg.value = '#202020'; bg.dispatchEvent(new w.Event('input'));

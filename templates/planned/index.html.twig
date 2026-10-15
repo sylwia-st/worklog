@@ -2,13 +2,15 @@
 
 {% block title %}Planowane zmiany – Raport czasu{% endblock %}
 
+{% import '_icons.html.twig' as icons %}
 {% block body %}
+<span class="eyebrow">Z wyprzedzeniem</span>
 <h1>Planowane zmiany</h1>
 <p class="sub">Późniejsze przyjście, wcześniejsze wyjście albo krótszy dzień – zapisz, a narzędzie przygotuje mail do wysłania.</p>
 
 <div class="grid">
 <form method="post" action="{{ path('planned_create') }}" class="panel">
-    <h2>Nowa zmiana</h2>
+    <h2>{{ icons.i('plus') }}Nowa zmiana</h2>
     <div class="row">
         <div><label for="date">Dzień</label><input type="date" id="date" name="date" value="{{ form.date }}" required></div>
         <div>
@@ -26,21 +28,21 @@
         <label for="reason">Powód (opcjonalnie)</label>
         <textarea id="reason" name="reason" rows="2">{{ form.reason }}</textarea>
     </div>
-    <div class="actions"><button type="submit" class="primary">Zapisz i przygotuj mail</button></div>
+    <div class="actions"><button type="submit" class="primary">{{ icons.i('mail') }}Zapisz i przygotuj mail</button></div>
 </form>
 
 <div>
     <div class="panel">
-        <h2>Nadchodzące</h2>
+        <h2>{{ icons.i('planned') }}Nadchodzące</h2>
         {% for p in upcoming %}
             {{ _self.item(p) }}
         {% else %}
-            <p class="muted">Brak.</p>
+            <div class="empty">{{ icons.i('planned', 28) }}Brak zaplanowanych zmian.</div>
         {% endfor %}
     </div>
     {% if past is not empty %}
     <div class="panel">
-        <h2>Minione</h2>
+        <h2 class="muted">Minione</h2>
         {% for p in past %}{{ _self.item(p) }}{% endfor %}
     </div>
     {% endif %}
@@ -49,10 +51,11 @@
 {% endblock %}
 
 {% macro item(p) %}
-    <div style="display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--line)">
-        <a href="{{ path('planned_show', {id: p.id}) }}">{{ p.date|date('d.m.Y') }} · {{ p.typeLabel }}{% if p.fromTime %} od {{ p.fromTime }}{% endif %}{% if p.toTime %} do {{ p.toTime }}{% endif %}</a>
-        {% if p.mailDoneAt %}<span class="badge ok">mail ✓</span>{% else %}<span class="badge warn">mail —</span>{% endif %}
-    </div>
+    <a class="item" href="{{ path('planned_show', {id: p.id}) }}">
+        {{ icons.datechip(p.date) }}
+        <span class="what"><b>{{ p.typeLabel }}</b><span>{{ p.date|pl_day }} {{ p.date|date('d.m.Y') }}{% if p.fromTime %} · od {{ p.fromTime }}{% endif %}{% if p.toTime %} · do {{ p.toTime }}{% endif %}</span></span>
+        {% if p.mailDoneAt %}<span class="badge ok">mail wysłany</span>{% else %}<span class="badge warn">mail do wysłania</span>{% endif %}
+    </a>
 {% endmacro %}
 
 {% block scripts %}
