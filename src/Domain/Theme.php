@@ -92,10 +92,10 @@ final class Theme
             'bg' => '#f5f5f4', 'panel' => '#ffffff', 'ink' => '#18181b', 'muted' => '#63636b', 'line' => '#e4e4e7',
             'accent' => '#27272a', 'accent-2' => '#52525b', 'accent-ink' => '#ffffff',
         ]],
-        // z gier: łąka, drewno, złote litery
+        // z gier: łąka z mapy, brązowe okna, żółte napisy, zielone przyciski
         'settlers' => ['Osadnicy', [
-            'bg' => '#1b2410', 'panel' => '#3d2c19', 'ink' => '#f6e7b9', 'muted' => '#c9b183', 'line' => '#6e5432',
-            'accent' => '#f4c233', 'accent-2' => '#9ccc45', 'accent-ink' => '#2b1a06',
+            'bg' => '#22401a', 'panel' => '#45331f', 'ink' => '#f6ebb4', 'muted' => '#cfba88', 'line' => '#6e5432',
+            'accent' => '#ffd83a', 'accent-2' => '#6fb83a', 'accent-ink' => '#1d1405',
         ]],
     ];
 

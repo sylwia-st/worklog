@@ -1,9 +1,9 @@
 <?php
 
-// Router wbudowanego serwera PHP: czcionki z public/fonts podaje bezpośrednio (z długim cache),
+// Router wbudowanego serwera PHP: czcionki z public/fonts i obrazki z public/img podaje bezpośrednio (z długim cache),
 // wszystko inne idzie do Symfony.
 $path = (string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-if (preg_match('#^/fonts/[a-z0-9-]+\.woff2$#', $path) && is_file(__DIR__.'/../public'.$path)) {
+if (preg_match('#^/(fonts/[a-z0-9-]+\.woff2|img/[a-z0-9-]+\.svg)$#', $path) && is_file(__DIR__.'/../public'.$path)) {
     header('Cache-Control: public, max-age=31536000, immutable');
 
     return false;

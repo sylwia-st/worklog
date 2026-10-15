@@ -216,7 +216,7 @@ box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba
           'gdy w profilu nie ma opcji tokenów.')
 
 p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
-  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Osadnicy w stylu The Settlers II (drewno, złoto, łąka) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
+  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Osadnicy w stylu The Settlers II (okna z gry, żółte pikselowe napisy, tragarze na drodze pod menu) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
   f'czytelny. Zmianę widać od razu; zostaje po {G("Zapisz ustawienia")}.')
 
 h('2. Wpisanie dnia')
