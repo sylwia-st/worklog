@@ -159,8 +159,8 @@ $contrast = static function (string $a, string $b) use ($luminance): float {
 
     return ($hi + 0.05) / ($lo + 0.05);
 };
-check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'dawn', 'mint', 'peach', 'lavender', 'paper', 'settlers', 'custom']);
-check('motywy: grupy', Theme::groups(), ['Ciemne' => ['aurora', 'ocean', 'sunset', 'neon', 'mono'], 'Jasne' => ['dawn', 'mint', 'peach', 'lavender', 'paper'], 'Z gier' => ['settlers'], 'Własny' => ['custom']]);
+check('motywy: lista', array_keys(Theme::choices()), ['aurora', 'ocean', 'sunset', 'neon', 'mono', 'dawn', 'mint', 'peach', 'lavender', 'paper', 'bootstrap', 'settlers', 'custom']);
+check('motywy: grupy', Theme::groups(), ['Ciemne' => ['aurora', 'ocean', 'sunset', 'neon', 'mono'], 'Jasne' => ['dawn', 'mint', 'peach', 'lavender', 'paper', 'bootstrap'], 'Z gier' => ['settlers'], 'Własny' => ['custom']]);
 check('motywy: domyślny Papier', [Theme::DEFAULT, Settings::DEFAULTS['theme']], ['paper', 'paper']);
 check('motywy: id do data-theme', [Theme::id('settlers'), Theme::id('custom'), Theme::id('auto'), Theme::id('')], ['settlers', 'custom', 'paper', 'paper']);
 $names = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'accent-2', 'accent-ink', 'ok', 'ok-bg', 'warn', 'warn-bg', 'err', 'err-bg', 'info', 'info-bg'];

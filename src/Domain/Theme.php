@@ -6,8 +6,8 @@ namespace App\Domain;
  * Motywy – ciemne i jasne, wszystkie z poświatą; różnią się tłem i parą akcentów (--accent, --accent-2: przyciski,
  * gradienty, poświata). Kolory stanów (ok, warn, err, info), ticketów i cieni zależą tylko od tego, czy tło jest jasne,
  * żeby „nadgodziny” czy „krócej” wyglądały w każdym motywie tak samo.
- * Efekty (szkło, krawędzie, gradienty) są w base.html.twig i liczą się z tych zmiennych. Motywy z GAMES mają tam
- * jeszcze własny wygląd (czcionka, ramki, przyciski) – pod [data-theme=id].
+ * Efekty (szkło, krawędzie, gradienty) są w base.html.twig i liczą się z tych zmiennych. Motywy z GAMES i STYLED mają
+ * tam jeszcze własny wygląd (czcionka, ramki, przyciski) – pod [data-theme=id].
  */
 final class Theme
 {
@@ -45,6 +45,9 @@ final class Theme
      */
     public const SERIES_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
     public const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+
+    /** Motywy z własnym wyglądem w base.html.twig (płaskie, bez poświat): id → opis w Ustawieniach */
+    public const STYLED = ['bootstrap' => 'płasko, w stylu Bootstrapa'];
 
     /** Motywy w stylu gier: id → gra (opis w Ustawieniach) */
     public const GAMES = ['settlers' => 'The Settlers II: Veni Vidi Vici'];
@@ -91,6 +94,11 @@ final class Theme
         'paper' => ['Papier', [
             'bg' => '#f5f5f4', 'panel' => '#ffffff', 'ink' => '#18181b', 'muted' => '#63636b', 'line' => '#e4e4e7',
             'accent' => '#27272a', 'accent-2' => '#52525b', 'accent-ink' => '#ffffff',
+        ]],
+        // płasko jak Bootstrap 5 (własny wygląd w base.html.twig – STYLED); oba akcenty takie same, bo bez gradientów
+        'bootstrap' => ['Prosty', [
+            'bg' => '#f8f9fa', 'panel' => '#ffffff', 'ink' => '#212529', 'muted' => '#5c636a', 'line' => '#dee2e6',
+            'accent' => '#0d6efd', 'accent-2' => '#0d6efd', 'accent-ink' => '#ffffff',
         ]],
         // z gier: prawie czarne okna w zielone smugi, kamienna rama, żółte napisy (tło strony to trawa – obrazek)
         'settlers' => ['Osadnicy', [

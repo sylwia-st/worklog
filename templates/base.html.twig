@@ -476,6 +476,66 @@
         footer { padding-bottom: 28px; display: flex; gap: 6px; align-items: center; }
         footer::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); opacity: .8; }
 
+        /* motyw Prosty – płasko jak Bootstrap 5: białe karty z cienką szarą ramką, zaokrąglenia 6px, systemowa czcionka,
+           niebieski przycisk główny, pozostałe obrysowane; bez poświat, gradientów, szkła i siatki kropek. Kolory –
+           App\Domain\Theme ('bootstrap'), stany jak alerty Bootstrapa. */
+        [data-theme=bootstrap] body {
+            --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+            --card: var(--panel);
+            --shadow-sm: none; --shadow: 0 .125rem .25rem rgb(0 0 0 / .075); --shadow-lg: 0 .5rem 1rem rgb(0 0 0 / .15);
+            --r: 6px;
+            --ok: #146c43; --ok-bg: #d1e7dd; --warn: #8a6100; --warn-bg: #fff3cd; --err: #b02a37; --err-bg: #f8d7da; --info: #055160; --info-bg: #cff4fc;
+            background: var(--bg); font-feature-settings: normal; }
+        [data-theme=bootstrap] body::before, [data-theme=bootstrap] .tile::before, [data-theme=bootstrap] .tile::after, [data-theme=bootstrap] .flash::before { display: none; }
+        [data-theme=bootstrap] :is(.panel, fieldset, .tile, .closing, .savebar, .savefloat) { background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
+        [data-theme=bootstrap] :is(header nav, header nav a, input, select, textarea, button, .btn, .flash, .datechip, .item, pre, code, .cal a, .cal .pad, .settings-nav a,
+            .tc-preview, .closing, .savebar, .savefloat, .tile .lbl svg, #timerbar) { border-radius: 6px; }
+        /* nagłówek: biały pasek z linią, nawigacja jak nav-pills */
+        [data-theme=bootstrap] header { background: var(--panel); border-bottom: 1px solid var(--line); border-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+        [data-theme=bootstrap] header nav { gap: 4px; padding: 0; border: 0; background: none; }
+        [data-theme=bootstrap] header nav a { color: var(--accent); font-weight: 500; }
+        [data-theme=bootstrap] header nav a:hover { color: #0a58ca; background: none; }
+        [data-theme=bootstrap] header nav a.active { background: var(--accent); color: #fff; font-weight: 500; box-shadow: none; }
+        [data-theme=bootstrap] header nav a.active svg { color: #fff; filter: none; }
+        [data-theme=bootstrap] .brand { font-weight: 600; letter-spacing: 0; }
+        [data-theme=bootstrap] .brand .mark { filter: none; }
+        /* napisy: zwykłe, bez gradientów i poświaty */
+        [data-theme=bootstrap] h1 { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--ink); font-weight: 500; letter-spacing: -.01em; }
+        [data-theme=bootstrap] h1 .soft { -webkit-text-fill-color: var(--muted); font-weight: 400; }
+        [data-theme=bootstrap] h2 { font-weight: 600; }
+        [data-theme=bootstrap] .eyebrow { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--muted); }
+        [data-theme=bootstrap] :is(.big, .tile .v) { text-shadow: none; font-weight: 600; letter-spacing: -.02em; }
+        [data-theme=bootstrap] .tile .lbl svg { background: color-mix(in srgb, var(--tile-c, var(--accent)) 12%, transparent); box-shadow: none; }
+        /* pola: białe, szara ramka, niebieski pierścień przy fokusie */
+        [data-theme=bootstrap] :is(input:not([type=checkbox], [type=radio], [type=color]), select, textarea) { background: var(--panel); border-color: #ced4da; }
+        [data-theme=bootstrap] :is(input, select, textarea):hover { border-color: #ced4da; }
+        [data-theme=bootstrap] :is(input, select, textarea):focus { background: var(--panel); border-color: #86b7fe; box-shadow: 0 0 0 .25rem rgb(13 110 253 / .25); }
+        /* przyciski: jak btn-outline-secondary, główny jak btn-primary, bez cieni i podskoków (wyjątki w :not() bez
+           selektora id – inaczej reguła przebiłaby przycisk główny) */
+        [data-theme=bootstrap] :is(button, .btn):not(.link, .tfrom, [id=tb-stop]) { background: var(--panel); border: 1px solid #6c757d; color: #5c636a; font-weight: 400; box-shadow: none; transition: background .15s, color .15s, border-color .15s; }
+        [data-theme=bootstrap] :is(button, .btn):not(.link, .tfrom, [id=tb-stop]):hover { background: #6c757d; border-color: #6c757d; color: #fff; }
+        [data-theme=bootstrap] :is(button, .btn):active { transform: none; }
+        [data-theme=bootstrap] :is(button.primary, .btn.primary) { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: none; }
+        [data-theme=bootstrap] :is(button.primary, .btn.primary):hover { background: #0b5ed7; border-color: #0a58ca; color: #fff; filter: none; transform: none; box-shadow: none; }
+        [data-theme=bootstrap] button.danger { background: #dc3545; border-color: #dc3545; color: #fff; }
+        [data-theme=bootstrap] button.danger:hover { background: #bb2d3b; border-color: #b02a37; }
+        [data-theme=bootstrap] :is(.iconbtn, .iconbtn:hover) { color: inherit; }
+        [data-theme=bootstrap] .entries .tbtn { border-color: var(--accent); color: var(--accent); }
+        [data-theme=bootstrap] .entries .tbtn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+        /* komunikaty jak alerty Bootstrapa, plakietki i wykres płasko */
+        [data-theme=bootstrap] .flash { padding: 12px 16px; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
+        [data-theme=bootstrap] .pill-today { background: var(--accent); color: #fff; box-shadow: none; }
+        [data-theme=bootstrap] a.pill-today { background: none; color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+        [data-theme=bootstrap] .bars .b:not(.missing, .off) i { background: var(--accent); box-shadow: none; }
+        [data-theme=bootstrap] .bars .b:not(.missing, .off) i.over { background: var(--warn); }
+        [data-theme=bootstrap] .bars .b.today i { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px rgb(13 110 253 / .35); }
+        [data-theme=bootstrap] .settings-nav a.on { background: var(--accent); color: #fff; box-shadow: none; }
+        /* kafelek motywu w Ustawieniach – płasko, także z innego motywu */
+        .theme-card[data-id=bootstrap] .tc-preview { background: var(--t-bg); }
+        .theme-card[data-id=bootstrap] .tc-panel { border-radius: 4px; box-shadow: 0 0 0 1px #dee2e6; }
+        .theme-card[data-id=bootstrap] .tc-btn { border-radius: 3px !important; background: var(--t-a); box-shadow: none; }
+        .theme-card[data-id=bootstrap] .tc-bars i { background: var(--t-a); }
+
         /* motyw Osadnicy – w stylu The Settlers II: Veni Vidi Vici, według zrzutów z gry. Tło to pikselowa trawa z mapy
            z plamami światła i cienia jak teren w grze, ekran obwiedziony ciemnym kamieniem z czerwonymi żyłkami. Panele to
            okna z gry: rama z kamienia khaki, pasek tytułu z zagnieżdżonymi kwadratami w rogach i żółtym napisem na wklęsłej
