@@ -1,4 +1,4 @@
-<img src="docs/logo.svg" width="72" height="72" alt="Logo: stoper, którego wskazówki tworzą ptaszek">
+<img src="docs/logo.svg" width="72" height="72" alt="Logo: tarcza zegara z pierścieniem z kolorowych odcinków – czas rozpisany na tickety">
 
 # Raport czasu pracy
 

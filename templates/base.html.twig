@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="referrer" content="no-referrer">
     <title>{% block title %}Raport czasu{% endblock %}</title>
-    {% import '_icons.html.twig' as icons %}{% set tc = theme_colors() %}
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{{ icons.logo_badge(tc.accent, tc['accent-2'], tc['accent-ink'])|url_encode }}">
+    {% import '_icons.html.twig' as icons %}
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{{ icons.logo(32)|url_encode }}">
     <style>
         @font-face { font-family: "Inter"; font-style: normal; font-display: swap; font-weight: 100 900;
             src: url(/fonts/inter-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
@@ -69,9 +69,9 @@
             border-image: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 45%, transparent), color-mix(in srgb, var(--accent-2) 40%, transparent), transparent) 1; }
         header .wrap { display: flex; gap: 8px 20px; align-items: center; min-height: 62px; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap; }
         .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 15.5px; letter-spacing: -.015em; color: var(--ink); text-decoration: none; }
-        .brand .mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--accent-ink);
-            background: linear-gradient(140deg, var(--accent), var(--accent-2));
-            box-shadow: 0 0 0 1px color-mix(in srgb, #fff 18%, transparent) inset, 0 0 22px -2px color-mix(in srgb, var(--accent) 70%, transparent); }
+        /* logo jest takie samo w każdym motywie – kafelek ma w sobie (_icons.html.twig), tu tylko cień */
+        .brand .mark { display: block; width: 32px; height: 32px; filter: drop-shadow(0 4px 10px rgb(10 16 40 / .35)); }
+        .brand .mark svg { display: block; }
         header nav { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 3%, transparent);
             border: 1px solid var(--hair); overflow-x: auto; scrollbar-width: none; max-width: 100%; }
         header nav a { display: inline-flex; align-items: center; gap: 7px; text-decoration: none; color: var(--muted); padding: 6px 12px; border-radius: 9px;
@@ -548,8 +548,6 @@
         [data-theme=settlers] header { background: var(--streaks); border-bottom: 7px solid; border-image: linear-gradient(180deg, #b8ba96, #74704f 60%, #545036) 1;
             box-shadow: 0 1px 0 #000, 0 10px 22px -12px #000; backdrop-filter: none; -webkit-backdrop-filter: none; }
         [data-theme=settlers] .brand { color: var(--gold); font-size: 19px; font-weight: 600; text-shadow: 2px 2px 0 #000; }
-        [data-theme=settlers] .brand .mark { border-radius: 1px; border: 2px solid; border-color: var(--bevel); background: var(--granite), linear-gradient(180deg, #34323e, #22202a);
-            color: var(--gold); box-shadow: 0 0 0 1px #000; }
         [data-theme=settlers] header nav { gap: 4px; padding: 1px; border: 0; border-radius: 0; background: none; }
         /* przyciski: ciemny nakrapiany granit z jasną fazą, żółty napis; główny – rdzawobrązowy granit */
         [data-theme=settlers] :is(button, .btn, header nav a):not(.link, .danger) { border-radius: 1px; border: 2px solid; border-color: var(--bevel); color: var(--gold); font-size: 15px; font-weight: 500;
@@ -621,7 +619,7 @@
 <header>
     <div class="wrap">
         <a class="brand" href="{{ path('today') }}">
-            <span class="mark">{{ icons.logo(24) }}</span>
+            <span class="mark">{{ icons.logo(32) }}</span>
             Raport czasu
         </a>
         {% set r = app.request.attributes.get('_route') %}

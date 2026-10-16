@@ -116,7 +116,9 @@ def cmd(text):
 
 
 class Logo(Flowable):
-    """Znak aplikacji jak docs/logo.svg: stoper, którego wskazówki tworzą ptaszek."""
+    """Znak aplikacji jak docs/logo.svg: tarcza zegara z pierścieniem z kolorowych odcinków (czas rozpisany na tickety)."""
+
+    SEGMENTS = (('#2dd4bf', 0.36), ('#fbbf24', 0.24), ('#fb7185', 0.17), ('#a78bfa', 0.13))  # reszta pierścienia wolna
 
     def __init__(self, size):
         super().__init__()
@@ -127,27 +129,29 @@ class Logo(Flowable):
         c.saveState()
         c.scale(self.width / 32, self.height / 32)
         c.translate(0, 32)
-        c.scale(1, -1)  # układ jak w SVG: y w dół
+        c.scale(1, -1)  # układ jak w SVG: y w dół (kąty łuków rosną zgodnie z ruchem wskazówek)
         frame = c.beginPath()
         frame.roundRect(0, 0, 32, 32, 8)
         c.clipPath(frame, stroke=0, fill=0)
-        c.linearGradient(0, 0, 32, 32, (colors.HexColor('#0f766e'), colors.HexColor('#0e7490')), extend=True)
-        c.translate(16, 16)
-        c.scale(.84, .84)
-        c.translate(-16, -16)
-        c.setStrokeColor(colors.white)
+        c.linearGradient(0, 0, 32, 32, (colors.HexColor('#1e2a4a'), colors.HexColor('#0d1326')), extend=True)
+        c.setLineWidth(4.2)
+        c.setStrokeColor(colors.Color(1, 1, 1, alpha=0.1))
+        c.circle(16, 16, 9.5, stroke=1, fill=0)
+        gap = 1.1 / (2 * 3.14159265 * 9.5) * 360  # przerwa między odcinkami w stopniach
+        start = -90
+        for color, share in self.SEGMENTS:
+            c.setStrokeColor(colors.HexColor(color))
+            arc = c.beginPath()
+            arc.arc(6.5, 6.5, 25.5, 25.5, start, share * 360 - gap)
+            c.drawPath(arc, stroke=1, fill=0)
+            start += share * 360
+        c.setStrokeColor(colors.HexColor('#f8fafc'))
+        c.setFillColor(colors.HexColor('#f8fafc'))
         c.setLineCap(1)
-        c.setLineJoin(1)
-        c.setLineWidth(2.4)
-        c.circle(16, 17.5, 9.5, stroke=1, fill=0)
-        c.line(13.6, 3.8, 18.4, 3.8)
-        c.line(16, 3.8, 16, 8)
-        c.setLineWidth(2.8)
-        hands = c.beginPath()
-        hands.moveTo(11.9, 13.9)
-        hands.lineTo(16, 17.5)
-        hands.lineTo(21.2, 12.2)
-        c.drawPath(hands, stroke=1, fill=0)
+        c.setLineWidth(2)
+        c.line(16, 16, 16, 10.6)
+        c.line(16, 16, 19.4, 18.2)
+        c.circle(16, 16, 1.5, stroke=0, fill=1)
         c.restoreState()
 
 
