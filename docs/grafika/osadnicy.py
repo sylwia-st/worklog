@@ -669,8 +669,8 @@ if __name__ == '__main__':
                          '#8ab228'], seed=7, streak=2, flowers=['#e8a8c0', '#d8b058', '#b088d0', '#e0d890'],
                     flower_rate=0.003)
     png(OUT / 'osadnicy-trawa.png', grass)
-    # droga jak w grze: szara kostka z brązowawymi grudkami ziemi
-    gravel = texture(32, ['#5e625e', '#6e746e', '#828a82', '#8e8478', '#9ea29e', '#b4b8b4'], seed=3, streak=2)
+    # zwykła droga z gry: ubita ziemia, jasna różowawo-beżowa z brązowymi grudkami (szara kostka to dopiero droga dla osłów)
+    gravel = texture(32, ['#84644c', '#90807a', '#9c9080', '#b49c88', '#b0a48c', '#c8b4a4', '#d2bea8'], seed=3, streak=2)
     png(OUT / 'osadnicy-zwir.png', gravel)
     png(OUT / 'osadnicy-okno.png', brush(64, seed=5))
     for name, draw in BUILDINGS.items():
