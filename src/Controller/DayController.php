@@ -106,7 +106,10 @@ final class DayController extends AbstractController
         $day = $this->applyForm($d, $day, $form)['day'];
 
         if ('sync' === $action) {
-            foreach ($this->sync->sync($day) as $result) {
+            $results = $this->sync->sync($day);
+            // błędy na górze – nie mogą zginąć pod listą udanych wysyłek
+            usort($results, static fn (array $a, array $b): int => ('error' === $b['type']) <=> ('error' === $a['type']));
+            foreach ($results as $result) {
                 $this->addFlash($result['type'], $result['message']);
             }
             $this->em->flush();

@@ -35,6 +35,18 @@
     </form>
 {% endif %}
 
+{# wpisy odrzucone przez Jirę – baner zostaje, dopóki ponowna wysyłka się nie uda (treść błędu prosto od Jiry) #}
+{% set jiraFailed = form.rows|filter(r => r.status == 'error') %}
+{% if jiraFailed is not empty %}
+    <div class="flash error jira-failed" role="alert">
+        <strong>Jira nie przyjęła {{ plural(jiraFailed|length, 'wpisu', 'wpisów', 'wpisów') }} – tego czasu nie ma w Jirze.</strong>
+        <ul>
+            {% for r in jiraFailed %}<li><b>{{ r.issue }}</b>{{ r.time ? ' (' ~ r.time ~ ')' }}: {{ r.error }}</li>{% endfor %}
+        </ul>
+        <button type="submit" form="dayform" name="action" value="sync" class="primary">Wyślij ponownie do Jiry</button>
+    </div>
+{% endif %}
+
 <div id="draft-banner" class="flash warning" hidden>
     <span id="draft-msg"></span>
     <button type="button" id="draft-restore" class="primary" style="margin-left:8px">Przywróć</button>
