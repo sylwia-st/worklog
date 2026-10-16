@@ -578,17 +578,17 @@
         .road { display: none; }
         [data-theme=settlers] .road { display: block; }
         [data-theme=settlers] .road + main.wrap { padding-top: 10px; }
-        .road .wrap { position: relative; height: 92px; --L: 160px; --R: 268px; --n: 4; --span: calc(100% - var(--L) - var(--R)); }
+        .road .wrap { position: relative; height: 84px; --L: 156px; --R: 262px; --n: 4; --span: calc(100% - var(--L) - var(--R)); }
         .road .wrap::before { content: ""; position: absolute; left: var(--L); right: var(--R); bottom: 11px; height: 8px;
             background: url(/img/osadnicy-zwir.png) 0 0 / 64px 64px; image-rendering: pixelated; box-shadow: 0 1px 0 rgb(40 50 20 / .5), 0 -1px 0 rgb(40 50 20 / .3); }
         .road i { position: absolute; bottom: 13px; display: block; background: no-repeat 0 0; image-rendering: pixelated; }
         .road .r-pine { left: 0; width: 20px; height: 44px; bottom: 16px; background-image: url(/img/osadnicy-swierk.svg); background-size: 20px 44px; }
         .road .r-tree { left: 42px; width: 32px; height: 44px; bottom: 7px; background-image: url(/img/osadnicy-drzewo.svg); background-size: 32px 44px; }
         .road .r-cutter { left: 24px; width: 22px; height: 38px; background-image: url(/img/osadnicy-drwal.svg); background-size: 44px 38px; --sw: 44px; animation: r-frames .9s steps(2) infinite; }
-        .road .r-hut { left: 82px; width: 70px; height: 54px; bottom: 10px; background-image: url(/img/osadnicy-chata.png); background-size: 70px 54px; image-rendering: auto; }
-        .road .r-builder { right: 176px; width: 22px; height: 38px; background-image: url(/img/osadnicy-budowniczy.svg); background-size: 44px 38px; --sw: 44px; animation: r-frames .7s steps(2) infinite; }
-        .road .r-site { right: 92px; width: 76px; height: 56px; bottom: 4px; background-image: url(/img/osadnicy-budowa.png); background-size: 76px 56px; image-rendering: auto; }
-        .road .r-house { right: 0; width: 92px; height: 66px; bottom: 8px; background-image: url(/img/osadnicy-dom.png); background-size: 92px 66px; image-rendering: auto; }
+        .road .r-hut { left: 82px; width: 64px; height: 48px; bottom: 14px; background-image: url(/img/osadnicy-chata.png); background-size: 64px 48px; image-rendering: auto; }
+        .road .r-builder { right: 168px; width: 22px; height: 38px; background-image: url(/img/osadnicy-budowniczy.svg); background-size: 44px 38px; --sw: 44px; animation: r-frames .7s steps(2) infinite; }
+        .road .r-site { right: 100px; width: 60px; height: 55px; bottom: 6px; background-image: url(/img/osadnicy-budowa.png); background-size: 60px 55px; image-rendering: auto; }
+        .road .r-house { right: 0; width: 93px; height: 65px; bottom: 6px; background-image: url(/img/osadnicy-dom.png); background-size: 93px 65px; image-rendering: auto; }
         .road .r-flag { left: calc(var(--L) + var(--span) * var(--i) / var(--n) - 3px); width: 16px; height: 36px; bottom: 13px; z-index: 1;
             background-image: url(/img/osadnicy-choragiewka.svg); background-size: 32px 36px; --sw: 32px; animation: r-frames .8s steps(2) infinite; }
         .road .r-leg { position: absolute; bottom: 13px; height: 38px; left: calc(var(--L) + var(--span) * var(--i) / var(--n) + 8px); width: calc(var(--span) / var(--n) - 16px); }
@@ -604,7 +604,7 @@
             50.01% { left: calc(100% - 22px); transform: scaleX(-1); } 100% { left: 0; transform: scaleX(-1); } }
         @keyframes r-there { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
         @keyframes r-back { 0%, 50% { opacity: 0; } 50.01%, 100% { opacity: 1; } }
-        @media (max-width: 640px) { .road .wrap { --n: 2; --L: 80px; --R: 170px; } .road :is(.r-far, .r-hut, .r-house) { display: none; } .road .r-builder { right: 92px; } .road .r-site { right: 8px; } }
+        @media (max-width: 640px) { .road .wrap { --n: 2; --L: 80px; --R: 170px; } .road :is(.r-far, .r-hut, .r-house) { display: none; } .road .r-builder { right: 76px; } .road .r-site { right: 8px; } }
         /* puste listy: osadnik macha ręką */
         [data-theme=settlers] .empty svg { display: none; }
         [data-theme=settlers] .empty::before { content: ""; width: 22px; height: 38px; background: url(/img/osadnicy-machajacy.svg) 0 0 / 44px 38px no-repeat; image-rendering: pixelated;

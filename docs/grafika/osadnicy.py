@@ -222,12 +222,12 @@ pine = [[
     '..........',
 ]]
 
-# --- budynki: jak pre-renderowane w grze – bryły w rzucie ukośnym (przód, prawy bok w głąb, dach od góry), liczone
-# w potrójnej rozdzielczości i uśredniane (gładkie krawędzie), z fakturą tynku, desek i dachówki, cieniem pod okapem,
-# ciemnym konturem i cieniem na trawie. Zapis: PNG z przezroczystością, w CSS w skali 1:1.
-# Punkt (x, y, z): x w prawo, y w górę, z w głąb; na ekranie głąb idzie w prawo-w górę.
+# --- budynki: jak pre-renderowane w grze – rzut izometryczny (budynek stoi narożnikiem do widza: widać lewą ścianę
+# w pełnym świetle, prawą w półcieniu i dach od góry), liczone w potrójnej rozdzielczości i uśredniane (gładkie
+# krawędzie), z fakturą tynku, desek i dachówki, ciemnym konturem i cieniem na trawie. PNG z przezroczystością, w CSS 1:1.
+# Punkt (x, y, z): oś x biegnie na ekranie w prawo-w dół, z w lewo-w dół, y w górę. Widoczne ściany: x = x1 (prawa)
+# i z = z1 (lewa).
 
-KX, KY = 0.55, 0.5  # przesunięcie ekranu na jednostkę głębi
 SS = 3  # nadpróbkowanie
 
 
@@ -260,12 +260,12 @@ class Scene:
     """Płótno w nadpróbkowaniu; poly(punkty 3D, paint) – paint(u, v, px, py): u, v w płaszczyźnie ściany (0..1),
     px, py – piksel obrazu wynikowego (do szumu). Kolor (r, g, b) albo (r, g, b, alfa)."""
 
-    def __init__(self, w, h, ox, oy):
-        self.w, self.h, self.ox, self.oy = w, h, ox, oy
+    def __init__(self, w, h, ox, oy, k=1.6):
+        self.w, self.h, self.ox, self.oy, self.k = w, h, ox, oy, k
         self.px = [[None] * (w * SS) for _ in range(h * SS)]
 
     def at(self, x, y, z):
-        return (self.ox + x + z * KX) * SS, (self.oy - y - z * KY) * SS
+        return (self.ox + (x - z) * self.k) * SS, (self.oy + ((x + z) * 0.5 - y) * self.k) * SS
 
     def poly(self, pts3d, paint):
         pts = [self.at(*p) for p in pts3d]
@@ -287,10 +287,10 @@ class Scene:
                     if color:
                         self.px[y][x] = color
 
-    def box(self, x0, z0, x1, z1, y0, y1, front, side, top=None):
-        """Prostopadłościan: prawy bok, przód, opcjonalnie wierzch (paint jak w poly)."""
-        self.poly([(x1, y0, z0), (x1, y0, z1), (x1, y1, z1), (x1, y1, z0)], side)
-        self.poly([(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0)], front)
+    def box(self, x0, x1, z0, z1, y0, y1, left, right, top=None):
+        """Prostopadłościan: prawa ściana (x = x1), lewa (z = z1), opcjonalnie wierzch (paint jak w poly)."""
+        self.poly([(x1, y0, z1), (x1, y0, z0), (x1, y1, z0), (x1, y1, z1)], right)
+        self.poly([(x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)], left)
         if top:
             self.poly([(x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1)], top)
 
@@ -323,15 +323,20 @@ class Scene:
                 k = outline if edge else 1.0
                 row.append((round(c[0] * k), round(c[1] * k), round(c[2] * k), round(c[3] * 255)))
             final.append(row)
-        return final
+        # przycięcie do zawartości (płótno rysujemy z zapasem)
+        ys = [y for y in range(self.h) if any(px[3] for px in final[y])]
+        xs = [x for x in range(self.w) if any(final[y][x][3] for y in ys)]
+        assert ys[0] > 0 and xs[0] > 0 and ys[-1] < self.h - 1 and xs[-1] < self.w - 1, 'budynek nie mieści się na płótnie'
+        return [row[xs[0]:xs[-1] + 1] for row in final[ys[0]:ys[-1] + 1]]
 
 
 SHADOW = (8, 30, 0, 0.38)
+LIT, HALF = 1.0, 0.74  # lewa ściana w świetle, prawa w półcieniu
 
 
-def ground_shadow(sc, x0, x1, d, h, length):
-    """Cień na trawie w prawo-w tył: rzut bryły przy świetle z lewej góry."""
-    sc.poly([(x1, 0, -0.5), (x1 + length, 0, h * 0.25), (x1 + length, 0, d + h * 0.35), (x0 + 4, 0, d + h * 0.35), (x0 + 4, 0, d)],
+def ground_shadow(sc, x0, x1, z0, z1, length):
+    """Cień na trawie w prawo: rzut podstawy przesunięty w stronę +x, −z (światło z lewej)."""
+    sc.poly([(x0, 0, z0), (x1, 0, z0), (x1, 0, z1), (x1 + length, 0, z1 - length), (x1 + length, 0, z0 - length), (x0 + length, 0, z0 - length)],
             lambda u, v, px, py: SHADOW)
 
 
@@ -376,178 +381,156 @@ def tiled(base, seed, rows, cols, edge=None):
     return f
 
 
-def opening(sc, x0, x1, y0, y1, z, arch=True, inner=(34, 24, 18), frame=(150, 120, 90)):
-    """Ciemny otwór drzwi/bramy w przedniej ścianie, z łukiem i jasną krawędzią od światła."""
-    cx, r = (x0 + x1) / 2, (x1 - x0) / 2
-    def f(u, v, px, py):
-        x, y = x0 + u * (x1 - x0), y0 + v * (y1 - y0)
-        top = y1 - r + (r * r - (x - cx) ** 2) ** 0.5 * 0.9 if arch else y1
-        if y > top:
-            return None
-        if y > top - 0.9 or x < x0 + 0.8:
-            return frame
-        k = 0.7 + 0.5 * (x - x0) / (x1 - x0)
-        return shade(inner, k)
-    sc.poly([(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], f)
-
-
-def window(sc, x0, y0, w, h, z, side=False, d=0.0):
-    """Okienko z drewnianą kratką i kamiennym parapetem; side – w prawym boku (x0 to głębia)."""
-    def f(u, v, px, py):
-        if v < 0.14:
-            return (200, 190, 170)
-        if u < 0.12 or u > 0.88 or v > 0.9:
-            return (110, 70, 40)
-        if abs(u - 0.5) < 0.07 or abs(v - 0.55) < 0.06:
-            return (130, 86, 50)
-        return (30, 26, 24)
-    if side:
-        sc.poly([(d, y0, x0), (d, y0, x0 + w), (d, y0 + h, x0 + w), (d, y0 + h, x0)], f)
-    else:
-        sc.poly([(x0, y0, z), (x0 + w, y0, z), (x0 + w, y0 + h, z), (x0, y0 + h, z)], f)
-
-
-def walls(sc, x0, x1, z0, z1, h, front, side, base=None, base_h=0.0, eave=0.0):
-    """Przednia i prawa ściana z cokołem (base) i cieniem pod okapem (eave – grubość cienia)."""
-    def wrap(paint, span, dark):
-        def f(u, v, px, py):
-            y = v * h
-            c = base(u, y / base_h if base_h else 0, px, py) if base and y < base_h else paint(u, v, px, py)
-            if eave and y > h - eave:
-                c = shade(c, 0.7)
-            return shade(c, dark)
-        return f
-    sc.poly([(x1, 0, z0), (x1, 0, z1), (x1, h, z1), (x1, h, z0)], wrap(side, z1 - z0, 0.72))
-    sc.poly([(x0, 0, z0), (x1, 0, z0), (x1, h, z0), (x0, h, z0)], wrap(front, x1 - x0, 1.0))
-
-
-def gable(sc, x0, x1, z0, z1, h, rise, tiles_paint, gable_paint, over=1.6):
-    """Dach dwuspadowy z kalenicą wzdłuż x: trójkąt szczytu z prawej, tylna połać (widać jej skraj), przednia połać,
-    deska szczytowa i gąsiory na kalenicy."""
-    zm = (z0 + z1) / 2
-    sc.poly([(x1, h, z0), (x1, h, z1), (x1, h + rise, zm)], gable_paint)
-    sc.poly([(x0 - over, h - 0.6, z1 + over), (x1 + over, h - 0.6, z1 + over), (x1 + over, h + rise, zm), (x0 - over, h + rise, zm)],
-            lambda u, v, px, py: shade(tiles_paint(u, 1 - v, px, py), 0.62))
-    sc.poly([(x1 + over, h - 0.6, z0 - over), (x1 + over + 0.9, h - 0.6, z0 - over), (x1 + over + 0.9, h + rise, zm), (x1 + over, h + rise, zm)],
-            lambda u, v, px, py: (96, 52, 26))
-    sc.poly([(x0 - over, h - 0.8, z0 - over), (x1 + over, h - 0.8, z0 - over), (x1 + over, h + rise, zm), (x0 - over, h + rise, zm)], tiles_paint)
-    sc.poly([(x0 - over, h + rise - 0.5, zm - 0.6), (x1 + over, h + rise - 0.5, zm - 0.6), (x1 + over, h + rise + 0.9, zm), (x0 - over, h + rise + 0.9, zm)],
-            lambda u, v, px, py: shade((200, 110, 50), 0.8 + 0.3 * v + ((u * 30) % 1 < 0.15) * -0.25))
-
-
-def lean_to(sc, x0, x1, z0, z1, h_low, h_high, tiles_paint, over=1.2):
-    """Daszek pulpitowy dobudówki: opada ku przodowi."""
-    sc.poly([(x0 - over, h_low, z0 - over), (x1, h_low, z0 - over), (x1, h_high, z1), (x0 - over, h_high, z1)], tiles_paint)
-
-
-ROOF = (222, 128, 52)
-WALL = (232, 222, 200)
-BASE_RED = (176, 82, 56)
+ROOF = (238, 150, 52)
+WALL = (222, 208, 178)
+BASE_RED = (196, 96, 70)
 
 
 def red_base(seed):
     def f(u, t, px, py):
-        if t > 0.86:
-            return (120, 52, 34)  # listwa nad cokołem
+        if t > 0.9:
+            return (140, 60, 40)  # listwa nad cokołem
         return shade(BASE_RED, 0.86 + vnoise(px, py, 4, seed) * 0.2 + (_hash(px, py, seed) - 0.5) * 0.08)
     return f
 
 
+def block(sc, x0, x1, z0, z1, h, left, right, base=None, base_h=0.0, eave=0.0):
+    """Bryła: prawa ściana w półcieniu, lewa w świetle; cokół (base) do wysokości base_h, cień pod okapem."""
+    def wrap(paint, k):
+        def f(u, v, px, py):
+            y = v * h
+            c = base(u, y / base_h, px, py) if base and y < base_h else paint(u, v, px, py)
+            if eave and y > h - eave:
+                c = shade(c, 0.72)
+            return shade(c, k)
+        return f
+    sc.poly([(x1, 0, z1), (x1, 0, z0), (x1, h, z0), (x1, h, z1)], wrap(right, HALF))
+    sc.poly([(x0, 0, z1), (x1, 0, z1), (x1, h, z1), (x0, h, z1)], wrap(left, LIT))
+
+
+def hole_left(sc, x0, x1, y0, y1, z, color=(34, 26, 22), arch=False):
+    """Ciemny otwór (okno, drzwi, brama) w lewej ścianie; arch – zaokrąglona góra."""
+    def f(u, v, px, py):
+        if arch:
+            t = (u - 0.5) * 2
+            if v > 1 - 0.35 * (1 - (1 - min(1, t * t)) ** 0.5):
+                return None
+        return shade(color, 0.8 + 0.35 * u)
+    sc.poly([(x0, y0, z), (x1, y0, z), (x1, y1, z), (x0, y1, z)], f)
+
+
+def hole_right(sc, z0, z1, y0, y1, x, color=(30, 24, 20)):
+    sc.poly([(x, y0, z1), (x, y0, z0), (x, y1, z0), (x, y1, z1)], lambda u, v, px, py: shade(color, 0.8 + 0.3 * v))
+
+
+def roof_x(sc, x0, x1, z0, z1, h, rise, tiles_paint, gable_paint, over=1.0):
+    """Dach dwuspadowy, kalenica wzdłuż x: tylna połać, szczyt w prawej ścianie, przednia połać (w świetle),
+    deska na skraju i gąsiory na kalenicy."""
+    zm = (z0 + z1) / 2
+    sc.poly([(x0 - over, h, z0 - over), (x1 + over, h, z0 - over), (x1 + over, h + rise, zm), (x0 - over, h + rise, zm)],
+            lambda u, v, px, py: shade(tiles_paint(u, v, px, py), 0.6))
+    sc.poly([(x1, h, z1), (x1, h, z0), (x1, h + rise, zm)], lambda u, v, px, py: shade(gable_paint(u, v, px, py), HALF))
+    sc.poly([(x1 + over, h - 0.7, z1 + over), (x1 + over, h, z1 + over), (x1 + over, h + rise, zm), (x1 + over, h + rise - 0.7, zm)],
+            lambda u, v, px, py: (110, 56, 26))
+    sc.poly([(x0 - over, h, z1 + over), (x1 + over, h, z1 + over), (x1 + over, h + rise, zm), (x0 - over, h + rise, zm)], tiles_paint)
+    sc.poly([(x0 - over, h + rise - 0.4, zm + 0.5), (x1 + over, h + rise - 0.4, zm + 0.5), (x1 + over, h + rise + 0.5, zm), (x0 - over, h + rise + 0.5, zm)],
+            lambda u, v, px, py: shade((206, 112, 44), 0.8 + 0.3 * v - ((u * 24) % 1 < 0.15) * 0.25))
+
+
+def roof_z(sc, x0, x1, z0, z1, h, rise, tiles_paint, gable_paint, over=1.0):
+    """Dach dwuspadowy, kalenica wzdłuż z: szczyt w lewej ścianie (w świetle), widoczna prawa połać (półcień)."""
+    xm = (x0 + x1) / 2
+    sc.poly([(x0 - over, h, z1 + over), (x0 - over, h, z0 - over), (xm, h + rise, z0 - over), (xm, h + rise, z1 + over)],
+            lambda u, v, px, py: shade(tiles_paint(u, v, px, py), 0.6))
+    sc.poly([(x0, h, z1), (x1, h, z1), (xm, h + rise, z1)], gable_paint)
+    sc.poly([(x0 - over, h - 0.7, z1 + over), (x0 - over, h, z1 + over), (xm, h + rise, z1 + over), (xm, h + rise - 0.7, z1 + over)],
+            lambda u, v, px, py: (120, 62, 28))
+    sc.poly([(x1 + over, h - 0.7, z1 + over), (x1 + over, h, z1 + over), (xm, h + rise, z1 + over), (xm, h + rise - 0.7, z1 + over)],
+            lambda u, v, px, py: (96, 48, 22))
+    sc.poly([(x1 + over, h, z1 + over), (x1 + over, h, z0 - over), (xm, h + rise, z0 - over), (xm, h + rise, z1 + over)],
+            lambda u, v, px, py: shade(tiles_paint(u, v, px, py), 0.82))
+
+
 def house():
-    """Dom jak w grze: główna bryła z białego tynku na czerwonym cokole, pomarańczowa dachówka, łukowe drzwi,
-    kratkowane okienka, ceglany komin; z lewej niższa dobudówka z daszkiem pulpitowym i ciemną bramą."""
-    sc = Scene(92, 66, 20, 61)
-    w, d, h = 40, 22, 17
-    ground_shadow(sc, -16, w, d, h + 14, 12)
-    # dobudówka z lewej (cofnięta)
-    walls(sc, -16, 0, 6, 20, 10, stucco(WALL, 31, 0.15), stucco(WALL, 32), red_base(33), 2.4, 1.2)
-    opening(sc, -12, -4, 0, 7.6, 6)
-    lean_to(sc, -16, 0, 6, 20, 9.6, 14, tiled(ROOF, 34, 5, 7))
-    # główna bryła
-    walls(sc, 0, w, 0, d, h, stucco(WALL, 35, 0.15), stucco(WALL, 36), red_base(37), 3.2, 1.6)
-    opening(sc, 16, 23, 0, 10.5, 0)
-    window(sc, 5, 8.5, 4.5, 5, 0)
-    window(sc, 30, 8.5, 4.5, 5, 0)
-    window(sc, 7, 8.5, 4, 5, 0, side=True, d=w)
-    window(sc, 14, 8.5, 4, 5, 0, side=True, d=w)
-    gable(sc, 0, w, 0, d, h, 16, tiled(ROOF, 38, 7, 16, edge=0.012), stucco(WALL, 39))
-    # komin
-    brick = lambda u, v, px, py: shade((168, 72, 48), 0.85 + _hash(int(u * 3), int(v * 9), 40) * 0.25 - (((v * 9) % 1) < 0.15) * 0.3)
-    sc.box(28, 13, 32, 16, 24, 36, brick, lambda u, v, px, py: shade(brick(u, v, px, py), 0.7), lambda u, v, px, py: (60, 30, 20))
+    """Dom jak w grze: piętrowa bryła z kremowego tynku na grubym ceglanym cokole, pomarańczowa dachówka, małe
+    ciemne okienka w dwóch rzędach, łukowe drzwi, komin; z prawej parterowa przybudówka z ciemną bramą."""
+    sc = Scene(120, 110, 50, 60)
+    ground_shadow(sc, 0, 28, 0, 14, 7)
+    # piętrowa bryła
+    block(sc, 0, 16, 0, 14, 15, stucco(WALL, 31, 0.12), stucco(WALL, 32), red_base(33), 4, 1.2)
+    for wx in (2.5, 7, 11.5):
+        hole_left(sc, wx, wx + 2, 10, 12.6, 14)
+    hole_left(sc, 2.5, 4.5, 5.5, 8, 14)
+    hole_left(sc, 7.5, 11, 0, 7, 14, (40, 28, 20), arch=True)  # drzwi
+    hole_right(sc, 4, 6, 10, 12.6, 16)
+    roof_x(sc, 0, 16, 0, 14, 15, 7, tiled(ROOF, 38, 7, 12, edge=0.01), stucco(WALL, 39))
+    brick = lambda u, v, px, py: shade((176, 80, 54), 0.85 + _hash(int(u * 3), int(v * 8), 40) * 0.22 - (((v * 8) % 1) < 0.15) * 0.3)
+    sc.box(10, 12, 3, 5, 17, 24, brick, lambda u, v, px, py: shade(brick(u, v, px, py), HALF), lambda u, v, px, py: (54, 30, 22))  # komin
+    # przybudówka z bramą
+    block(sc, 16, 28, 3, 14, 8.5, stucco(WALL, 41, 0.12), stucco(WALL, 42), red_base(43), 3.5, 1)
+    hole_left(sc, 19, 25, 0, 6.8, 14, (22, 16, 14), arch=True)
+    hole_right(sc, 6, 8, 4.5, 6.8, 28)
+    roof_x(sc, 16, 28, 3, 14, 8.5, 4, tiled(ROOF, 44, 4, 9, edge=0.012), stucco(WALL, 45), over=0.8)
     return sc.image()
 
 
 def hut():
-    """Chata drwala jak w grze: ściany z czerwonobrązowych desek na ceglanym cokole, dach z ciemnego gontu,
-    ciemne drzwi i okienko, obok sterta bali."""
-    sc = Scene(70, 54, 6, 50)
-    w, d, h = 28, 16, 12
-    ground_shadow(sc, 0, w, d, h + 10, 9)
-    wood = (164, 104, 62)
-    walls(sc, 0, w, 0, d, h, planks(wood, 51), planks(wood, 52), red_base(53), 2.2, 1.4)
-    opening(sc, 16, 22, 0, 8.4, 0, arch=False, inner=(28, 18, 12), frame=(96, 56, 34))
-    window(sc, 5, 5.5, 4, 3.6, 0)
-    window(sc, 6, 5.5, 3.6, 3.6, 0, side=True, d=w)
-    gable(sc, 0, w, 0, d, h, 12, tiled((132, 78, 46), 54, 6, 14, edge=0.015), planks((128, 70, 44), 55), over=1.4)
-    # sterta bali z prawej z przodu: czoła bali jako elipsy ze słojami
-    for i, (bx, by) in enumerate(((w + 6, 1.6), (w + 9.2, 1.6), (w + 12.4, 1.6), (w + 7.6, 4.4), (w + 10.8, 4.4), (w + 9.2, 7.2))):
-        def log_end(u, v, px, py, i=i):
+    """Chata drwala jak w grze: zwarta bryła z brązowych desek na kamiennej podmurówce, dach z ciemnego gontu,
+    drzwi w lewej ścianie, okienko w prawej, obok sterta bali."""
+    sc = Scene(120, 110, 50, 60)
+    wood = (150, 92, 56)
+    ground_shadow(sc, 0, 14, 0, 11, 6)
+    stone = lambda u, t, px, py: shade((150, 142, 128), 0.8 + _hash(int(u * 9 + (t > 0.5) * 0.5), int(t * 2), 51) * 0.3
+                                       - ((u * 9 + (t > 0.5) * 0.5) % 1 < 0.1) * 0.35)
+    block(sc, 0, 14, 0, 11, 9, planks(wood, 52), planks(wood, 53), stone, 2.2, 1)
+    hole_left(sc, 7.5, 11, 0, 6.5, 11, (30, 20, 14))
+    hole_left(sc, 2.5, 4.5, 4, 6.2, 11)
+    hole_right(sc, 4, 6, 4, 6.2, 14)
+    roof_x(sc, 0, 14, 0, 11, 9, 7, tiled((128, 76, 44), 54, 6, 10, edge=0.012), planks((132, 80, 48), 55), over=1.2)
+    # sterta bali przed prawą ścianą: walce leżące wzdłuż z, widać ich czoła
+    for i, (lx, ly) in enumerate(((16.5, 1.2), (19, 1.2), (21.5, 1.2), (17.8, 3.4), (20.3, 3.4), (19, 5.6))):
+        sc.poly([(lx - 1.2, ly + 1.1, 2), (lx + 1.2, ly + 1.1, 2), (lx + 1.2, ly + 1.1, 9), (lx - 1.2, ly + 1.1, 9)],
+                lambda u, v, px, py: shade((126, 80, 46), 0.8 + 0.3 * u))
+        def end(u, v, px, py, i=i):
             r = ((u - 0.5) ** 2 + (v - 0.5) ** 2) ** 0.5 * 2
             if r > 1:
                 return None
-            if r > 0.82:
-                return (96, 60, 34)
-            return shade((214, 170, 110), 0.85 + 0.15 * ((r * 4) % 1 > 0.5) + _hash(i, 0, 56) * 0.1)
-        sc.poly([(bx - 1.6, by + 1.4, 1), (bx + 1.6, by + 1.4, 1), (bx + 1.6, by + 1.4, -5), (bx - 1.6, by + 1.4, -5)],
-                lambda u, v, px, py: shade((120, 74, 42), 0.8 + 0.3 * u))  # wierzch bala
-        sc.poly([(bx - 1.6, by - 1.6, -5), (bx + 1.6, by - 1.6, -5), (bx + 1.6, by + 1.6, -5), (bx - 1.6, by + 1.6, -5)], log_end)
+            return (98, 60, 34) if r > 0.8 else shade((216, 172, 112), 0.86 + 0.14 * ((r * 4) % 1 > 0.5) + _hash(i, 0, 56) * 0.1)
+        sc.poly([(lx - 1.2, ly - 1.1, 9), (lx + 1.2, ly - 1.1, 9), (lx + 1.2, ly + 1.1, 9), (lx - 1.2, ly + 1.1, 9)], end)
     return sc.image()
 
 
 def site():
-    """Plac budowy jak w grze: fundament z kamiennych bloków, zaczęte mury z tynku na cokole (nierówna góra),
-    rusztowanie z bali z belkami, z boku stos desek i kamieni."""
-    sc = Scene(76, 56, 6, 50)
-    w, d, f = 32, 18, 2.2
-    ground_shadow(sc, 0, w, d, 12, 8)
-    stone = lambda u, v, px, py, span=1: shade((176, 170, 158), 0.8 + _hash(int(u * 12 + (int(v * 2) % 2) * 0.5), int(v * 2), 61) * 0.3
-                                               - ((u * 12 + (int(v * 2) % 2) * 0.5) % 1 < 0.08) * 0.35 - ((v * 2) % 1 < 0.12) * 0.3)
+    """Plac budowy jak w grze: płyta fundamentu z kamiennych bloków, rusztowanie z bali, zaczęte mury, deski i kamienie."""
+    sc = Scene(120, 110, 50, 60)
+    f = 1.4
+    ground_shadow(sc, 0, 16, 0, 12, 4)
+    stone = lambda u, v, px, py: shade((182, 176, 162), 0.82 + _hash(int(u * 8), int(v * 6), 61) * 0.25
+                                       - ((u * 8) % 1 < 0.08 or (v * 6) % 1 < 0.08) * 0.3)
     post = lambda u, v, px, py: shade((150, 100, 56), 0.75 + 0.45 * (1 - u))
-    beam = lambda u, v, px, py: shade((160, 108, 60), 0.7 + 0.4 * v)
-    # tylne słupy i belka
-    for x in (0.5, w - 2):
-        sc.box(x, d - 2, x + 1.5, d - 0.5, f, 22, post, lambda u, v, px, py: shade((110, 72, 40), 1))
-    sc.box(0.5, d - 2, w - 0.5, d - 0.5, 20.5, 22, beam, beam)
-    # fundament
-    sc.box(-1, -1, w + 1, d + 1, 0, f, stone, lambda u, v, px, py: shade(stone(u, v, px, py), 0.72),
-           lambda u, v, px, py: shade((190, 184, 172), 0.9 + _hash(px, py, 62) * 0.15))
-    # zaczęte mury: z tyłu wyższe (z prawej), z przodu do połowy, góra postrzępiona
-    rag = lambda u: 0.55 + 0.3 * ((int(u * 9) * 7) % 5) / 4
-    def wall_paint(seed):
-        st = stucco(WALL, seed)
-        rb = red_base(seed + 1)
-        def p(u, v, px, py):
-            if v > rag(u):
-                return None
-            return rb(u, v / 0.3, px, py) if v < 0.3 else st(u, v, px, py)
-        return p
-    sc.poly([(w, f, 0), (w, f, d), (w, f + 9, d), (w, f + 9, 0)], lambda u, v, px, py: (lambda c: shade(c, 0.72) if c else None)(wall_paint(63)(u, v, px, py)))
-    sc.poly([(0, f, 0), (w, f, 0), (w, f + 9, 0), (0, f + 9, 0)], wall_paint(65))
-    # przednie słupy, belki, zastrzał
-    for x in (0.5, w - 2):
-        sc.box(x, -0.5, x + 1.5, 1, f, 22, post, lambda u, v, px, py: shade((110, 72, 40), 1))
-    sc.box(0.5, -0.5, w - 0.5, 1, 20.5, 22, beam, beam)
-    sc.poly([(w - 1, 20.5, 1), (w, 20.5, 1), (w, 20.5, d - 0.5), (w - 1, 20.5, d - 0.5)], beam)
-    sc.poly([(2, f + 1, -0.6), (3.4, f + 1, -0.6), (13, 20.5, -0.6), (11.6, 20.5, -0.6)], post)
-    # deski i kamienie obok
-    for i in range(4):
-        y = i * 1.1
-        sc.box(w + 4, -8 + i * 0.3, w + 16, -5 + i * 0.3, y, y + 1.1,
-               lambda u, v, px, py: shade((210, 160, 100), 0.8 + 0.25 * v - (u < 0.03) * 0.3), lambda u, v, px, py: (150, 104, 60),
-               lambda u, v, px, py: shade((222, 176, 116), 0.9 + _hash(int(u * 20), 0, 66 + i) * 0.15))
-    for bx, bz, s_ in ((w + 5, 4, 3.4), (w + 9, 6, 2.8), (w + 7, 9, 3)):
-        sc.box(bx, bz, bx + s_, bz + s_ * 0.8, 0, s_ * 0.7, lambda u, v, px, py: shade((178, 172, 160), 0.85 + _hash(px, py, 67) * 0.2),
-               lambda u, v, px, py: (120, 116, 108), lambda u, v, px, py: shade((200, 196, 184), 0.9 + _hash(px, py, 68) * 0.15))
+    beam = lambda u, v, px, py: shade((168, 116, 66), 0.75 + 0.35 * v)
+    for x, z in ((0, 0), (15, 0)):  # tylne słupy
+        sc.box(x, x + 1, z, z + 1, f, 15, post, post)
+    sc.box(0, 16, 0, 1, 14, 15, beam, beam, beam)
+    sc.box(-0.5, 16.5, -0.5, 12.5, 0, f, lambda u, v, px, py: shade(stone(u, v, px, py), LIT), lambda u, v, px, py: shade(stone(u, v, px, py), HALF),
+           lambda u, v, px, py: shade((196, 190, 176), 0.9 + _hash(px, py, 62) * 0.12))
+    rag = lambda u: 0.45 + 0.35 * ((int(u * 7) * 5) % 4) / 3
+    def wall(seed, k):
+        st, rb = stucco(WALL, seed), red_base(seed + 1)
+        return lambda u, v, px, py: None if v > rag(u) else shade(rb(u, v / 0.35, px, py) if v < 0.35 else st(u, v, px, py), k)
+    sc.poly([(16, f, 12), (16, f, 0), (16, f + 7, 0), (16, f + 7, 12)], wall(63, HALF))
+    sc.poly([(0, f, 12), (16, f, 12), (16, f + 7, 12), (0, f + 7, 12)], wall(65, LIT))
+    for x, z in ((0, 11), (15, 11)):  # przednie słupy i belki
+        sc.box(x, x + 1, z, z + 1, f, 15, post, post)
+    sc.box(0, 16, 11, 12, 14, 15, beam, beam, beam)
+    sc.box(15, 16, 0, 12, 14, 15, beam, beam, beam)
+    for i in range(3):  # deski
+        y = i * 0.9
+        sc.box(19, 21.5, 2 + i * 0.2, 11 + i * 0.2, y, y + 0.9, lambda u, v, px, py: (150, 104, 60),
+               lambda u, v, px, py: shade((206, 156, 96), 0.85 + 0.2 * v), lambda u, v, px, py: shade((224, 178, 118), 0.9 + _hash(int(v * 20), 0, 66 + i) * 0.15))
+    for bx, bz, s_ in ((18.5, 12.5, 2.4), (21, 13.5, 2), (19.5, 15, 2.2)):  # kamienie
+        sc.box(bx, bx + s_, bz, bz + s_, 0, s_ * 0.7, lambda u, v, px, py: shade((180, 174, 162), 0.9 + _hash(px, py, 67) * 0.15),
+               lambda u, v, px, py: (124, 120, 112), lambda u, v, px, py: shade((204, 200, 188), 0.9 + _hash(px, py, 68) * 0.12))
     return sc.image()
 
 
