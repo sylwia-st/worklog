@@ -92,10 +92,10 @@ final class Theme
             'bg' => '#f5f5f4', 'panel' => '#ffffff', 'ink' => '#18181b', 'muted' => '#63636b', 'line' => '#e4e4e7',
             'accent' => '#27272a', 'accent-2' => '#52525b', 'accent-ink' => '#ffffff',
         ]],
-        // z gier: ciemnozielone okna w kamiennej ramie, żółte napisy (tło strony to trawa – obrazek)
+        // z gier: prawie czarne okna w zielone smugi, kamienna rama, żółte napisy (tło strony to trawa – obrazek)
         'settlers' => ['Osadnicy', [
-            'bg' => '#173a20', 'panel' => '#1c4024', 'ink' => '#f6ebb4', 'muted' => '#cfba88', 'line' => '#465040',
-            'accent' => '#ffd83a', 'accent-2' => '#6fb83a', 'accent-ink' => '#1d1405',
+            'bg' => '#173a20', 'panel' => '#10201a', 'ink' => '#f8e68c', 'muted' => '#d4c27c', 'line' => '#3a4632',
+            'accent' => '#ffe41a', 'accent-2' => '#6fb83a', 'accent-ink' => '#1d1405',
         ]],
     ];
 

@@ -19,6 +19,9 @@
         @font-face { font-family: "Pixelify Sans"; font-style: normal; font-display: swap; font-weight: 400 700;
             src: url(/fonts/pixelify-latin.woff2) format("woff2"); unicode-range: U+0000-002F, U+003A-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
+        /* atrybut hidden ukrywa zawsze – także elementy, którym klasa nadaje display (np. pusta .axis, banery .flash) */
+        [hidden] { display: none !important; }
+
         /* kolory motywu (tła, tekst, akcenty --accent / --accent-2, stany, tickety --s1…--s8) – wybór w Ustawieniach → Wygląd, patrz App\Domain\Theme */
         {{ theme_css() }}
         body {
@@ -80,7 +83,6 @@
         header nav a.active svg { color: var(--accent); opacity: 1; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 80%, transparent)); }
         #timerbar { margin-left: auto; display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; background: var(--ok-bg); color: var(--ok);
             border: 1px solid color-mix(in srgb, var(--ok) 25%, transparent); border-radius: 999px; padding: 4px 5px 4px 13px; font-size: 14px; box-shadow: var(--shadow-sm); }
-        #timerbar[hidden] { display: none; }
         #timerbar .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent); animation: pulse 1.8s ease-out infinite; }
         #timerbar b { color: var(--ink); font-family: var(--mono); }
         #timerbar small { color: var(--ok); opacity: .85; }
@@ -468,116 +470,147 @@
         footer { padding-bottom: 28px; display: flex; gap: 6px; align-items: center; }
         footer::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); opacity: .8; }
 
-        /* motyw Osadnicy – w stylu The Settlers II: Veni Vidi Vici. Tło to trawa z mapy, panele to okna z gry: rama
-           z szarozielonego kamienia, pasek tytułu z kwadratami w rogach, ciemnozielony środek w ukośne smugi; przyciski
-           z ciemnego kamienia, żółte pikselowe napisy. Pod nagłówkiem droga z osadnikami (.road). Kolory – App\Domain\Theme
-           ('settlers'), grafiki – public/img/osadnicy-* (rysuje docs/grafika/osadnicy.py, rozmiary tu ×2). */
+        /* motyw Osadnicy – w stylu The Settlers II: Veni Vidi Vici, według zrzutów z gry. Tło to pikselowa trawa z mapy
+           z plamami światła i cienia jak teren w grze, ekran obwiedziony ciemnym kamieniem z czerwonymi żyłkami. Panele to
+           okna z gry: rama z kamienia khaki, pasek tytułu z zagnieżdżonymi kwadratami w rogach i żółtym napisem na wklęsłej
+           tabliczce, wnętrze prawie czarne w zielone smugi pędzla (osadnicy-okno.png). Przyciski z ciemnego, nakrapianego
+           granitu z jasną fazą, główny – rdzawobrązowy. Pod nagłówkiem droga z osadnikami (.road). Kolory – App\Domain\Theme
+           ('settlers'), grafiki – public/img/osadnicy-* (rysuje docs/grafika/osadnicy.py; postaci i tekstury tu ×2, budynki i rzeźby 1:1). */
         body {
             --mottle: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='d' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.09' numOctaves='3' seed='3'/><feColorMatrix values='0 0 0 0 .05 0 0 0 0 .03 0 0 0 0 .01 1.6 0 0 0 -.74'/></filter><filter id='l' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.16' numOctaves='2' seed='8'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .86 1.2 0 0 0 -.74'/></filter><rect width='100%' height='100%' filter='url(%23d)'/><rect width='100%' height='100%' filter='url(%23l)'/></svg>");
-            --streaks: repeating-linear-gradient(-52deg, rgb(255 255 255 / .05) 0 3px, transparent 3px 13px), repeating-linear-gradient(-52deg, rgb(0 0 0 / .2) 0 6px, transparent 6px 19px);
-            --stone: var(--mottle), linear-gradient(180deg, #8f9a7e, #5e6852);
+            --granite: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><filter id='l' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.5' numOctaves='2' seed='2'/><feColorMatrix values='0 0 0 0 .4 0 0 0 0 .41 0 0 0 0 .52 5 0 0 0 -3.1'/></filter><filter id='d' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.35' numOctaves='2' seed='9'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 .03 4 0 0 0 -2.1'/></filter><rect width='100%' height='100%' filter='url(%23d)'/><rect width='100%' height='100%' filter='url(%23l)'/></svg>");
+            --streaks: url(/img/osadnicy-okno.png) 0 0 / 128px 128px;
+            --stone: var(--mottle), linear-gradient(180deg, #a2a480, #7c7a5a 55%, #666244);
         }
         [data-theme=settlers] body {
             --pixel: "Pixelify Sans", var(--sans);
-            --bevel: #9a9c94 #1c1d1a #1c1d1a #9a9c94;
-            --bevel-in: #1c1d1a #9a9c94 #9a9c94 #1c1d1a;
-            --card: var(--streaks) padding-box, var(--mottle) padding-box, linear-gradient(160deg, #24502e, var(--panel)) padding-box,
-                linear-gradient(135deg, #b4bea2, #7a8668 35%, #4e5844 75%, #343c2c) border-box;
-            --shadow: 0 0 0 1px #0c1009, inset 0 0 0 1px #0c1009, 0 12px 24px -10px rgb(0 0 0 / .7);
+            --gold: #ffe41a;
+            --bevel: #a4a6c4 #08080e #08080e #a4a6c4;
+            --bevel-in: #08080e #a4a6c4 #a4a6c4 #08080e;
+            --card: var(--streaks) padding-box, var(--mottle) border-box, linear-gradient(135deg, #b8ba96, #92926e 30%, #74704f 70%, #545036) border-box;
+            --shadow: 0 0 0 1px #000, inset 0 0 0 1px #000, 0 12px 24px -10px rgb(0 0 0 / .7);
             --shadow-lg: var(--shadow);
-            --r: 2px;
-            background: url(/img/osadnicy-trawa.png) 0 0 / 128px 128px var(--bg); image-rendering: auto; }
+            --r: 1px;
+            image-rendering: pixelated;
+            background-color: var(--bg);
+            background-image: radial-gradient(closest-side, rgb(255 250 140 / .26), transparent), radial-gradient(closest-side, rgb(0 24 0 / .5), transparent),
+                radial-gradient(closest-side, rgb(0 24 0 / .36), transparent), radial-gradient(closest-side, rgb(255 250 140 / .2), transparent), url(/img/osadnicy-trawa.png);
+            background-size: 1400px 1200px, 1400px 1200px, 1400px 1200px, 1400px 1200px, 128px 128px;
+            background-position: -260px -380px, 520px 180px, -420px 640px, 700px -300px, 0 0; }
         [data-theme=settlers] body::before { display: none; }
-        [data-theme=settlers] :is(.panel, fieldset, .tile) { border-width: 6px; }
+        /* rama ekranu: ciemny kamień z czerwonymi żyłkami, jak obwódka mapy w grze */
+        [data-theme=settlers] body::after { content: ""; position: fixed; inset: 0; z-index: 50; pointer-events: none; border: 10px solid #303239;
+            border-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g' x='0' y='0' width='1' height='1'><feTurbulence type='fractalNoise' stitchTiles='stitch' baseFrequency='.18' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .52 0 0 0 0 .6 2.4 0 0 0 -1.25'/></filter><filter id='v' x='0' y='0' width='1' height='1'><feTurbulence type='turbulence' stitchTiles='stitch' baseFrequency='.035' numOctaves='2' seed='11'/><feComponentTransfer><feFuncA type='table' tableValues='1 0 0 0 0 0 0 0 0 0 0 0'/></feComponentTransfer><feColorMatrix values='0 0 0 0 .62 0 0 0 0 .1 0 0 0 0 .07 0 0 0 1 0'/></filter><rect width='100%' height='100%' fill='%23303239'/><rect width='100%' height='100%' filter='url(%23g)'/><rect width='100%' height='100%' filter='url(%23v)'/></svg>") 10 round;
+            box-shadow: inset 0 0 0 1px #000, inset 0 0 0 3px rgb(140 142 160 / .35), inset 0 0 18px rgb(0 0 0 / .45);
+            /* marmurowe rzeźby w rogach ramy, jak w grze (render 3D – docs/grafika/rzezby.py): na dole posągi z amforą, u góry kariatydy podpierające róg */
+            background: url(/img/osadnicy-posag.png) left 2px bottom 0 / 54px 177px no-repeat, url(/img/osadnicy-posag-prawy.png) right 2px bottom 0 / 54px 177px no-repeat,
+                url(/img/osadnicy-naroznik.png) left 0 top 0 / 62px 99px no-repeat, url(/img/osadnicy-naroznik-prawy.png) right 0 top 0 / 62px 99px no-repeat;
+            image-rendering: auto;
+            filter: drop-shadow(2px 3px 0 rgb(0 0 0 / .35)); }
+        /* rzeźby tylko tam, gdzie obok treści jest wolne miejsce */
+        @media (max-width: 1280px) { [data-theme=settlers] body::after { background: none; filter: none; } }
+        @media (max-width: 640px) { [data-theme=settlers] body::after { border-width: 5px; } }
+        [data-theme=settlers] :is(.panel, fieldset, .tile) { border-width: 7px; }
         [data-theme=settlers] .tile::after { display: none; }
-        /* pasek tytułu okna: kamień, kwadraty w rogach, żółty napis */
-        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend) { position: relative; margin: -20px -20px 16px; padding: 7px 40px; min-height: 40px;
-            background: var(--stone); border-bottom: 2px solid #1a2016; box-shadow: inset 0 1px 0 rgb(255 255 255 / .25); }
+        /* pasek tytułu okna: kamień khaki, zagnieżdżone kwadraty w rogach, żółty napis na wklęsłej tabliczce
+           (warstwy tła: tabliczka, pod nią jasna krawędź przesunięta w prawo-dół i ciemna w lewo-górę, na końcu kamień) */
+        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend) { position: relative; margin: -20px -20px 16px; padding: 7px 44px; min-height: 42px;
+            background: linear-gradient(180deg, #6a6646, #5c583c) 36px 6px / calc(100% - 72px) calc(100% - 12px) no-repeat,
+                linear-gradient(#b4b692, #b4b692) 37px 7px / calc(100% - 72px) calc(100% - 12px) no-repeat,
+                linear-gradient(#24220f, #24220f) 35px 5px / calc(100% - 72px) calc(100% - 12px) no-repeat, var(--stone);
+            border-bottom: 2px solid #000; box-shadow: inset 0 1px 0 rgb(255 255 255 / .25); }
         [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend)::before,
-        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend)::after { content: ""; position: absolute; top: 8px; left: 8px; width: 20px; height: 20px;
-            background: var(--stone); border: 2px solid; border-color: #c4ccb4 #2a3022 #2a3022 #c4ccb4; box-shadow: inset 0 0 0 3px rgb(0 0 0 / .18); }
-        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend)::after { left: auto; right: 8px; }
+        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend)::after { content: ""; position: absolute; top: calc(50% - 12px); left: 7px; width: 24px; height: 24px; box-sizing: border-box;
+            background: var(--stone); border: 2px solid; border-color: #d0d2b0 #24220f #24220f #d0d2b0;
+            box-shadow: inset 0 0 0 3px #84825f, inset 1px 1px 0 4px #24220f, inset -1px -1px 0 4px #c8caa6; }
+        [data-theme=settlers] :is(.panel > h2:first-child, .panel > .panel-h:first-child, fieldset > legend)::after { left: auto; right: 7px; }
         [data-theme=settlers] .panel > h2:first-child { justify-content: center; }
+        [data-theme=settlers] .panel > .panel-h:first-child :is(a, .link) { color: var(--gold); text-shadow: 1px 1px 0 #1a1400; }
         [data-theme=settlers] fieldset > legend { width: calc(100% + 40px); text-align: center; }
-        /* napisy: pikselowe (bez cyfr – patrz @font-face), żółte, z cieniem */
-        [data-theme=settlers] :is(h1, h2, legend, .brand, .eyebrow, .themes-h, .settings-nav a, header nav a, button, .btn) { font-family: var(--pixel); letter-spacing: 0; }
-        [data-theme=settlers] h1 { color: var(--accent); background: none; -webkit-background-clip: border-box; background-clip: border-box; font-weight: 600; width: fit-content;
-            text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
+        /* napisy jak w grze: pikselowe (bez cyfr – patrz @font-face), żółte, z ostrym cieniem */
+        [data-theme=settlers] :is(h1, h2, legend, .brand, .eyebrow, .themes-h, .settings-nav a, header nav a, button, .btn, .lbl, th) { font-family: var(--pixel); letter-spacing: 0; }
+        [data-theme=settlers] :is(.lbl, th) { font-size: 13px; font-weight: 500; letter-spacing: .03em; color: var(--muted); }
+        [data-theme=settlers] .tile .lbl { color: var(--gold); text-shadow: 1px 1px 0 #000; }
+        /* tytuł strony: kamienna tabliczka z żółtym napisem */
+        [data-theme=settlers] h1 { color: var(--gold); background: var(--stone); -webkit-background-clip: border-box; background-clip: border-box; font-weight: 600; width: fit-content;
+            padding: 6px 16px 8px; border: 3px solid; border-color: #d0d2b0 #24220f #24220f #d0d2b0; box-shadow: 0 0 0 1px #000, 0 10px 18px -8px rgb(0 0 0 / .7);
+            text-shadow: 2px 2px 0 #1a1400, 0 0 1px #000; }
         [data-theme=settlers] h1 .soft { -webkit-text-fill-color: var(--ink); font-weight: 400; }
-        [data-theme=settlers] :is(h2, legend) { color: var(--accent); font-weight: 600; font-size: 18px; text-shadow: 1px 1px 0 #000, 2px 2px 0 rgb(0 0 0 / .4); }
-        [data-theme=settlers] h2 svg { color: var(--accent); filter: drop-shadow(1px 1px 0 #000); }
-        /* tekst leżący na trawie – na ciemnej podkładce */
-        [data-theme=settlers] :is(.sub, .eyebrow, footer) { width: fit-content; padding: 3px 10px; background: rgb(14 30 16 / .82); border-radius: 2px; }
-        [data-theme=settlers] .eyebrow { background: rgb(14 30 16 / .82); -webkit-background-clip: border-box; background-clip: border-box; color: var(--accent-2); font-size: 14px; }
-        [data-theme=settlers] .settings-nav { padding: 8px; background: var(--streaks), var(--panel); border: 4px solid #6f7a60; box-shadow: 0 0 0 1px #0c1009; }
+        [data-theme=settlers] :is(h2, legend) { color: var(--gold); font-weight: 600; font-size: 18px; text-shadow: 1px 1px 0 #1a1400, 2px 2px 0 rgb(0 0 0 / .45); }
+        [data-theme=settlers] h2 svg { color: var(--gold); filter: drop-shadow(1px 1px 0 #000); }
+        /* tekst leżący na trawie – w małym okienku */
+        [data-theme=settlers] :is(.sub, .eyebrow, footer, .day-off) { width: fit-content; padding: 3px 10px; background: var(--streaks); border: 3px solid #86866a; border-radius: 1px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000; }
+        [data-theme=settlers] .eyebrow { -webkit-background-clip: border-box; background-clip: border-box; color: var(--gold); font-size: 14px; }
+        [data-theme=settlers] :is(.closing, .savebar, .savefloat) { background: var(--card); border-width: 5px; border-radius: 1px; box-shadow: var(--shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
+        [data-theme=settlers] .settings-nav { padding: 8px; background: var(--streaks); border: 5px solid #86866a; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000; }
         [data-theme=settlers] :is(.tile .v, .big) { text-shadow: 2px 2px 0 #000; }
-        /* nagłówek: jak pasek narzędzi w grze */
-        [data-theme=settlers] header { background: var(--streaks), linear-gradient(180deg, #24502e, #173a20); border-bottom: 6px solid; border-image: linear-gradient(180deg, #a4ae92, #4e5844) 1;
+        /* nagłówek: wnętrze okna w kamiennej oprawie */
+        [data-theme=settlers] header { background: var(--streaks); border-bottom: 7px solid; border-image: linear-gradient(180deg, #b8ba96, #74704f 60%, #545036) 1;
             box-shadow: 0 1px 0 #000, 0 10px 22px -12px #000; backdrop-filter: none; -webkit-backdrop-filter: none; }
-        [data-theme=settlers] .brand { color: var(--accent); font-size: 19px; font-weight: 600; text-shadow: 2px 2px 0 #000; }
-        [data-theme=settlers] .brand .mark { border-radius: 2px; border: 2px solid; border-color: var(--bevel); background: var(--mottle), linear-gradient(180deg, #5a5c56, #41433e);
-            color: var(--accent); box-shadow: 0 0 0 1px #000; }
+        [data-theme=settlers] .brand { color: var(--gold); font-size: 19px; font-weight: 600; text-shadow: 2px 2px 0 #000; }
+        [data-theme=settlers] .brand .mark { border-radius: 1px; border: 2px solid; border-color: var(--bevel); background: var(--granite), linear-gradient(180deg, #34323e, #22202a);
+            color: var(--gold); box-shadow: 0 0 0 1px #000; }
         [data-theme=settlers] header nav { gap: 4px; padding: 1px; border: 0; border-radius: 0; background: none; }
-        /* przyciski: ciemny kamień z fazą, żółty napis; główny – pomarańczowobrązowa tabliczka */
-        [data-theme=settlers] :is(button, .btn, header nav a):not(.link, .danger) { border-radius: 2px; border: 2px solid; border-color: var(--bevel); color: var(--accent); font-size: 15px; font-weight: 500;
-            background: var(--mottle), linear-gradient(180deg, #5c5e58, #42443f); text-shadow: 1px 1px 0 #000; box-shadow: 0 0 0 1px #000; }
-        [data-theme=settlers] :is(button, .btn, header nav a):not(.link, .danger):hover { color: #fff07a; background: var(--mottle), linear-gradient(180deg, #6c6e67, #4e504a); border-color: var(--bevel); }
+        /* przyciski: ciemny nakrapiany granit z jasną fazą, żółty napis; główny – rdzawobrązowy granit */
+        [data-theme=settlers] :is(button, .btn, header nav a):not(.link, .danger) { border-radius: 1px; border: 2px solid; border-color: var(--bevel); color: var(--gold); font-size: 15px; font-weight: 500;
+            background: var(--granite), linear-gradient(180deg, #363440, #24222c); text-shadow: 1px 1px 0 #000; box-shadow: 0 0 0 1px #000; }
+        [data-theme=settlers] :is(button, .btn, header nav a):not(.link, .danger):hover { color: #fff36e; background: var(--granite), linear-gradient(180deg, #44424f, #2e2c38); border-color: var(--bevel); }
         [data-theme=settlers] :is(button, .btn):not(.link, .danger):active { border-color: var(--bevel-in); transform: translateY(1px); }
         [data-theme=settlers] header nav a svg { opacity: 1; filter: drop-shadow(1px 1px 0 #000); }
-        [data-theme=settlers] header nav a.active { border-color: var(--bevel-in); color: #fff07a; background: var(--mottle), linear-gradient(180deg, #34362f, #4a4c46);
-            box-shadow: 0 0 0 1px #000, inset 1px 1px 3px rgb(0 0 0 / .6); }
-        [data-theme=settlers] header nav a.active svg { color: #fff07a; filter: drop-shadow(1px 1px 0 #000); }
-        [data-theme=settlers] :is(button.primary, .btn.primary) { color: #ffe94a; border-color: #e0a070 #4a2008 #4a2008 #e0a070;
-            background: var(--mottle), linear-gradient(180deg, #b0602a, #86401a); box-shadow: 0 0 0 1px #000, 0 6px 16px -8px #000; }
-        [data-theme=settlers] :is(button.primary, .btn.primary):hover { color: #fff36e; background: var(--mottle), linear-gradient(180deg, #c06e34, #94481e); border-color: #eab080 #4a2008 #4a2008 #eab080; filter: none; }
-        [data-theme=settlers] :is(button.primary, .btn.primary):active { border-color: #4a2008 #e0a070 #e0a070 #4a2008; }
-        /* pola: wklęsłe */
-        [data-theme=settlers] :is(input:not([type=checkbox], [type=radio], [type=color]), select, textarea) { border-radius: 2px; border: 2px solid; border-color: #0c1009 #7a8668 #7a8668 #0c1009;
-            background: #11261a; box-shadow: none; }
-        [data-theme=settlers] :is(input, select, textarea):focus { border-color: #0c1009 var(--accent) var(--accent) #0c1009; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+        [data-theme=settlers] header nav a.active { border-color: var(--bevel-in); color: #fff36e; background: var(--granite), linear-gradient(180deg, #16151c, #24222c);
+            box-shadow: 0 0 0 1px #000, inset 1px 1px 3px rgb(0 0 0 / .7); }
+        [data-theme=settlers] header nav a.active svg { color: #fff36e; filter: drop-shadow(1px 1px 0 #000); }
+        [data-theme=settlers] :is(button.primary, .btn.primary) { color: #ffe94a; border-color: #e8a47c #3a1004 #3a1004 #e8a47c;
+            background: var(--granite), linear-gradient(180deg, #a8481e, #7a2c10); box-shadow: 0 0 0 1px #000, 0 6px 16px -8px #000; }
+        [data-theme=settlers] :is(button.primary, .btn.primary):hover { color: #fff36e; background: var(--granite), linear-gradient(180deg, #b85626, #883414); border-color: #f0b48c #3a1004 #3a1004 #f0b48c; filter: none; }
+        [data-theme=settlers] :is(button.primary, .btn.primary):active { border-color: #3a1004 #e8a47c #e8a47c #3a1004; }
+        /* pola: wklęsłe, jak paski postępu w oknach gry */
+        [data-theme=settlers] :is(input:not([type=checkbox], [type=radio], [type=color]), select, textarea) { border-radius: 1px; border: 2px solid; border-color: #000 #8a8ca8 #8a8ca8 #000;
+            background: #0a0c12; box-shadow: none; }
+        [data-theme=settlers] :is(input, select, textarea):focus { border-color: #000 var(--gold) var(--gold) #000; box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); }
         [data-theme=settlers] input[type=checkbox], [data-theme=settlers] input[type=radio] { accent-color: var(--accent-2); }
-        [data-theme=settlers] :is(.badge, .delta, .pill-today, .datechip, .flash, code, pre, .mailmeta, .item, .settings-nav a, .tile .lbl svg, header nav, .cal a, .cal .pad, .tc-preview) { border-radius: 2px; }
-        [data-theme=settlers] .settings-nav a.on { color: var(--accent); background: rgb(0 0 0 / .3); box-shadow: inset 1px 1px 3px rgb(0 0 0 / .6); }
-        [data-theme=settlers] .pill-today { color: var(--accent-ink); background: var(--accent); box-shadow: 0 0 0 1px #000; }
+        [data-theme=settlers] :is(.badge, .delta, .pill-today, .datechip, .flash, code, pre, .mailmeta, .item, .settings-nav a, .tile .lbl svg, header nav, .cal a, .cal .pad, .tc-preview) { border-radius: 1px; }
+        [data-theme=settlers] .settings-nav a.on { color: var(--gold); background: rgb(0 0 0 / .45); box-shadow: inset 1px 1px 3px rgb(0 0 0 / .7); }
+        [data-theme=settlers] .pill-today { color: var(--accent-ink); background: var(--gold); box-shadow: 0 0 0 1px #000; }
 
         /* droga z osadnikami: jak w grze – między chorągiewkami po jednym tragarzu, który niesie towar i wraca pusty;
            z lewej las, drwal i jego chata, z prawej budowniczy przy budowie i dom. Tylko w motywie Osadnicy. */
         .road { display: none; }
         [data-theme=settlers] .road { display: block; }
         [data-theme=settlers] .road + main.wrap { padding-top: 10px; }
-        .road .wrap { position: relative; height: 76px; --L: 150px; --R: 176px; --n: 4; --span: calc(100% - var(--L) - var(--R)); }
+        .road .wrap { position: relative; height: 92px; --L: 160px; --R: 268px; --n: 4; --span: calc(100% - var(--L) - var(--R)); }
         .road .wrap::before { content: ""; position: absolute; left: var(--L); right: var(--R); bottom: 11px; height: 8px;
             background: url(/img/osadnicy-zwir.png) 0 0 / 64px 64px; image-rendering: pixelated; box-shadow: 0 1px 0 rgb(40 50 20 / .5), 0 -1px 0 rgb(40 50 20 / .3); }
         .road i { position: absolute; bottom: 13px; display: block; background: no-repeat 0 0; image-rendering: pixelated; }
         .road .r-pine { left: 0; width: 20px; height: 44px; bottom: 16px; background-image: url(/img/osadnicy-swierk.svg); background-size: 20px 44px; }
         .road .r-tree { left: 42px; width: 32px; height: 44px; bottom: 7px; background-image: url(/img/osadnicy-drzewo.svg); background-size: 32px 44px; }
-        .road .r-cutter { left: 24px; width: 18px; height: 34px; background-image: url(/img/osadnicy-drwal.svg); background-size: 36px 34px; --sw: 36px; animation: r-frames .9s steps(2) infinite; }
-        .road .r-hut { left: 84px; width: 48px; height: 32px; bottom: 22px; background-image: url(/img/osadnicy-chata.svg); background-size: 48px 32px; }
-        .road .r-builder { right: 120px; width: 18px; height: 34px; background-image: url(/img/osadnicy-budowniczy.svg); background-size: 36px 34px; --sw: 36px; animation: r-frames .7s steps(2) infinite; }
-        .road .r-site { right: 66px; width: 48px; height: 32px; bottom: 10px; background-image: url(/img/osadnicy-budowa.svg); background-size: 48px 32px; }
-        .road .r-house { right: 0; width: 48px; height: 32px; bottom: 22px; background-image: url(/img/osadnicy-dom.svg); background-size: 48px 32px; }
+        .road .r-cutter { left: 24px; width: 22px; height: 38px; background-image: url(/img/osadnicy-drwal.svg); background-size: 44px 38px; --sw: 44px; animation: r-frames .9s steps(2) infinite; }
+        .road .r-hut { left: 82px; width: 70px; height: 54px; bottom: 10px; background-image: url(/img/osadnicy-chata.png); background-size: 70px 54px; image-rendering: auto; }
+        .road .r-builder { right: 176px; width: 22px; height: 38px; background-image: url(/img/osadnicy-budowniczy.svg); background-size: 44px 38px; --sw: 44px; animation: r-frames .7s steps(2) infinite; }
+        .road .r-site { right: 92px; width: 76px; height: 56px; bottom: 4px; background-image: url(/img/osadnicy-budowa.png); background-size: 76px 56px; image-rendering: auto; }
+        .road .r-house { right: 0; width: 92px; height: 66px; bottom: 8px; background-image: url(/img/osadnicy-dom.png); background-size: 92px 66px; image-rendering: auto; }
         .road .r-flag { left: calc(var(--L) + var(--span) * var(--i) / var(--n) - 3px); width: 16px; height: 36px; bottom: 13px; z-index: 1;
             background-image: url(/img/osadnicy-choragiewka.svg); background-size: 32px 36px; --sw: 32px; animation: r-frames .8s steps(2) infinite; }
-        .road .r-leg { position: absolute; bottom: 13px; height: 34px; left: calc(var(--L) + var(--span) * var(--i) / var(--n) + 8px); width: calc(var(--span) / var(--n) - 16px); }
-        .road .r-walker { position: absolute; left: 0; bottom: 0; width: 18px; height: 34px; animation: r-patrol var(--t) linear var(--d) infinite; }
-        .road .r-walker i { left: 0; bottom: 0; width: 18px; height: 34px; background-size: 72px 34px; --sw: 72px;
+        .road .r-leg { position: absolute; bottom: 13px; height: 38px; left: calc(var(--L) + var(--span) * var(--i) / var(--n) + 8px); width: calc(var(--span) / var(--n) - 16px); }
+        .road .r-walker { position: absolute; left: 0; bottom: 0; width: 22px; height: 38px; animation: r-patrol var(--t) linear var(--d) infinite; }
+        .road .r-walker i { left: 0; bottom: 0; width: 22px; height: 38px; background-size: 88px 38px; --sw: 88px;
             animation: r-frames .6s steps(4) infinite, r-there var(--t) linear var(--d) infinite; }
         .road .r-walker i.back { opacity: 0; background-image: url(/img/osadnicy-tragarz-pusty.svg); animation: r-frames .6s steps(4) infinite, r-back var(--t) linear var(--d) infinite; }
         .road .kloda { background-image: url(/img/osadnicy-tragarz-kloda.svg); }
         .road .kamien { background-image: url(/img/osadnicy-tragarz-kamien.svg); }
         .road .worek { background-image: url(/img/osadnicy-tragarz-worek.svg); }
         @keyframes r-frames { to { background-position-x: calc(-1 * var(--sw)); } }
-        @keyframes r-patrol { 0% { left: 0; transform: none; } 50% { left: calc(100% - 18px); transform: none; }
-            50.01% { left: calc(100% - 18px); transform: scaleX(-1); } 100% { left: 0; transform: scaleX(-1); } }
+        @keyframes r-patrol { 0% { left: 0; transform: none; } 50% { left: calc(100% - 22px); transform: none; }
+            50.01% { left: calc(100% - 22px); transform: scaleX(-1); } 100% { left: 0; transform: scaleX(-1); } }
         @keyframes r-there { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
         @keyframes r-back { 0%, 50% { opacity: 0; } 50.01%, 100% { opacity: 1; } }
-        @media (max-width: 640px) { .road .wrap { --n: 2; --L: 80px; --R: 144px; } .road :is(.r-far, .r-hut, .r-house) { display: none; } .road .r-builder { right: 70px; } .road .r-site { right: 16px; } }
+        @media (max-width: 640px) { .road .wrap { --n: 2; --L: 80px; --R: 170px; } .road :is(.r-far, .r-hut, .r-house) { display: none; } .road .r-builder { right: 92px; } .road .r-site { right: 8px; } }
         /* puste listy: osadnik macha ręką */
         [data-theme=settlers] .empty svg { display: none; }
-        [data-theme=settlers] .empty::before { content: ""; width: 18px; height: 34px; background: url(/img/osadnicy-machajacy.svg) 0 0 / 36px 34px no-repeat; image-rendering: pixelated;
-            --sw: 36px; animation: r-frames .8s steps(2) infinite; }
+        [data-theme=settlers] .empty::before { content: ""; width: 22px; height: 38px; background: url(/img/osadnicy-machajacy.svg) 0 0 / 44px 38px no-repeat; image-rendering: pixelated;
+            --sw: 44px; animation: r-frames .8s steps(2) infinite; }
         /* kafelek motywu w Ustawieniach – trawa, okno z gry i tragarz, widoczne także z innego motywu */
-        .theme-card[data-id=settlers] .tc-preview { background: url(/img/osadnicy-tragarz-worek.svg) no-repeat 6px 58px / 36px 17px, url(/img/osadnicy-trawa.png) 0 0 / 64px 64px; image-rendering: pixelated; }
+        .theme-card[data-id=settlers] .tc-preview { background: url(/img/osadnicy-tragarz-worek.svg) no-repeat 6px 56px / 44px 19px, url(/img/osadnicy-trawa.png) 0 0 / 64px 64px; image-rendering: pixelated; }
         .theme-card[data-id=settlers] .tc-panel { left: 28px; background: var(--streaks), var(--t-panel); border: 3px solid #7a8668; border-radius: 1px; }
         .theme-card[data-id=settlers] .tc-btn { border-radius: 1px !important; background: linear-gradient(180deg, #b0602a, #86401a); box-shadow: 0 0 0 1px #000; }
         .theme-card[data-id=settlers] .tc-name { font-family: "Pixelify Sans", var(--sans); font-size: 15px; }

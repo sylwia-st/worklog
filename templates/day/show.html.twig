@@ -25,7 +25,7 @@
     </div>
 {% elseif not dayOff and form.rows is empty %}
     {# jeden klik: ten dzień jako urlop / L4 / wolne – wraca tutaj #}
-    <form method="post" action="{{ path('absence_add') }}" class="muted small" style="margin:0 0 16px">
+    <form method="post" action="{{ path('absence_add') }}" class="day-off muted small" style="margin:0 0 16px">
         <input type="hidden" name="from" value="{{ date|date('Y-m-d') }}">
         <input type="hidden" name="back" value="{{ path('day', {date: date|date('Y-m-d')}) }}">
         Nie pracujesz tego dnia? Oznacz go jako
