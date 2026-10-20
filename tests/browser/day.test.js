@@ -50,6 +50,14 @@ function page(rows, storage, extraHtml = '') {
         if (!ev.defaultPrevented) w.submits.push(Object.fromEntries(new w.FormData(ev.target, ev.submitter).entries()));
         ev.preventDefault(); // jsdom i tak nie nawiguje
     });
+    // jak przeglądarka: requestSubmit wywołany w trakcie obsługi własnego submitu jest ignorowany
+    const realRequestSubmit = w.HTMLFormElement.prototype.requestSubmit;
+    let firing = false;
+    w.HTMLFormElement.prototype.requestSubmit = function (submitter) {
+        if (firing) return;
+        firing = true;
+        try { realRequestSubmit.call(this, submitter); } finally { firing = false; }
+    };
     w.fetch = async (url, opts = {}) => {
         const body = opts.body instanceof w.FormData ? Object.fromEntries(opts.body.entries()) : (opts.body ? JSON.parse(opts.body) : null);
         w.calls.push({url, method: opts.method || 'GET', body});
@@ -211,6 +219,31 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     check('submit w trakcie autozapisu – jeden autozapis', w7.calls.filter(c => c.url.includes('autosave')).length, 1);
     check('submit w trakcie autozapisu – formularz z id', w7.submits.map(s => [s.action, s['entries[1][id]']]), [['sync', '100']]);
     check('submit w trakcie autozapisu – brak beacona', w7.calls.some(c => c.method === 'BEACON'), false);
+
+    // 11a. dwa szybkie kliknięcia „Zapisz i wyślij” → jedna wysyłka; po powrocie z pamięci przeglądarki znowu działa
+    const w7b = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    w7b.document.getElementById('syncbtn').click();
+    w7b.document.getElementById('syncbtn').click();
+    await sleep(100);
+    check('dwa kliknięcia – jedna wysyłka', w7b.submits.map(s => s.action), ['sync']);
+    const show = new w7b.Event('pageshow');
+    Object.defineProperty(show, 'persisted', {value: true});
+    w7b.dispatchEvent(show);
+    w7b.document.getElementById('syncbtn').click();
+    await sleep(100);
+    check('po pageshow (persisted) kolejne kliknięcie wysyła', w7b.submits.length, 2);
+
+    // 11b. działający stoper: pola „do” i „czas” tylko do odczytu, z podpowiedzią; po zatrzymaniu zwykła podpowiedź
+    const w7c = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    const tr7c = w7c.document.querySelector('[data-key="0"]');
+    const hints = () => ['.f-to', '.f-time'].map(s => [tr7c.querySelector(s).readOnly, tr7c.querySelector(s).title]);
+    tr7c.querySelector('.tbtn').click(); await sleep(100);
+    const stopHint = 'Stoper działa – zatrzymaj go, żeby wpisać godzinę';
+    check('stoper działa – podpowiedź', hints(), [[true, stopHint], [true, stopHint]]);
+    tr7c.querySelector('.tbtn').click(); await sleep(100);
+    check('stoper zatrzymany – zwykła podpowiedź', hints(), [[false, 'Godzina zakończenia – czas wyliczy się sam'], [false, '']]);
 
     // 12. wszystko zapisane → zamknięcie karty nie wysyła beacona
     const w8 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);

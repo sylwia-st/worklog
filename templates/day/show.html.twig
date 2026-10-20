@@ -339,21 +339,30 @@
     // pełny zapis przyciskiem – szkic zostaje do czasu, aż strona wróci z serwera z tą samą treścią.
     // Autozapis nie może biec równolegle: nowy wiersz (id=0) zapisałby się wtedy dwa razy (i trafił dwa razy do Jiry).
     // Czekamy więc na trwający autozapis (jego id trafią do formularza), a potem blokujemy kolejne i beacon.
+    // Właściwe wysłanie idzie przez requestSubmit dopiero po wyjściu z tej obsługi: wywołane w trakcie
+    // zdarzenia submit przeglądarka po cichu ignoruje (wtedy „Zapisz” nic nie robiło).
+    let resubmit = false;
     form.addEventListener('submit', async (ev) => {
-        if (submitting) return;
+        if (resubmit) return;
         ev.preventDefault();
+        if (submitting) return; // drugie kliknięcie, zanim pierwsze poszło
+        submitting = true;
         clearTimeout(debounce); clearTimeout(retryTimer);
+        await new Promise(r => setTimeout(r));
         while (saving) await new Promise(r => setTimeout(r, 50));
         clearTimeout(debounce); clearTimeout(retryTimer);
         // usunięcie wierszy nigdy nie zapisuje się samo – najpierw lista do potwierdzenia
         if (ev.submitter !== delGo && markedRows().length) {
+            submitting = false;
             showDelConfirm(ev.submitter && ev.submitter.value === 'sync' ? 'sync' : 'save');
             if (dirty !== savedDirty) debounce = setTimeout(save, 400);
             return;
         }
-        submitting = true;
-        form.requestSubmit(ev.submitter);
+        resubmit = true;
+        try { form.requestSubmit(ev.submitter); } finally { resubmit = false; }
     });
+    // powrót przyciskiem Wstecz (strona z pamięci przeglądarki) – przyciski znowu działają
+    window.addEventListener('pageshow', (ev) => { if (ev.persisted) submitting = false; });
 
     // ---------- usuwanie wierszy: zawsze z potwierdzeniem ----------
     // Serwer też usuwa tylko z potwierdzeniem (confirm_delete), a autozapis nie usuwa nigdy.
@@ -462,6 +471,7 @@
         if (await startRow(startAtRow, ev.target, DATE + 'T' + time).catch(() => false)) { startAt.hidden = true; startAtRow = null; }
     };
 
+    const STOPPED_HINT = 'Stoper działa – zatrzymaj go, żeby wpisać godzinę', TO_HINT = 'Godzina zakończenia – czas wyliczy się sam';
     document.addEventListener('timer:update', (ev) => {
         const s = ev.detail;
         for (const tr of rows.children) {
@@ -469,8 +479,10 @@
             tr.classList.toggle('running', on);
             tr.querySelector('.tbtn').textContent = on ? '❚❚' : '▶';
             tr.querySelector('.tbtn').title = on ? 'Zatrzymaj stoper' : 'Włącz stoper';
-            tr.querySelector('.f-time').readOnly = on;
-            if (tr.querySelector('.f-to')) tr.querySelector('.f-to').readOnly = on;
+            const time = tr.querySelector('.f-time'), to = tr.querySelector('.f-to');
+            time.readOnly = on;
+            time.title = on ? STOPPED_HINT : '';
+            if (to) { to.readOnly = on; to.title = on ? STOPPED_HINT : TO_HINT; }
             if (!on) tr.querySelector('.live').textContent = '';
         }
         if (s.stopped && s.stopped.date === DATE) {

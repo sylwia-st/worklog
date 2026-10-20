@@ -433,6 +433,7 @@
         .entries tr.running .tbtn { background: var(--ok); border-color: var(--ok); color: var(--bg); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 22%, transparent), 0 0 18px -2px var(--ok); }
         .entries tr.running .tfrom { visibility: hidden; }
         .entries tr.running .f-time { color: var(--ok); }
+        .entries tr.running .f-time, .entries tr.running .f-to { opacity: .6; cursor: not-allowed; }
         .entries tr.has-error :is(.f-issue, .f-from, .f-to, .f-time) { border-color: var(--err); }
         .entries tr.marked-delete :is(.f-issue, .f-title, .f-from, .f-to, .f-time, .f-desc) { text-decoration: line-through; opacity: .55; }
         .delbox { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; margin: 0; border-radius: 9px; color: var(--muted); cursor: pointer; opacity: .45; transition: opacity .12s, background .12s; }
