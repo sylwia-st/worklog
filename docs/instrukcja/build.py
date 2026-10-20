@@ -220,7 +220,7 @@ box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba
           'gdy w profilu nie ma opcji tokenów.')
 
 p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
-  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Osadnicy w stylu The Settlers II (okna z gry, żółte pikselowe napisy, tragarze na drodze pod menu) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
+  f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Prosty (płasko, w stylu Bootstrapa), Osadnicy w stylu The Settlers II (okna z gry, żółte pikselowe napisy, tragarze na drodze pod menu) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
   f'czytelny. Zmianę widać od razu; zostaje po {G("Zapisz ustawienia")}.')
 
 h('2. Wpisanie dnia')
@@ -292,7 +292,8 @@ bullets(
     f'{B("Zatrzymaj o tej godzinie")} – nie doliczy się czas, w którym nie było pracy. Godzina zatrzymania musi być '
     f'późniejsza niż start stopera. Jeśli praca faktycznie trwa '
     f'tyle bez przerwy: {B("Pracuję dalej")}.',
-    'W czasie działania stopera pole Czas jest tylko do odczytu. Po zatrzymaniu możesz je poprawić ręcznie (np. gdy '
+    'W czasie działania stopera pola „do” i Czas są tylko do odczytu (lekko wyszarzone, podpowiedź po najechaniu). '
+    'Po zatrzymaniu możesz je poprawić ręcznie (np. gdy '
     'stoper nie został zatrzymany na przerwę).',
     'Wiersz bez czasu (np. założony tylko pod stoper) nie jest wysyłany do Jiry ani na Slacka.')
 
@@ -305,6 +306,10 @@ table(['Pasek przy wierszu', 'Znaczenie', 'Co zrobić'], [
     [f'{DOT("#a8a6a0")} szary', 'Jeszcze nie wysłany', 'Zapisz i wyślij do Jiry'],
     [f'{DOT("#b3261e")} czerwony', 'Jira zgłosiła błąd – treść pod wierszem i po najechaniu', 'Patrz rozdział 12'],
 ], [40, 80, 50])
+p(f'Błędy z Jiry są zawsze na górze, przed udanymi wysyłkami. Dopóki jakiś wpis nie trafił do Jiry, nad formularzem '
+  f'zostaje czerwony baner „Jira nie przyjęła N wpisów” z listą ticketów i dokładną treścią błędu. Po poprawieniu '
+  f'wiersza (albo usunięciu przyczyny, np. tokenu) kliknij na banerze {G("Wyślij ponownie do Jiry")} – baner znika '
+  f'dopiero po udanej wysyłce.')
 p('Godziny rozpoczęcia worklogów w Jirze ustawiają się kolejno od początku dnia, według kolejności wierszy '
   '(np. 8:00–10:00, 10:00–12:00, 13:00–15:00…) i omijają przerwę 12:00–13:00. Jeśli wpis wypada w trakcie obiadu, '
   'kolejne startują po nim. Wpis z godziną w kolumnie Od–do startuje dokładnie o niej (także w porze obiadu), '
