@@ -9,6 +9,8 @@ use App\Domain\TimeFormat;
 use App\Service\JiraClient;
 use App\Service\JiraException;
 use App\Service\Settings;
+use App\Service\TogglClient;
+use App\Service\TogglException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,6 +35,9 @@ final class SettingsController extends AbstractController
             'jira_email' => ['E-mail (tylko Jira Cloud)', 'text', 'Dla Jira Server / Data Center zostaw puste – wtedy token to Personal Access Token.'],
             'jira_token' => ['Token API', 'password', 'Cloud: id.atlassian.com → Security → API tokens. Server/DC: Profil → Personal Access Tokens. Zostaw puste, żeby nie zmieniać.'],
             'jira_jql' => ['Zapytanie JQL – „moje tickety” do podpowiedzi', 'text', ''],
+        ],
+        'Toggl' => [
+            'toggl_token' => ['Token API Toggl Track', 'password', 'Toggl Track → avatar → Profile settings → na dole „API Token”. Zostaw puste, żeby nie zmieniać.'],
         ],
         'Dzień pracy' => [
             'default_start' => ['Domyślna godzina rozpoczęcia', 'time', 'Od tej godziny liczone są godziny „started” worklogów, jeśli nie podasz godziny dnia.'],
@@ -93,8 +98,10 @@ final class SettingsController extends AbstractController
                 }
             }
         }
-        if ('' === $values['jira_token']) {
-            unset($values['jira_token']); // puste = bez zmian
+        foreach (array_keys(Settings::TOKEN_FILES) as $key) {
+            if ('' === $values[$key]) {
+                unset($values[$key]); // puste = bez zmian
+            }
         }
 
         $errors = [];
@@ -184,6 +191,19 @@ final class SettingsController extends AbstractController
         return $this->redirectToRoute('settings');
     }
 
+    #[Route('/settings/toggl-test', name: 'settings_toggl_test', methods: ['POST'])]
+    public function togglTest(TogglClient $toggl): Response
+    {
+        try {
+            $me = $toggl->me();
+            $this->addFlash('success', sprintf('Połączono z Togglem jako %s (%s).', $me['name'], $me['email']));
+        } catch (TogglException $e) {
+            $this->addFlash('error', $e->getMessage());
+        }
+
+        return $this->redirectToRoute('settings');
+    }
+
     #[Route('/settings/jira-issues', name: 'settings_jira_issues', methods: ['POST'])]
     public function refreshIssues(JiraClient $jira, Settings $settings, Request $request): Response
     {
@@ -221,7 +241,7 @@ final class SettingsController extends AbstractController
             'series' => ['dark' => Theme::SERIES_DARK, 'light' => Theme::SERIES_LIGHT],
             'shades' => Theme::SHADES,
             'values' => $values,
-            'hasToken' => '' !== $settings->get('jira_token'),
+            'hasTokens' => array_map(static fn (string $key): bool => '' !== $settings->get($key), array_combine(array_keys(Settings::TOKEN_FILES), array_keys(Settings::TOKEN_FILES))),
             'issueCount' => count($settings->issueCache()),
         ], new Response(status: $status));
     }

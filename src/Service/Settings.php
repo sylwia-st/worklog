@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Ustawienia trzymane lokalnie w SQLite (wolumen Dockera worklog-data, plik worklog.db, uprawnienia 600).
+ * Tokeny (Jira, Toggl) leżą w osobnych plikach obok bazy – patrz TOKEN_FILES.
  */
 final class Settings
 {
@@ -28,6 +29,9 @@ final class Settings
         ],
     ];
 
+    /** Ustawienia-tokeny → plik obok bazy (600); w bazie zostaje pusta wartość. */
+    public const TOKEN_FILES = ['jira_token' => '.jira_token', 'toggl_token' => '.toggl_token'];
+
     public const DEFAULTS = [
         'forma' => 'n',
 
@@ -37,6 +41,9 @@ final class Settings
         'jira_token' => '',
         'jira_jql' => 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC',
         'jira_issue_cache' => '[]',
+
+        // Toggl Track
+        'toggl_token' => '',
 
         // Dzień pracy
         'default_start' => '08:00',
@@ -126,7 +133,9 @@ final class Settings
                     $stored[$s->getName()] = $s->getValue();
                 }
             }
-            $stored['jira_token'] = $this->loadToken($stored['jira_token'] ?? '');
+            foreach (array_keys(self::TOKEN_FILES) as $key) {
+                $stored[$key] = $this->loadToken($key, $stored[$key] ?? '');
+            }
             $form = $stored['forma'] ?? self::DEFAULTS['forma'];
             $this->cache = $stored + self::defaultsFor(isset(self::FORMS[$form]) ? $form : self::DEFAULTS['forma']);
         }
@@ -167,9 +176,11 @@ final class Settings
             }
         }
 
-        if (array_key_exists('jira_token', $values) && null !== $file = $this->tokenFile()) {
-            $this->writeToken($file, $values['jira_token']);
-            unset($values['jira_token']);
+        foreach (array_keys(self::TOKEN_FILES) as $key) {
+            if (array_key_exists($key, $values) && null !== $file = $this->tokenFile($key)) {
+                $this->writeToken($file, $values[$key], $key);
+                unset($values[$key]);
+            }
         }
 
         $repo = $this->em->getRepository(Setting::class);
@@ -189,30 +200,31 @@ final class Settings
     }
 
     /**
-     * Token Jiry leży w pliku obok bazy (/data/.jira_token, 600), a nie w bazie – kopie zapasowe go nie zawierają.
+     * Token (Jiry, Toggla) leży w pliku obok bazy (/data/.jira_token, /data/.toggl_token, 600), a nie w bazie –
+     * kopie zapasowe go nie zawierają.
      * Token z bazy (sprzed tej zmiany albo z przywróconej starej kopii) przechodzi do pliku, jeśli plik jest pusty;
      * w bazie zostaje pusta wartość.
      */
-    private function loadToken(string $fromDb): string
+    private function loadToken(string $key, string $fromDb): string
     {
-        $file = $this->tokenFile();
+        $file = $this->tokenFile($key);
         if (null === $file) {
             return $fromDb; // baza nie jest plikiem (np. w pamięci) – token zostaje w niej
         }
         $token = is_file($file) ? trim((string) file_get_contents($file)) : '';
         if ('' !== $fromDb) {
             if ('' === $token) {
-                $this->writeToken($file, $fromDb);
+                $this->writeToken($file, $fromDb, $key);
                 $token = $fromDb;
             }
             // DBAL zamiast flush() – flush w trakcie odczytu zapisałby też inne, jeszcze niezatwierdzone zmiany
-            $this->em->getConnection()->executeStatement("UPDATE setting SET value = '' WHERE name = 'jira_token'");
+            $this->em->getConnection()->executeStatement("UPDATE setting SET value = '' WHERE name = ?", [$key]);
         }
 
         return $token;
     }
 
-    private function writeToken(string $file, string $token): void
+    private function writeToken(string $file, string $token, string $key): void
     {
         $umask = umask(0o077);
         try {
@@ -221,21 +233,27 @@ final class Settings
             umask($umask);
         }
         if (!$ok) {
-            throw new \RuntimeException('Nie udało się zapisać tokenu Jiry do '.$file.'.');
+            throw new \RuntimeException(sprintf('Nie udało się zapisać tokenu (%s) do %s.', 'toggl_token' === $key ? 'Toggl' : 'Jira', $file));
         }
     }
 
-    private function tokenFile(): ?string
+    private function tokenFile(string $key): ?string
     {
         $path = $this->em->getConnection()->getParams()['path'] ?? null;
 
-        return is_string($path) && '' !== $path ? dirname($path).'/.jira_token' : null;
+        return is_string($path) && '' !== $path ? dirname($path).'/'.self::TOKEN_FILES[$key] : null;
     }
 
     /** Adres i token Jiry są wpisane – bez nich nie pokazujemy „do wysłania do Jiry”, bo nie da się tego zrobić. */
     public function jiraConfigured(): bool
     {
         return '' !== trim($this->get('jira_url')) && '' !== trim($this->get('jira_token'));
+    }
+
+    /** Token Toggla jest wpisany – bez niego nie pokazujemy „Pobierz z Toggla”. */
+    public function togglConfigured(): bool
+    {
+        return '' !== trim($this->get('toggl_token'));
     }
 
     /** @return array<string, string> klucz → tytuł */

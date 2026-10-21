@@ -6,11 +6,11 @@ use App\Domain\DayAxis;
 use App\Domain\DaySummary;
 use App\Domain\Template;
 use App\Domain\TimeFormat;
-use App\Entity\PlannedChange;
 use App\Entity\WorkDay;
 use App\Entity\WorklogEntry;
 use App\Repository\PlannedChangeRepository;
 use App\Repository\WorkDayRepository;
+use App\Service\DayDefaults;
 use App\Service\ReportBuilder;
 use App\Service\Settings;
 use App\Service\WorkCalendar;
@@ -33,6 +33,7 @@ final class DayController extends AbstractController
         private readonly Settings $settings,
         private readonly WorkCalendar $calendar,
         private readonly EntityManagerInterface $em,
+        private readonly DayDefaults $defaults,
     ) {
     }
 
@@ -321,6 +322,7 @@ final class DayController extends AbstractController
             'form' => $form,
             'pendingDeletions' => null !== $day ? $day->getPendingDeletions() : [],
             'confirmDelete' => $confirmDelete,
+            'togglConfigured' => $this->settings->togglConfigured(),
             'dayOff' => $this->calendar->dayOff($d),
             'planned' => $this->planned->findForDate($d),
             // na dzisiejszej stronie: maile o zmianach w kolejnych dniach, które jeszcze czekają (te z dziś są w banerze wyżej)
@@ -358,6 +360,7 @@ final class DayController extends AbstractController
                 'desc' => $e->getDescription(),
                 'status' => $statuses[(int) $e->getId()] ?? null,
                 'error' => $e->getJiraError(),
+                'toggl' => [] !== $e->getTogglIds(),
             ], $day->getActiveEntries()),
         ];
     }
@@ -365,27 +368,12 @@ final class DayController extends AbstractController
     /** @return array<string, mixed> */
     private function emptyForm(\DateTimeImmutable $d): array
     {
-        if (null !== $this->calendar->dayOff($d)) {
-            // dzień wolny: bez podpowiadanych godzin – inaczej domyślne 8:00–16:00 wyszłyby jako nadgodziny
-            return ['start' => null, 'end' => null, 'break' => '', 'lunchWorked' => false, 'rows' => []];
-        }
-        $start = $this->settings->get('default_start');
-        $end = $this->settings->get('default_end');
-        // zaplanowana zmiana na ten dzień → podpowiadamy jej godziny
-        foreach ($this->planned->findForDate($d) as $p) {
-            if (in_array($p->getType(), [PlannedChange::TYPE_LATE, PlannedChange::TYPE_SHORT], true) && $p->getFromTime()) {
-                $start = $p->getFromTime();
-            }
-            if (in_array($p->getType(), [PlannedChange::TYPE_EARLY, PlannedChange::TYPE_SHORT], true) && $p->getToTime()) {
-                $end = $p->getToTime();
-            }
-        }
-        $break = $this->settings->int('default_break');
+        $defaults = $this->defaults->for($d);
 
         return [
-            'start' => $start,
-            'end' => $end,
-            'break' => $break > 0 ? TimeFormat::format($break) : '',
+            'start' => $defaults['start'],
+            'end' => $defaults['end'],
+            'break' => $defaults['breakMinutes'] > 0 ? TimeFormat::format($defaults['breakMinutes']) : '',
             'lunchWorked' => false,
             'rows' => [],
         ];

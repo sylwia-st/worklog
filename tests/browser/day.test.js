@@ -37,6 +37,7 @@ function page(rows, storage, extraHtml = '') {
   <button type="button" id="addrow"></button><button type="submit" name="action" value="sync" id="syncbtn"></button><span id="savestate"></span>
   <div id="delconfirm" hidden><ul id="delconfirm-list"></ul><button type="submit" name="confirm_delete" value="save" id="delconfirm-go"></button><button type="button" id="delconfirm-cancel"></button></div></form>
  <div id="panels"></div>
+ <form id="togglform" method="post" action="/day/2026-10-20/toggl"></form><button type="submit" form="togglform" id="togglbtn"></button>
  ${extraHtml}
  <template id="rowtpl">${row('__i__', {id: 0, issue: '', time: '', desc: ''})}</template></body>`;
     const dom = new JSDOM(html, {runScripts: 'outside-only', url: 'http://127.0.0.1:8765/day/2026-10-20'});
@@ -50,13 +51,14 @@ function page(rows, storage, extraHtml = '') {
         if (!ev.defaultPrevented) w.submits.push(Object.fromEntries(new w.FormData(ev.target, ev.submitter).entries()));
         ev.preventDefault(); // jsdom i tak nie nawiguje
     });
-    // jak przeglądarka: requestSubmit wywołany w trakcie obsługi własnego submitu jest ignorowany
+    // jak przeglądarka: requestSubmit wywołane w trakcie rozsyłania zdarzenia submit na tym samym formularzu jest ignorowane
+    const firing = new Set();
+    w.addEventListener('submit', (ev) => firing.add(ev.target), true);
+    w.addEventListener('submit', (ev) => firing.delete(ev.target));
     const realRequestSubmit = w.HTMLFormElement.prototype.requestSubmit;
-    let firing = false;
     w.HTMLFormElement.prototype.requestSubmit = function (submitter) {
-        if (firing) return;
-        firing = true;
-        try { realRequestSubmit.call(this, submitter); } finally { firing = false; }
+        if (firing.has(this)) return;
+        return realRequestSubmit.call(this, submitter);
     };
     w.fetch = async (url, opts = {}) => {
         const body = opts.body instanceof w.FormData ? Object.fromEntries(opts.body.entries()) : (opts.body ? JSON.parse(opts.body) : null);
@@ -244,6 +246,28 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     check('stoper działa – podpowiedź', hints(), [[true, stopHint], [true, stopHint]]);
     tr7c.querySelector('.tbtn').click(); await sleep(100);
     check('stoper zatrzymany – zwykła podpowiedź', hints(), [[false, 'Godzina zakończenia – czas wyliczy się sam'], [false, '']]);
+
+    // 11c. „Pobierz z Toggla” po niezapisanej edycji → najpierw zapis, potem wysłanie formularza Toggla
+    const wt = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    wt.delay = 300;
+    const ft = wt.document.querySelector('[data-key="0"] .f-desc');
+    ft.value = 'zmiana';
+    fire(wt, ft, 'input');
+    wt.document.getElementById('togglbtn').click();
+    await sleep(100);
+    check('Toggl – czeka na zapis', [wt.calls.filter(c => c.url.includes('autosave')).length, wt.submits.length], [1, 0]);
+    await sleep(500);
+    check('Toggl – po zapisie wysyła formularz Toggla', [wt.calls.filter(c => c.url.includes('autosave')).length, wt.submits.length], [1, 1]);
+    check('Toggl – zapis zawierał edycję', wt.calls.find(c => c.url.includes('autosave')).body['entries[0][desc]'], 'zmiana');
+    fire(wt, wt, 'pagehide');
+    check('Toggl – brak beacona', wt.calls.some(c => c.method === 'BEACON'), false);
+    // bez zmian – od razu submit, bez zbędnego zapisu
+    const wt2 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    wt2.document.getElementById('togglbtn').click();
+    await sleep(100);
+    check('Toggl – bez zmian: submit bez zapisu', [wt2.calls.filter(c => c.url.includes('autosave')).length, wt2.submits.length], [0, 1]);
 
     // 12. wszystko zapisane → zamknięcie karty nie wysyła beacona
     const w8 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);

@@ -219,6 +219,13 @@ table(['Twoja Jira', 'Pole „E-mail”', 'Skąd wziąć token'], [
 box(None, 'Token ma te same uprawnienia co Ty – niczego dodatkowego nie trzeba. Admina pytasz tylko wtedy, '
           'gdy w profilu nie ma opcji tokenów.')
 
+p(f'{B("Toggl Track (nieobowiązkowo)")} – jeśli czas mierzysz w Togglu, wpisz w {B("Ustawienia → Toggl")} swój token API '
+  f'(Toggl Track → avatar → Profile settings → na dole „API Token”) i kliknij {G("Sprawdź połączenie")}. Na stronie dnia '
+  f'pojawi się przycisk {G("Pobierz z Toggla")}: wpisy z tego dnia trafiają do wierszy (ticket z opisu albo z nazwy projektu, '
+  f'czas, godzina startu). Wpisy z tym samym ticketem i opisem łączą się w jeden wiersz, a ponowne kliknięcie nie dubluje '
+  f'wierszy, tylko aktualizuje czas. Wpisy bez numeru ticketu aplikacja pomija i o tym informuje. Stoper, który w Togglu jeszcze działa, jest doliczany do chwili pobrania – po jego zatrzymaniu pobierz dzień ponownie. '
+  f'Obok przycisku widać „pobrano o …”, a wiersze z Toggla mają przy tickecie małą ikonę.')
+
 p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
   f'jasne Świt, Mięta, Brzoskwinia, Lawenda, Papier (domyślny), Prosty (płasko, w stylu Bootstrapa), Osadnicy w stylu The Settlers II (okna z gry, żółte pikselowe napisy, tragarze na drodze pod menu) – albo {B("Własny")}: 8 kolorów do wyboru, z ostrzeżeniem, gdy tekst byłby słabo '
   f'czytelny. Zmianę widać od razu; zostaje po {G("Zapisz ustawienia")}.')
@@ -455,6 +462,7 @@ table(['Objaw / komunikat', 'Co zrobić'], [
     ['„Jira odrzuciła logowanie (401)”', 'Sprawdź token. Cloud: e-mail musi być wpisany. Server/DC: pole e-mail ma być puste.'],
     ['„Nie znaleziono (404)”', 'Literówka w numerze ticketu albo brak dostępu do projektu.'],
     ['„Brak uprawnień (403)”', 'Nie możesz logować czasu w tym projekcie – zapytaj jego administratora.'],
+    ['„Toggl odrzucił token (401 / 403)”', 'Sprawdź token API Toggla w Ustawieniach (Toggl Track → Profile settings → API Token).'],
     ['„Brak połączenia z Jirą”', f'Sprawdź adres Jiry w ustawieniach i czy otwiera się w przeglądarce. Jeśli działa '
      f'tylko przez VPN: {M("./install.sh --vpn")}.'],
     ['„Popraw zaznaczone wiersze”', 'Wiersz z czerwoną ramką ma zły numer ticketu (np. ABC-123) albo czas.'],
@@ -500,8 +508,8 @@ box('Warto wiedzieć',
     f'narzędzie samo robi kopię obecnego stanu (jeśli ta się nie uda, nic nie zmienia). Plik, który nie jest kopią '
     f'raportu, zostanie odrzucony; starsza kopia działa od razu, bez restartu.',
     'Najlepiej, żeby katalog ~/worklog-backups był objęty Twoją zwykłą kopią zapasową (np. firmową) – wtedy '
-    'przetrwa nawet awarię dysku. Kopie nie zawierają tokenu Jiry: po przywróceniu kopii na nowym komputerze '
-    'wpisz go ponownie w Ustawieniach.')
+    'przetrwa nawet awarię dysku. Kopie nie zawierają tokenów (Jiry i Toggla): po przywróceniu kopii na nowym komputerze '
+    'wpisz je ponownie w Ustawieniach.')
 
 h('14. Obsługa i kopia zapasowa')
 table(['Polecenie (w katalogu narzędzia)', 'Działanie'], [
@@ -516,7 +524,7 @@ table(['Polecenie (w katalogu narzędzia)', 'Działanie'], [
     [M('./worklog uninstall'), 'usunięcie wszystkiego – najpierw robi ostatnią kopię bazy'],
 ], [70, 100], key_column=False)
 box('Prywatność',
-    'Dane i token są tylko na Twoim komputerze. Aplikacja łączy się wyłącznie z Jirą; Slacka i maili nie wysyła sama.',
+    'Dane i token są tylko na Twoim komputerze. Aplikacja łączy się wyłącznie z Jirą (i z Toggl Track, jeśli wpiszesz jego token); Slacka i maili nie wysyła sama.',
     f'Usunięcie wszystkiego razem z danymi: {M("./worklog uninstall")} (przedtem robi ostatnią kopię bazy; kopie '
     f'zapasowe zostają) – potem unieważnij token w Jirze.')
 

@@ -74,6 +74,7 @@
 
 <div class="grid daygrid">
 <div>
+    {% if togglConfigured %}<form id="togglform" method="post" action="{{ path('day_toggl', {date: date|date('Y-m-d')}) }}"></form>{% endif %}
     <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel dayform" id="dayform">
         <div class="hours">
             <div class="hfield"><label for="start" class="lbl">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
@@ -112,6 +113,13 @@
             <button type="button" id="addrow" class="link">{{ icons.i('plus') }}Dodaj wpis</button>
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
+            {% endif %}
+            {% if togglConfigured %}
+                <button type="submit" form="togglform" class="link" title="Wpisy z tym samym ticketem i opisem łączą się w jeden wiersz, a ponowne pobranie aktualizuje czas zamiast dublować wiersze.">{{ icons.i('toggl') }}Pobierz z Toggla</button>
+                {% if day and day.togglSyncedAt %}
+                    {% set togglRows = day.activeEntries|filter(e => e.togglIds is not empty)|length %}
+                    <span class="muted small">pobrano o {{ day.togglSyncedAt|date('H:i') }} · {{ plural(togglRows, 'wiersz', 'wiersze', 'wierszy') }} z Toggla</span>
+                {% endif %}
             {% endif %}
             <span class="hint">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper. Od–do niewymagane: start + czas albo start + koniec.</span>
         </div>
@@ -159,12 +167,14 @@
 {% endblock %}
 
 {% macro entry_row(i, row, titles) %}
+    {% import '_icons.html.twig' as icons %}
     <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}{{ row.delete|default(false) ? ' marked-delete' }}" data-key="{{ i }}">
         <td class="st">
             {% set stTitles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
             <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? stTitles[row.status] : '' }}"></span>
         </td>
         <td class="issue">
+            {% if row.toggl|default(false) %}<span class="from-toggl" title="Pobrany z Toggla">{{ icons.i('toggl', 12) }}</span>{% endif %}
             <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
             <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
             <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue" aria-label="Ticket">
@@ -363,6 +373,23 @@
     });
     // powrót przyciskiem Wstecz (strona z pamięci przeglądarki) – przyciski znowu działają
     window.addEventListener('pageshow', (ev) => { if (ev.persisted) submitting = false; });
+
+    // „Pobierz z Toggla” to osobny formularz – najpierw czekamy na zapis dnia (jak przy submit #dayform), żeby import
+    // nie ścigał się z autozapisem i nie zgubił niezapisanej edycji. Bez JS to zwykły submit.
+    const togglForm = document.getElementById('togglform');
+    let togglGo = false;
+    window.addEventListener('pageshow', (ev) => { if (ev.persisted) togglGo = false; }); // powrót z pamięci przeglądarki
+    if (togglForm) togglForm.addEventListener('submit', async (ev) => {
+        if (togglGo) return;
+        ev.preventDefault();
+        clearTimeout(debounce); clearTimeout(retryTimer);
+        while (saving) await new Promise(r => setTimeout(r, 50));
+        if (dirty !== savedDirty) await save();
+        if (dirty !== savedDirty) return; // zapis się nie udał – komunikat stoi przy przyciskach, nie importujemy na niezapisany dzień
+        submitting = true; togglGo = true;
+        await new Promise(r => setTimeout(r, 0)); // jw. – nie w trakcie dispatchu zdarzenia submit
+        togglForm.requestSubmit();
+    });
 
     // ---------- usuwanie wierszy: zawsze z potwierdzeniem ----------
     // Serwer też usuwa tylko z potwierdzeniem (confirm_delete), a autozapis nie usuwa nigdy.

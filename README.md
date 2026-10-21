@@ -11,14 +11,15 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 5. **Stoper** – ▶ przy tickecie, nad którym pracujesz; przełączenie na inny ticket zatrzymuje poprzedni. Pełne minuty, bez zaokrąglania. „od…” pod ▶ włącza stoper od wcześniejszej godziny (zadanie zaczęło się, zanim kliknięto ▶) – nie wcześniej niż ostatnie zatrzymanie stopera, więc zmierzony czas się nie nakłada.
 6. **Przypomnienie** w dni robocze o wybranej godzinie (domyślnie 15:45, zmiana w Ustawieniach) – powiadomienie na pulpicie, jeśli czegoś z dzisiejszego raportu brakuje albo czeka niewysłany mail o planowanej zmianie (dziś lub w kolejnych dniach). Gdy komputer był wtedy wyłączony, pojawi się po jego włączeniu.
 7. **Urlopy i święta** – polskie święta ustawowe są wbudowane (także ruchome i Wigilia), a urlop, L4 albo inny dzień wolny dodajesz w zakładce „Wolne” albo jednym kliknięciem na stronie dnia. W dzień wolny nie ma przypomnienia ani „brak raportu” na Przeglądzie, a praca tego dnia (także w weekend) liczy się w całości jako nadgodziny.
-8. **Podsumowanie miesiąca** (zakładka „Miesiąc”) – bilans, suma nadgodzin i niedoborów, dni bez raportu, urlopy i czas per ticket; eksport do CSV (dzień po dniu albo wszystkie wpisy) do otwarcia w Excelu.
+8. **Toggl Track** (nieobowiązkowo) – mierzysz czas w Togglu, a przycisk „Pobierz z Toggla” na stronie dnia wpisuje wpisy z tego dnia do wierszy (ticket, czas, opis, godzina startu). Numer ticketu bierze się z opisu wpisu albo z nazwy projektu w Togglu; wpisy z tym samym ticketem i opisem łączą się w jeden wiersz. Ponowne pobranie tego samego dnia nie dubluje wierszy, tylko aktualizuje czas – ticket i opis zmienione w aplikacji zostają. Stoper, który w Togglu nadal działa, jest doliczany do chwili pobrania (z ostrzeżeniem) – po jego zatrzymaniu pobierz dzień ponownie, a czas się domknie. Wpisy bez numeru ticketu są pomijane z ostrzeżeniem. Obok przycisku stoi „pobrano o 16:20 · 5 wierszy z Toggla”, a wiersze pobrane z Toggla mają przy numerze ticketu małą ikonę. Ponowne pobranie zaciąga wszystkie wpisy z Toggla, więc wiersz usunięty w aplikacji wróci, jeśli nadal jest w Togglu.
+9. **Podsumowanie miesiąca** (zakładka „Miesiąc”) – bilans, suma nadgodzin i niedoborów, dni bez raportu, urlopy i czas per ticket; eksport do CSV (dzień po dniu albo wszystkie wpisy) do otwarcia w Excelu.
 
 ## Prywatność
 
 - Port jest wystawiony tylko na `127.0.0.1` – aplikacja nie jest dostępna z sieci. Dodatkowo odrzuca żądania z obcym nagłówkiem `Host` i POST-y wysłane z innych stron.
-- Jedyne połączenie wychodzące z działającego kontenera to adres Twojej Jiry. Slack i maile nie są wysyłane przez aplikację – kopiujesz tekst / zatwierdzasz mail w swoim kliencie.
+- Połączenia wychodzące z działającego kontenera: adres Twojej Jiry oraz – tylko jeśli wpiszesz token Toggla – `api.track.toggl.com` (tylko odczyt Twoich wpisów). Slack i maile nie są wysyłane przez aplikację – kopiujesz tekst / zatwierdzasz mail w swoim kliencie.
 - Strona nie ładuje nic z internetu (żadnych CDN, fontów, analityki). Czcionki Inter i Pixelify Sans (do motywu Osadnicy) są dołączone do aplikacji (`public/fonts`, licencja SIL OFL).
-- Dane i token leżą w wolumenie Dockera `worklog-data` (pliki z uprawnieniami 600). Token jest w osobnym pliku, nie w bazie, więc kopie zapasowe go nie zawierają – po przywróceniu kopii na nowym komputerze wpisz go ponownie w Ustawieniach. Kontener działa jako zwykły użytkownik, bez uprawnień (`cap_drop: ALL`, `no-new-privileges`).
+- Dane i tokeny leżą w wolumenie Dockera `worklog-data` (pliki z uprawnieniami 600). Tokeny (Jiry i Toggla) są w osobnych plikach (`.jira_token`, `.toggl_token`), nie w bazie, więc kopie zapasowe ich nie zawierają – po przywróceniu kopii na nowym komputerze wpisz je ponownie w Ustawieniach. Kontener działa jako zwykły użytkownik, bez uprawnień (`cap_drop: ALL`, `no-new-privileges`).
 - Internet (Docker Hub, packagist.org) jest potrzebny tylko przy budowaniu obrazu.
 
 ## Bezpieczeństwo wpisów
@@ -26,7 +27,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 - **Autozapis** – każda zmiana trafia do bazy ok. 1 s po wpisaniu i przy zamykaniu karty; status „✓ zapisano 14:32” przy przyciskach.
 - **Kopia w przeglądarce** – gdy zapis do bazy się nie uda, zmiany zostają w przeglądarce i po ponownym otwarciu dnia można je przywrócić.
 - **Stoper w bazie** – czas startu jest na dysku, więc przeżywa zamknięcie przeglądarki i restart; stoper działający od innego dnia lub > 6h pyta, o której go zatrzymać.
-- **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność, bez tokenu Jiry; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
+- **Kopie co godzinę** – w dni robocze do `~/worklog-backups` (30 dni, sprawdzana integralność, bez tokenów; powiadomienie przy błędzie). Inny katalog: `./install.sh --backup-dir /ścieżka`.
 - **Kopia przed zmianą struktury bazy** – gdy nowa wersja zmienia tabele (start po `./worklog up`), kontener najpierw robi kopię do `/data/kopie` w wolumenie (10 ostatnich); bez udanej kopii nie startuje i niczego nie zmienia. Komunikat jest w `./worklog logs`. Przywrócenie: `docker cp worklog:/data/kopie/PLIK.db ~/` i `./worklog restore ~/PLIK.db`.
 - **Odporny zapis** – SQLite w trybie WAL z `synchronous=FULL`.
 - **Usuwanie z potwierdzeniem** – zaznaczenie ✕ niczego nie kasuje. Po „Zapisz” aplikacja pokazuje listę zaznaczonych wpisów i usuwa je dopiero po „Usuń zaznaczone” (także gdy formularz wyśle się Enterem); autozapis nigdy nie usuwa.
@@ -101,12 +102,17 @@ Token generujesz sam, z uprawnieniami swojego konta:
 
 Jeśli nie widzisz tej opcji, admin wyłączył tokeny – poproś go o Personal Access Token / API token z Twoimi uprawnieniami.
 
+## Toggl – token
+
+Token API generujesz sam: Toggl Track → avatar (Profile) → Profile settings → na dole „API Token”. Wpisz go w Ustawienia → Toggl i kliknij „Sprawdź połączenie” (panel „Połączenie z Togglem”). Dopiero z tokenem na stronie dnia pojawia się przycisk „Pobierz z Toggla”. Aplikacja tylko czyta Twoje wpisy; limit Toggla to ok. 1 zapytanie na sekundę.
+
 ## Codzienny przebieg
 
 1. **Dzień** → godziny od–do (domyślne są już wpisane) + wiersze: ticket, czas (`1h 30m`, `1.5`, `90m`, `1:30`; sama liczba to godziny, najwyżej 12 – przy `20` aplikacja zapyta, czy chodzi o minuty), opis.
    „Skopiuj tickety z poprzedniego dnia” przenosi same numery.
    Tytuł ticketu wpisujesz razem z numerem („ABC-123 Produkcja nie działa”) – numer zostaje w polu ticketu, tytuł przechodzi do linii pod nim i trafia na Slacka, do `{lista}` w mailu i do CSV. Przy kolejnych dniach podpowiada się sam.
    Kolumna **Od–do** (nieobowiązkowa) ustala, o której zaczął się worklog: wpisz start i czas – koniec wyliczy się sam, albo start i koniec – wyliczy się czas. Obiad i przerwy wpisane godzinami się nie liczą (11:00–14:00 z obiadem 12–13 = 2h).
+   Jeśli czas mierzysz w Togglu: **Pobierz z Toggla** (obok „Dodaj wpis”) zaciąga wpisy tego dnia. Przed wysłaniem do Jiry sprawdź wiersze – wpisy bez numeru ticketu trzeba dodać ręcznie.
 2. **Zapisz i wyślij do Jiry.** Pasek z lewej strony wiersza: zielony = w Jirze, żółty = zmieniony po wysłaniu, czerwony = błąd (najedź, żeby zobaczyć treść).
 3. **Kopiuj na Slacka** → wklej w kanał.
 4. Jeśli pojawi się panel maila → **Otwórz w programie pocztowym** → Wyślij.
@@ -171,6 +177,8 @@ Symfony 8.1 ma wsparcie bezpieczeństwa do stycznia 2027 – później zmień w 
 Jeśli wolisz rzadsze aktualizacje, możesz zamiast tego użyć LTS: `7.4.*` (wsparcie do listopada 2029).
 
 ## Testy logiki
+
+`tests/services_test.php` obejmuje m.in. import z Toggla (grupowanie, strefy czasowe, ponowny import) na atrapie HTTP.
 
 ```bash
 docker exec worklog php tests/domain_test.php
