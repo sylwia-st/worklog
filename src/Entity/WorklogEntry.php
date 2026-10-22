@@ -70,6 +70,15 @@ class WorklogEntry
     #[ORM\Column(options: ['default' => 0])]
     private int $carrySeconds = 0;
 
+    /**
+     * Identyfikatory wpisów Toggla, z których powstał ten wiersz (JSON) – klucz do ponownego pobrania tego samego dnia.
+     * Wiersz wpisany ręcznie nie ma ich wcale.
+     *
+     * @var list<int>|null
+     */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $togglIds = null;
+
     public function __construct(WorkDay $day, string $issueKey, int $minutes, string $description, int $position)
     {
         $this->day = $day;
@@ -124,6 +133,29 @@ class WorklogEntry
         $total = $this->minutes * 60 + $this->carrySeconds + max(0, $seconds);
         $this->minutes = intdiv($total, 60);
         $this->carrySeconds = $total % 60;
+    }
+
+    /**
+     * Ustawia czas z sekund (np. z Toggla): pełne minuty + reszta w carrySeconds.
+     * Inaczej niż update() nie zeruje reszty, więc 12m 30s + 17m 30s dalej daje 30m.
+     */
+    public function setTrackedSeconds(int $seconds): void
+    {
+        $seconds = max(0, $seconds);
+        $this->minutes = intdiv($seconds, 60);
+        $this->carrySeconds = $seconds % 60;
+    }
+
+    /** @return list<int> */
+    public function getTogglIds(): array
+    {
+        return $this->togglIds ?? [];
+    }
+
+    /** @param list<int> $ids */
+    public function setTogglIds(array $ids): void
+    {
+        $this->togglIds = [] === $ids ? null : array_values(array_map('intval', $ids));
     }
 
     public function getCarrySeconds(): int

@@ -46,6 +46,10 @@ class WorkDay
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $mailDoneAt = null;
 
+    /** Kiedy ostatnio udało się pobrać wpisy z Toggla do tego dnia (null = nigdy). */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $togglSyncedAt = null;
+
     /** @var Collection<int, WorklogEntry> */
     #[ORM\OneToMany(targetEntity: WorklogEntry::class, mappedBy: 'day', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['position' => 'ASC', 'id' => 'ASC'])]
@@ -167,6 +171,16 @@ class WorkDay
         if (!$this->entries->contains($entry)) {
             $this->entries->add($entry);
         }
+    }
+
+    public function getTogglSyncedAt(): ?\DateTimeImmutable
+    {
+        return $this->togglSyncedAt;
+    }
+
+    public function markTogglSynced(\DateTimeImmutable $at): void
+    {
+        $this->togglSyncedAt = $at;
     }
 
     public function removeEntry(WorklogEntry $entry): void
