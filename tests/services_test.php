@@ -599,12 +599,7 @@ namespace {
         public function __construct() {}
         public function knownIssueTitles(?\DateTimeImmutable $since = null): array { return ['ABC-9' => 'Moduł raportów']; }
     };
-    $plannedRepo = new class extends App\Repository\PlannedChangeRepository {
-        public function __construct() {}
-        public function findForDate(\DateTimeImmutable $date): array { return []; }
-    };
-    $dayDefaults = new App\Service\DayDefaults($tsettings, $plannedRepo, new App\Service\WorkCalendar($absenceRepo));
-    $import = new App\Service\TogglImport($tClient, $tsettings, $titleRepo, $dayDefaults);
+    $import = new App\Service\TogglImport($tClient, $tsettings, $titleRepo);
 
     // komunikaty importu bez informacji o godzinach obecności (te mają osobne testy)
     $msgs = static fn (array $res): array => array_values(array_map(fn ($r) => $r['type'].': '.$r['message'],
@@ -712,27 +707,33 @@ namespace {
     check('godziny: komunikat info', array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message'), ['Godziny obecności z Toggla: 07:23–15:23.']);
     // ponowny import: godziny równe poprzednim z toggl_hours są aktualizowane
     $tHttp->routes['/me/time_entries'] = [200, $hoursEntries(9000)];
-    $import->import($dh);
-    check('godziny: ponowny import aktualizuje', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end']], ['07:23', '15:53', '15:53']);
-    // użytkownik zmienił godziny: zostają, toggl_hours bez zmian, bez komunikatu
+    $res = $import->import($dh);
+    check('godziny: ponowny import aktualizuje', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end'], array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')],
+        ['07:23', '15:53', '15:53', ['Godziny obecności z Toggla: 07:23–15:53.']]);
+    // te same godziny przy kolejnym imporcie – bez komunikatu
+    $res = $import->import($dh);
+    check('godziny: bez zmiany godzin brak komunikatu', array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message'), []);
+    // flaga hoursByUser (godziny wpisał użytkownik): zostają, toggl_hours bez zmian, bez komunikatu
+    $dh->markHoursByUser();
     $dh->setEndTime('17:00');
     $tHttp->routes['/me/time_entries'] = [200, $hoursEntries(10800)];
     $res = $import->import($dh);
-    check('godziny: zmienione przez użytkownika zostają', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end'], array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')],
+    check('godziny: hoursByUser – zostają', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end'], array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')],
         ['07:23', '17:00', '15:53', []]);
-    // dzień z domyślnymi godzinami i toggl_hours = null (utworzony przez dawny import) – traktowany jak nieustawiony
+    // flaga false + dowolne godziny (także inne niż domyślne) → nadpisane
     $dl = new WorkDay(new DateTimeImmutable('2026-10-20'));
-    $dl->setStartTime('08:00');
-    $dl->setEndTime('16:00');
-    check('godziny: toggl_hours domyślnie null', $dl->getTogglHours(), null);
+    $dl->setStartTime('08:30');
+    $dl->setEndTime('16:45');
+    check('godziny: domyślnie hoursByUser = false, toggl_hours = null', [$dl->isHoursByUser(), $dl->getTogglHours()], [false, null]);
     $import->import($dl);
-    check('godziny: domyślne + toggl_hours null → z Toggla', [$dl->getStartTime(), $dl->getEndTime()], ['07:23', '16:23']);
-    // godziny inne niż domyślne i toggl_hours null – użytkownika, zostają
+    check('godziny: bez flagi nadpisane z Toggla', [$dl->getStartTime(), $dl->getEndTime()], ['07:23', '16:23']);
+    // flaga true na dniu bez toggl_hours – zostają
     $du = new WorkDay(new DateTimeImmutable('2026-10-20'));
-    $du->setStartTime('08:30');
+    $du->setStartTime('08:00');
     $du->setEndTime('16:00');
-    $import->import($du);
-    check('godziny: własne bez toggl_hours zostają', [$du->getStartTime(), $du->getEndTime(), $du->getTogglHours()], ['08:30', '16:00', null]);
+    $du->markHoursByUser();
+    $res = $import->import($du);
+    check('godziny: hoursByUser bez toggl_hours zostają', [$du->getStartTime(), $du->getEndTime(), $du->getTogglHours(), array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')], ['08:00', '16:00', null, []]);
     // puste godziny (np. dzień wolny) – import ustawia
     $de = new WorkDay(new DateTimeImmutable('2026-10-20'));
     $import->import($de);
@@ -770,6 +771,24 @@ namespace {
     ]];
     $import->import($dsc);
     check('ponowny import aktualizuje startClock', [count($dsc->getActiveEntries()), $sc->getMinutes(), $sc->getStartClock()], [1, 31, '08:50']);
+
+    // wiersz kończący się po północy nie dostaje godziny „od”
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(80, 'ABC-1 późno', '2026-10-20T21:10:00+00:00', 3600),    // 23:10 + 60m → po północy
+        $te(81, 'ABC-2 wcześniej', '2026-10-20T20:00:00+00:00', 3600), // 22:00 + 60m → 23:00
+    ]];
+    $dpm = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $res = $import->import($dpm);
+    $byKey = [];
+    foreach ($dpm->getActiveEntries() as $r) { $byKey[$r->getIssueKey()] = $r->getStartClock(); }
+    ksort($byKey);
+    check('północ: startClock tylko gdy wiersz się mieści', $byKey, ['ABC-1' => null, 'ABC-2' => '22:00']);
+    check('północ: ostrzeżenie', array_values(array_filter($msgs($res), fn ($m) => str_contains($m, 'po północy'))), ['warning: „późno” (ABC-1, 1h): wpis kończyłby się po północy – bez godziny „od”.']);
+    // ponowny import też zdejmuje godzinę „od”, gdy wiersz urósł ponad północ
+    $tHttp->routes['/me/time_entries'] = [200, [$te(81, 'ABC-2 wcześniej', '2026-10-20T20:00:00+00:00', 7500)]]; // 22:00 + 2h05m
+    $import->import($dpm);
+    $r2 = array_values(array_filter($dpm->getActiveEntries(), fn ($r) => 'ABC-2' === $r->getIssueKey()))[0];
+    check('północ: ponowny import – wiersz urósł', [$r2->getMinutes(), $r2->getStartClock()], [125, null]);
 
     // (c) dwa wiersze pasują do jednej grupy: pierwszy bierze sumę, drugi znika, czas nie liczy się podwójnie
     foreach ([false, true] as $inJira) {

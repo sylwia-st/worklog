@@ -178,12 +178,19 @@ final class DaySummary
     /** Dodatnia = nadgodziny, ujemna = krócej. */
     public function difference(): int
     {
-        return $this->basisMinutes() - $this->normMinutes;
+        // pusty dzień nie ma bilansu (inaczej Przegląd liczyłby go jako −norma)
+        return $this->isEmpty() ? 0 : $this->basisMinutes() - $this->normMinutes;
+    }
+
+    /** Nic do rozliczenia: brak czasu w ticketach i (w trybie ticketów albo bez godzin) brak obecności. */
+    private function isEmpty(): bool
+    {
+        return 0 === $this->loggedMinutes && ($this->balanceFromTickets || null === $this->presenceMinutes);
     }
 
     public function kind(): string
     {
-        if (0 === $this->loggedMinutes && ($this->balanceFromTickets || null === $this->presenceMinutes)) {
+        if ($this->isEmpty()) {
             return self::KIND_EMPTY;
         }
         $diff = $this->difference();
