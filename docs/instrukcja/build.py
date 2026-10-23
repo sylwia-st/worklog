@@ -351,8 +351,7 @@ h('7. Mail o nadgodzinach lub krótszym dniu')
 p('Panel maila pojawia się sam, gdy bilans dnia przekracza tolerancję. Bilans liczony jest z godzin obecności: '
   'od–do minus obiad (tylko ta część 12:00–13:00, która wypada w godzinach pracy) minus dodatkowa przerwa. Jeśli '
   'godzin nie podasz – z sumy czasu w ticketach. Norma to 7h. Jeśli pobierasz wpisy z Toggla, godziny od–do ustawia '
-  'import – z pierwszego i ostatniego wpisu dnia (patrz rozdział 1), chyba że zmienisz je ręcznie. W Ustawieniach → Dzień pracy możesz przełączyć bilans na czas w ticketach – wtedy nadgodziny '
-  'i krótszy dzień liczą się z sumy wierszy, a godziny od–do służą tylko do maila i godzin worklogów w Jirze.')
+  'import – z pierwszego i ostatniego wpisu dnia (patrz rozdział 1), chyba że zmienisz je ręcznie. Bilans można też liczyć z sumy czasu w ticketach – patrz podrozdział niżej.')
 table(['Godziny', 'Obecność', 'Bilans (norma 7h)'], [
     ['8:00–16:00', '7h (obiad odliczony)', '±0 – mail niepotrzebny'],
     ['8:00–17:00', '8h', '+1h – mail o nadgodzinach'],
@@ -373,6 +372,31 @@ box('Wskazówka', 'Jeśli czas w ticketach różni się od czasu obecności (np.
                  'panel Bilans pokaże żółte ostrzeżenie, a przypomnienie wspomni o brakującym czasie. Przy Togglu różnica 1–3 minut '
                  'jest normalna – to sekundy niezłożone w pełne minuty i luki między zatrzymaniem a ponownym startem stopera. '
                  'Większa różnica to przerwa bez stopera albo wpis bez numeru ticketu (np. projekt „Przerwa”), którego import pominął.')
+
+sub('Bilans z czasu w ticketach – tryb dla Toggla i stopera')
+p('Używaj go, gdy cały czas mierzysz stoperem (Toggl albo ▶ w aplikacji) i suma wierszy jest Twoim prawdziwym czasem '
+  'pracy – godziny od–do byłyby wtedy tylko przybliżeniem.')
+steps(
+    f'Otwórz {B("Ustawienia → Dzień pracy")}.',
+    f'W polu {B("Bilans dnia liczony z")} wybierz {B("czasu w ticketach")}.',
+    f'Kliknij {G("Zapisz ustawienia")}. Zmiana obowiązuje od razu na wszystkich stronach, także dla dni wstecz.')
+table(['Element', 'Z czego liczony w trybie „czas w ticketach”'], [
+    ['Bilans dnia i jego typ (nadgodziny, krócej, w normie)', 'suma wierszy'],
+    ['Mail o nadgodzinach / krótszym dniu ({roznica})', 'suma wierszy; „w godzinach od–do” w treści nadal z godzin dnia'],
+    ['Przegląd i Miesiąc (bilans, nadgodziny, „Czas pracy”)', 'suma wierszy'],
+    ['Ostrzeżenie „W ticketach jest mniej niż czas obecności”', 'nie pojawia się'],
+    ['Przypomnienie', 'nie wspomina o brakującym czasie'],
+    ['Dzień z godzinami, ale bez wierszy', 'pusty dzień – bez maila o krótszym dniu'],
+    ['Obecność w panelu Bilans', 'nadal pokazywana, tylko informacyjnie'],
+    ['Godziny od–do', 'nadal służą do maila i do godzin worklogów w Jirze'],
+], [85, 85])
+table(['Godziny', 'W ticketach', 'Bilans – obecność', 'Bilans – tickety'], [
+    ['8:00–16:00', '8h', '±0', '+1h'],
+    ['7:02–16:03 (z Toggla)', '7h 30m', '+1h 1m', '+30m'],
+    ['8:00–16:00', 'brak wierszy', '±0', 'dzień pusty'],
+], [50, 40, 40, 40])
+box('Wskazówka', 'Przy Togglu wpisy bez numeru ticketu (np. projekt „Przerwa”) nie wchodzą do sumy, więc w tym trybie '
+                 'nie liczą się jako praca – tak ma być. Jeśli chcesz, żeby się liczyły, dopisz numer ticketu w opisie wpisu w Togglu.')
 
 h('8. Planowane przyjście później / wyjście wcześniej')
 steps(
@@ -405,6 +429,7 @@ table(['Kolumna', 'Co znaczy'], [
 ], [45, 125])
 p(f'Domyślnie najnowsze dni są na górze. Kliknięcie nagłówka {B("Dzień ↓")} odwraca kolejność (najstarsze na górze, '
   f'{B("Dzień ↑")}); aplikacja zapamiętuje wybór.')
+p('Gdy w Ustawieniach bilans jest liczony z czasu w ticketach (rozdział 7), kolumna Bilans i liczby na górze biorą sumę wierszy, nie godziny od–do.')
 p('Zaległy dzień: kliknij jego datę, uzupełnij i wyślij jak zwykle – trafi pod właściwą datę.')
 
 sub('Podsumowanie miesiąca')
@@ -439,6 +464,7 @@ p(f'W dni robocze (bez świąt, urlopów i innych dni wolnych) o wybranej godzin
 p(f'Mail liczy się jako wysłany po kliknięciu {G("Otwórz w programie pocztowym")}. Jeśli poszedł inaczej '
   f'(np. przez {G("Kopiuj treść")}), kliknij {B("Wysłany")} obok „do wysłania” – inaczej przypomnienie będzie o nim wspominać. '
   'Niewysłane maile o kolejnych dniach widać też na górze dzisiejszej strony dnia.')
+p('Przy bilansie liczonym z czasu w ticketach (rozdział 7) przypomnienie nie wspomina o brakującym czasie względem godzin od–do.')
 p(f'Godzinę zmieniasz w {B("Ustawienia → Przypomnienie")} (między 06:00 a 22:00); puste pole wyłącza przypomnienie.')
 cmd('./worklog remind                 # sprawdź teraz w terminalu\n'
     './install.sh --no-remind         # wyłączenie razem z timerem systemd')
@@ -466,6 +492,7 @@ table(['Objaw / komunikat', 'Co zrobić'], [
     ['Strona http://127.0.0.1:8765 się nie otwiera', f'{M("./worklog status")} – jeśli kontener nie działa: '
      f'{M("./worklog up")}. Szczegóły: {M("./worklog logs")}.'],
     ['„Jira odrzuciła logowanie (401)”', 'Sprawdź token. Cloud: e-mail musi być wpisany. Server/DC: pole e-mail ma być puste.'],
+    ['Bilans pokazuje ±0, choć w ticketach jest 8h', 'Bilans liczy się z godzin od–do (domyślnie). Popraw godziny albo przełącz bilans na czas w ticketach (rozdział 7).'],
     ['„Nie znaleziono (404)”', 'Literówka w numerze ticketu albo brak dostępu do projektu.'],
     ['„Brak uprawnień (403)”', 'Nie możesz logować czasu w tym projekcie – zapytaj jego administratora.'],
     ['„Toggl odrzucił token (401 / 403)”', 'Sprawdź token API Toggla w Ustawieniach (Toggl Track → Profile settings → API Token).'],
