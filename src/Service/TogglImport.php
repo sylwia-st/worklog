@@ -22,6 +22,7 @@ final class TogglImport
         private readonly TogglClient $toggl,
         private readonly Settings $settings,
         private readonly WorkDayRepository $days,
+        private readonly DayDefaults $defaults,
     ) {
     }
 
@@ -32,7 +33,7 @@ final class TogglImport
         $messages = [];
 
         try {
-            $groups = $this->collect($day, $now, $messages, $seen, $allIds);
+            $groups = $this->collect($day, $now, $messages, $seen, $allIds, $hours);
         } catch (TogglException $e) {
             return [['type' => 'error', 'message' => $e->getMessage()]];
         }
@@ -104,6 +105,10 @@ final class TogglImport
             }
         }
 
+        if (null !== $hours && $this->applyHours($day, $hours)) {
+            $messages[] = ['type' => 'info', 'message' => sprintf('Godziny obecności z Toggla: %s–%s.', $hours['start'], $hours['end'])];
+        }
+
         if (0 === $seen) {
             array_unshift($messages, ['type' => 'info', 'message' => 'Toggl nie ma wpisów z tego dnia.']);
         } elseif ($new + $updated > 0) {
@@ -121,6 +126,58 @@ final class TogglImport
         return $messages;
     }
 
+    /**
+     * Obecność z WSZYSTKICH wpisów doby (także pominiętych, np. projekt „Przerwa”): od startu najwcześniejszego
+     * do końca najpóźniejszego, pełne minuty w dół. Wpis z działającym stoperem kończy się „teraz”,
+     * a koniec po północy przycinamy do 23:59.
+     *
+     * @param list<array{0: \DateTimeImmutable, 1: array<string, mixed>}> $entries
+     *
+     * @return array{start: string, end: string}|null
+     */
+    private function presence(array $entries, \DateTimeImmutable $now, \DateTimeImmutable $dayStart): ?array
+    {
+        if ([] === $entries) {
+            return null;
+        }
+        $start = $end = null;
+        foreach ($entries as [$s, $e]) {
+            $duration = (int) ($e['duration'] ?? 0);
+            $stop = $duration < 0 ? max($s->getTimestamp(), $now->getTimestamp()) : $s->getTimestamp() + $duration;
+            $start = null === $start ? $s->getTimestamp() : min($start, $s->getTimestamp());
+            $end = null === $end ? $stop : max($end, $stop);
+        }
+        $tz = $dayStart->getTimezone();
+        $startLocal = (new \DateTimeImmutable('@'.$start))->setTimezone($tz);
+        $endLocal = (new \DateTimeImmutable('@'.$end))->setTimezone($tz);
+        $endClock = $endLocal->format('Y-m-d') > $dayStart->format('Y-m-d') ? '23:59' : $endLocal->format('H:i');
+
+        return ['start' => $startLocal->format('H:i'), 'end' => $endClock];
+    }
+
+    /**
+     * Godziny obecności z Toggla dostaje dzień, w którym użytkownik ich nie ustawił: godziny równe tym z poprzedniego
+     * importu, domyślne (tak wyglądają dni utworzone przez import) albo puste. Godziny zmienione ręcznie zostają.
+     *
+     * @param array{start: string, end: string} $hours
+     */
+    private function applyHours(WorkDay $day, array $hours): bool
+    {
+        $current = [(string) $day->getStartTime(), (string) $day->getEndTime()];
+        $previous = $day->getTogglHours();
+        $defaults = $this->defaults->for($day->getDate());
+        $untouched = ['', ''] === $current
+            || (null !== $previous ? [$previous['start'], $previous['end']] === $current : [(string) $defaults['start'], (string) $defaults['end']] === $current);
+        if (!$untouched) {
+            return false;
+        }
+        $day->setStartTime($hours['start']);
+        $day->setEndTime($hours['end']);
+        $day->setTogglHours($hours);
+
+        return true;
+    }
+
     private static function label(WorklogEntry $row): string
     {
         return '' !== $row->getDescription() ? $row->getDescription() : $row->getIssueKey();
@@ -133,10 +190,11 @@ final class TogglImport
      * @param list<array{type: string, message: string}> $messages ostrzeżenia
      * @param int $seen ile wpisów Toggla z tej doby (z działającym stoperem włącznie)
      * @param list<int> $allIds ich identyfikatory
+     * @param array{start: string, end: string}|null $hours godziny obecności z pierwszego i ostatniego wpisu (null bez wpisów)
      *
      * @return list<array{key: string, description: string, seconds: int, ids: list<int>, clock: string}>
      */
-    private function collect(WorkDay $day, \DateTimeImmutable $now, array &$messages, ?int &$seen, ?array &$allIds): array
+    private function collect(WorkDay $day, \DateTimeImmutable $now, array &$messages, ?int &$seen, ?array &$allIds, ?array &$hours): array
     {
         $tz = new \DateTimeZone(date_default_timezone_get());
         $from = new \DateTimeImmutable($day->getDate()->format('Y-m-d').' 00:00:00', $tz);
@@ -155,6 +213,7 @@ final class TogglImport
         usort($entries, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
         $seen = count($entries);
         $allIds = array_map(static fn (array $e): int => (int) ($e[1]['id'] ?? 0), $entries);
+        $hours = $this->presence($entries, $now, $from);
 
         $projects = null;
         $groups = [];

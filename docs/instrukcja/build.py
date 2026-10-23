@@ -224,6 +224,7 @@ p(f'{B("Toggl Track (nieobowiązkowo)")} – jeśli czas mierzysz w Togglu, wpis
   f'pojawi się przycisk {G("Pobierz z Toggla")}: wpisy z tego dnia trafiają do wierszy (ticket z opisu albo z nazwy projektu, '
   f'czas, godzina startu). Wpisy z tym samym ticketem i opisem łączą się w jeden wiersz, a ponowne kliknięcie nie dubluje '
   f'wierszy, tylko aktualizuje czas. Wpisy bez numeru ticketu aplikacja pomija i o tym informuje. Stoper, który w Togglu jeszcze działa, jest doliczany do chwili pobrania – po jego zatrzymaniu pobierz dzień ponownie. '
+  f'Godziny „Od–Do” dnia ustawiają się z pierwszego i ostatniego wpisu w Togglu, chyba że je zmieniłeś ręcznie. '
   f'Obok przycisku widać „pobrano o …”, a wiersze z Toggla mają przy tickecie małą ikonę.')
 
 p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
