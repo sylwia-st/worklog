@@ -499,6 +499,44 @@ namespace {
     check('dwa maile', App\Domain\ReminderSchedule::plannedTodo([$late, $early], $rtoday),
         'wyślij maile o planowanych zmianach (jutro: późniejsze przyjście; piątek 16.10: wcześniejsze wyjście)');
 
+    // --- ustawienie „bilans dnia liczony z”: obecność (domyślnie) albo czas w ticketach ---
+    check('balance_source domyślnie presence', [Settings::DEFAULTS['balance_source'], array_keys(Settings::BALANCE_SOURCES)], ['presence', ['presence', 'tickets']]);
+    $setBalance = static function (string $source) use ($settings): void {
+        $c = new ReflectionProperty(Settings::class, 'cache');
+        $c->setValue($settings, ['balance_source' => $source] + $c->getValue($settings));
+    };
+    $bday = new WorkDay(new DateTimeImmutable('2026-10-14')); // środa
+    $bday->setStartTime('08:00');
+    $bday->setEndTime('16:00');
+    new WorklogEntry($bday, 'ABC-1', 480, 'dużo', 0);
+    $setBalance('presence');
+    $bs = $reports->summary($bday);
+    check('bilans z obecności: obiad odliczony, w normie', [$bs->presenceMinutes, $bs->basisMinutes(), $bs->difference(), $bs->kind(), $bs->loggedVsPresence(), $reports->presenceMail($bday)], [420, 420, 0, 'ok', 60, null]);
+    $setBalance('tickets');
+    $bs = $reports->summary($bday);
+    check('bilans z ticketów: nadgodziny, obecność nadal liczona', [$bs->presenceMinutes, $bs->basisMinutes(), $bs->difference(), $bs->kind(), $bs->basedOnPresence()], [420, 480, 60, 'over', false]);
+    check('bilans z ticketów: bez ostrzeżenia o różnicy', $bs->loggedVsPresence(), null);
+    $bm = $reports->presenceMail($bday);
+    check('bilans z ticketów: mail o nadgodzinach z {roznica} z ticketów', [$bm?->subject, str_contains((string) $bm?->body, 'dłużej o 1h')], ['Nadgodziny – 14.10.2026', true]);
+    $vv = (new ReflectionMethod(ReportBuilder::class, 'dayVars'))->invoke($reports, $bday, $bs);
+    check('bilans z ticketów: {obecnosc} bez zmian', [$vv['obecnosc'], $vv['roznica']], ['7h', '1h']);
+    $bdayEmpty = new WorkDay(new DateTimeImmutable('2026-10-15'));
+    $bdayEmpty->setStartTime('08:00');
+    $bdayEmpty->setEndTime('16:00');
+    check('bilans z ticketów: godziny bez wierszy to pusty dzień', $reports->summary($bdayEmpty)->kind(), 'empty');
+    // miesiąc: bilans sumuje się z ticketów
+    $mb = new WorkDay(new DateTimeImmutable('2026-11-02'));
+    $mb->setStartTime('08:00');
+    $mb->setEndTime('16:00');
+    new WorklogEntry($mb, 'ABC-1', 480, 'a', 0);
+    $setBalance('presence');
+    $mp = $months->build(new DateTimeImmutable('2026-11-01'), ['2026-11-02' => $mb], new DateTimeImmutable('2026-11-18'))['totals'];
+    $setBalance('tickets');
+    $mtk = $months->build(new DateTimeImmutable('2026-11-01'), ['2026-11-02' => $mb], new DateTimeImmutable('2026-11-18'))['totals'];
+    check('miesiąc z obecności', [$mp['balance'], $mp['worked'], $mp['logged']], [0, 420, 480]);
+    check('miesiąc z ticketów', [$mtk['balance'], $mtk['worked'], $mtk['logged'], $mtk['overDays']], [60, 480, 480, 1]);
+    $setBalance('presence');
+
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);
     check('mail w formie męskiej', str_contains(Settings::defaultsFor('m')['mail_under_body'], 'pracowałem krócej o {roznica}'), true);

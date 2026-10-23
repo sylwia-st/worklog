@@ -225,6 +225,7 @@ p(f'{B("Toggl Track (nieobowiązkowo)")} – jeśli czas mierzysz w Togglu, wpis
   f'czas, godzina „od” ze startu pierwszego wpisu; „do” wylicza się z czasu wiersza). Wpisy z tym samym ticketem i opisem łączą się w jeden wiersz, a ponowne kliknięcie nie dubluje '
   f'wierszy, tylko aktualizuje czas. Wpisy bez numeru ticketu aplikacja pomija i o tym informuje. Stoper, który w Togglu jeszcze działa, jest doliczany do chwili pobrania – po jego zatrzymaniu pobierz dzień ponownie. '
   f'Godziny „Od–Do” dnia ustawiają się z pierwszego i ostatniego wpisu w Togglu, chyba że je zmieniłeś ręcznie. '
+  f'Jeśli mierzysz wszystko w Togglu, przełącz bilans na czas w ticketach (Ustawienia → Dzień pracy, patrz rozdział 7). '
   f'Obok przycisku widać „pobrano o …”, a wiersze z Toggla mają przy tickecie małą ikonę.')
 
 p(f'Wygląd zmienisz w {B("Ustawienia → Wygląd")}: ciemne motywy Aurora, Głębia, Zachód, Neon, Grafit, '
@@ -350,7 +351,8 @@ h('7. Mail o nadgodzinach lub krótszym dniu')
 p('Panel maila pojawia się sam, gdy bilans dnia przekracza tolerancję. Bilans liczony jest z godzin obecności: '
   'od–do minus obiad (tylko ta część 12:00–13:00, która wypada w godzinach pracy) minus dodatkowa przerwa. Jeśli '
   'godzin nie podasz – z sumy czasu w ticketach. Norma to 7h. Jeśli pobierasz wpisy z Toggla, godziny od–do ustawia '
-  'import – z pierwszego i ostatniego wpisu dnia (patrz rozdział 1), chyba że zmienisz je ręcznie.')
+  'import – z pierwszego i ostatniego wpisu dnia (patrz rozdział 1), chyba że zmienisz je ręcznie. W Ustawieniach → Dzień pracy możesz przełączyć bilans na czas w ticketach – wtedy nadgodziny '
+  'i krótszy dzień liczą się z sumy wierszy, a godziny od–do służą tylko do maila i godzin worklogów w Jirze.')
 table(['Godziny', 'Obecność', 'Bilans (norma 7h)'], [
     ['8:00–16:00', '7h (obiad odliczony)', '±0 – mail niepotrzebny'],
     ['8:00–17:00', '8h', '+1h – mail o nadgodzinach'],

@@ -42,6 +42,7 @@ final class SettingsController extends AbstractController
         'Dzień pracy' => [
             'default_start' => ['Domyślna godzina rozpoczęcia', 'time', 'Od tej godziny liczone są godziny „started” worklogów, jeśli nie podasz godziny dnia.'],
             'default_end' => ['Domyślna godzina zakończenia', 'time', ''],
+            'balance_source' => ['Bilans dnia liczony z', 'select', 'Obecność: od–do minus obiad i przerwy – gdy godziny wpisujesz ręcznie. Czas w ticketach: suma wierszy – gdy mierzysz wszystko stoperem, np. w Togglu; godziny od–do służą wtedy tylko do maila i do godzin worklogów w Jirze.'],
             'lunch_from' => ['Stała przerwa (obiad) – od', 'time', 'Odliczana automatycznie w części przypadającej na godziny pracy; worklogi w Jirze ją omijają. Oba pola puste = bez stałej przerwy.'],
             'lunch_to' => ['Stała przerwa (obiad) – do', 'time', ''],
             'default_break' => ['Dodatkowa przerwa (minuty)', 'number', 'Domyślna wartość pola „Dodatkowa przerwa” w nowym dniu – zwykle 0.'],
@@ -107,6 +108,9 @@ final class SettingsController extends AbstractController
         $errors = [];
         if (!isset(Settings::FORMS[$values['forma']])) {
             $errors[] = 'Wybierz formę w tekstach.';
+        }
+        if (!isset(Settings::BALANCE_SOURCES[$values['balance_source']])) {
+            $errors[] = 'Wybierz, z czego liczyć bilans dnia.';
         }
         if (!isset(Theme::choices()[$values['theme']])) {
             $errors[] = 'Wybierz motyw.';
@@ -227,7 +231,7 @@ final class SettingsController extends AbstractController
     {
         return $this->render('settings.html.twig', [
             'form' => self::FORM,
-            'options' => ['forma' => Settings::FORMS],
+            'options' => ['forma' => Settings::FORMS, 'balance_source' => Settings::BALANCE_SOURCES],
             'themes' => Theme::choices(),
             'themeGroups' => Theme::groups(),
             // dopisek pod nazwą motywu z własnym wyglądem

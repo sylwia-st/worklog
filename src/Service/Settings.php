@@ -32,6 +32,9 @@ final class Settings
     /** Ustawienia-tokeny → plik obok bazy (600); w bazie zostaje pusta wartość. */
     public const TOKEN_FILES = ['jira_token' => '.jira_token', 'toggl_token' => '.toggl_token'];
 
+    /** Z czego liczony jest bilans dnia (nadgodziny / krótszy dzień). */
+    public const BALANCE_SOURCES = ['presence' => 'godzin obecności (od–do)', 'tickets' => 'czasu w ticketach'];
+
     public const DEFAULTS = [
         'forma' => 'n',
 
@@ -51,6 +54,7 @@ final class Settings
         'lunch_from' => '12:00',
         'lunch_to' => '13:00',
         'default_break' => '0',
+        'balance_source' => 'presence',
         'norm_minutes' => '420',
         'tolerance_minutes' => '0',
         'signature' => '',

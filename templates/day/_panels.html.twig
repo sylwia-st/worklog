@@ -25,11 +25,11 @@
             {% if norm > 0 %}<div class="norm" style="left:{{ (norm / scale * 100)|round(2) }}%"></div>{% endif %}
         </div>
         <p class="muted small" style="margin:6px 0 14px">
-            Liczone z {{ summary.basedOnPresence ? 'godzin obecności' : 'czasu w ticketach (brak godzin od–do)' }}.
+            Liczone z {{ summary.basedOnPresence ? 'godzin obecności' : (summary.balanceFromTickets ? 'czasu w ticketach' : 'czasu w ticketach (brak godzin od–do)') }}.
         </p>
         <dl class="stats">
             <dt>Obecność</dt><dd>{{ summary.presenceMinutes|hm }}</dd>
-            {% if summary.basedOnPresence %}<dt>Odliczona przerwa{{ day.workedThroughFixedBreak ? ' (wzięta później)' }}</dt><dd>{{ summary.breakMinutes|hm }}</dd>{% endif %}
+            {% if summary.presenceMinutes is not null %}<dt>Odliczona przerwa{{ day.workedThroughFixedBreak ? ' (wzięta później)' }}</dt><dd>{{ summary.breakMinutes|hm }}</dd>{% endif %}
             <dt>W ticketach</dt><dd>{{ summary.loggedMinutes|hm }}</dd>
             <dt>Norma</dt><dd>{{ summary.normMinutes|hm }}</dd>
         </dl>
