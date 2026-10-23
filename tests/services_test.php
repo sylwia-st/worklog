@@ -590,8 +590,8 @@ namespace {
     check('import: wierszy (ręczny + 3)', count($rows), 4);
     [, $r1, $r2, $r3] = $rows;
     check('import: grupa ABC-123 – suma z resztą', [$r1->getIssueKey(), $r1->getDescription(), $r1->getMinutes(), $r1->getCarrySeconds(), $r1->getTogglIds(), $r1->getStartClock()],
-        ['ABC-123', 'poprawka logowania', 30, 0, [1, 2], null]);
-    check('import: jeden wpis → godzina lokalna, tytuł ze znanych', [$r2->getIssueKey(), $r2->getMinutes(), $r2->getStartClock(), $r2->getIssueTitle(), $r2->getPosition()], ['ABC-9', 60, '11:00', 'Moduł raportów', 2]);
+        ['ABC-123', 'poprawka logowania', 30, 0, [1, 2], '09:00']);
+    check('import: godzina lokalna, tytuł ze znanych', [$r2->getIssueKey(), $r2->getMinutes(), $r2->getStartClock(), $r2->getIssueTitle(), $r2->getPosition()], ['ABC-9', 60, '11:00', 'Moduł raportów', 2]);
     check('import: numer z nazwy projektu, cały opis', [$r3->getIssueKey(), $r3->getDescription(), $r3->getMinutes(), $r3->getStartClock()], ['XYZ-5', 'praca', 15, '12:00']);
     check('import: ręczny wiersz nietknięty', [$manual->getMinutes(), $manual->getTogglIds()], [10, []]);
 
@@ -624,7 +624,7 @@ namespace {
         'success: Pobrano z Toggla: 1 wpis (1 nowy) – razem 37m.',
         'warning: Stoper w Togglu nadal działa („TER-379 workery kolejek”) – doliczono 17m do tej chwili; po zatrzymaniu pobierz ponownie.',
     ]);
-    check('stoper Toggla – 20m + 17m 30s w jednej grupie', [$rr->getMinutes(), $rr->getCarrySeconds(), $rr->getTogglIds(), $rr->getStartClock()], [37, 30, [40, 41], null]);
+    check('stoper Toggla – 20m + 17m 30s w jednej grupie', [$rr->getMinutes(), $rr->getCarrySeconds(), $rr->getTogglIds(), $rr->getStartClock()], [37, 30, [40, 41], '14:00']);
     $import->import($dRun, new DateTimeImmutable('2026-10-20 16:25:00'));
     check('stoper Toggla – kolejne pobranie podnosi czas bez duplikatu', [count($dRun->getActiveEntries()), $rr->getMinutes(), $rr->getCarrySeconds()], [1, 45, 0]);
     check('stoper Toggla – obecność do „teraz”', [$dRun->getStartTime(), $dRun->getEndTime()], ['14:00', '16:25']);
@@ -711,6 +711,27 @@ namespace {
     $dm0 = new WorkDay(new DateTimeImmutable('2026-10-20'));
     $import->import($dm0);
     check('godziny: koniec po północy → 23:59', [$dm0->getStartTime(), $dm0->getEndTime()], ['22:00', '23:59']);
+
+    // startClock = lokalny start NAJWCZEŚNIEJSZEGO wpisu grupy, także gdy API zwraca wpisy od najnowszego
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(72, 'ABC-6 trzy', '2026-10-20T11:05:59+00:00', 600),   // 13:05 (najnowszy, pierwszy w odpowiedzi)
+        $te(71, 'ABC-6 trzy', '2026-10-20T08:40:30+00:00', 900),   // 10:40
+        $te(70, 'ABC-6 trzy', '2026-10-20T07:15:00+00:00', 300),   // 09:15 (najwcześniejszy)
+    ]];
+    $dsc = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $import->import($dsc);
+    [$sc] = $dsc->getActiveEntries();
+    check('startClock = najwcześniejszy start grupy', [$sc->getMinutes(), $sc->getStartClock(), $sc->getTogglIds()], [30, '09:15', [70, 71, 72]]);
+    // ponowny import aktualizuje startClock tą samą regułą (Toggl jest źródłem czasu)
+    $sc->setStartClock('11:00');
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(72, 'ABC-6 trzy', '2026-10-20T11:05:59+00:00', 600),
+        $te(71, 'ABC-6 trzy', '2026-10-20T08:40:30+00:00', 900),
+        $te(70, 'ABC-6 trzy', '2026-10-20T07:15:00+00:00', 300),
+        $te(73, 'ABC-6 trzy', '2026-10-20T06:50:00+00:00', 60),     // 08:50 – nowy, wcześniejszy
+    ]];
+    $import->import($dsc);
+    check('ponowny import aktualizuje startClock', [count($dsc->getActiveEntries()), $sc->getMinutes(), $sc->getStartClock()], [1, 31, '08:50']);
 
     // (c) dwa wiersze pasują do jednej grupy: pierwszy bierze sumę, drugi znika, czas nie liczy się podwójnie
     foreach ([false, true] as $inJira) {

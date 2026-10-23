@@ -60,8 +60,8 @@ final class TogglImport
                     $matches[$i] = $candidate;
                 }
             }
-            // godzinę startu ustawiamy tylko przy jednym wpisie Toggla – przy kilku aplikacja sama rozłoży godziny
-            $startClock = 1 === count($group['ids']) ? $group['clock'] : null;
+            // „od” = start najwcześniejszego wpisu grupy; „do” wylicza się z czasu wiersza (przy przeplatanych odcinkach wypadnie wcześniej niż realny koniec)
+            $startClock = $group['clock'];
 
             if ([] !== $matches) {
                 foreach ($matches as $m) {
@@ -252,7 +252,7 @@ final class TogglImport
             }
 
             $id = $key."\0".$text;
-            $groups[$id] ??= ['key' => $key, 'description' => $text, 'seconds' => 0, 'ids' => [], 'clock' => $start->format('H:i')];
+            $groups[$id] ??= ['key' => $key, 'description' => $text, 'seconds' => 0, 'ids' => [], 'clock' => $start->format('H:i')]; // wpisy są posortowane po starcie, więc pierwszy w grupie jest najwcześniejszy
             $groups[$id]['seconds'] += $duration;
             $groups[$id]['ids'][] = (int) ($e['id'] ?? 0);
         }
