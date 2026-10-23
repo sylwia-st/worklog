@@ -349,7 +349,8 @@ p(f'Wygląd wiadomości (nagłówek, linia na ticket, stopka) zmienisz w {B("Ust
 h('7. Mail o nadgodzinach lub krótszym dniu')
 p('Panel maila pojawia się sam, gdy bilans dnia przekracza tolerancję. Bilans liczony jest z godzin obecności: '
   'od–do minus obiad (tylko ta część 12:00–13:00, która wypada w godzinach pracy) minus dodatkowa przerwa. Jeśli '
-  'godzin nie podasz – z sumy czasu w ticketach. Norma to 7h.')
+  'godzin nie podasz – z sumy czasu w ticketach. Norma to 7h. Jeśli pobierasz wpisy z Toggla, godziny od–do ustawia '
+  'import – z pierwszego i ostatniego wpisu dnia (patrz rozdział 1), chyba że zmienisz je ręcznie.')
 table(['Godziny', 'Obecność', 'Bilans (norma 7h)'], [
     ['8:00–16:00', '7h (obiad odliczony)', '±0 – mail niepotrzebny'],
     ['8:00–17:00', '8h', '+1h – mail o nadgodzinach'],
@@ -367,7 +368,9 @@ p('Na Windowsie długi mail (np. z długą listą ticketów) nie zmieści się w
   'z adresatami i tematem, a treść aplikacja skopiuje do schowka: wklej ją Ctrl+V. Pod przyciskiem pojawi się '
   'podpowiedź. To samo dotyczy maila o planowanej zmianie.')
 box('Wskazówka', 'Jeśli czas w ticketach różni się od czasu obecności (np. obecność 7h, a w ticketach jest 6h 30m), '
-                 'panel Bilans pokaże żółte ostrzeżenie, a przypomnienie wspomni o brakującym czasie.')
+                 'panel Bilans pokaże żółte ostrzeżenie, a przypomnienie wspomni o brakującym czasie. Przy Togglu różnica 1–3 minut '
+                 'jest normalna – to sekundy niezłożone w pełne minuty i luki między zatrzymaniem a ponownym startem stopera. '
+                 'Większa różnica to przerwa bez stopera albo wpis bez numeru ticketu (np. projekt „Przerwa”), którego import pominął.')
 
 h('8. Planowane przyjście później / wyjście wcześniej')
 steps(
