@@ -50,6 +50,19 @@ class WorkDay
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $togglSyncedAt = null;
 
+    /**
+     * Godziny obecności ostatnio ustawione przez import z Toggla, np. {"start": "07:23", "end": "15:23"} –
+     * do komunikatu i diagnostyki (o nadpisaniu decyduje hoursByUser).
+     *
+     * @var array{start: string, end: string}|null
+     */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $togglHours = null;
+
+    /** Godziny od–do wpisał lub poprawił użytkownik – import z Toggla ich wtedy nie nadpisuje. */
+    #[ORM\Column(name: 'hours_by_user', options: ['default' => false])]
+    private bool $hoursByUser = false;
+
     /** @var Collection<int, WorklogEntry> */
     #[ORM\OneToMany(targetEntity: WorklogEntry::class, mappedBy: 'day', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['position' => 'ASC', 'id' => 'ASC'])]
@@ -181,6 +194,28 @@ class WorkDay
     public function markTogglSynced(\DateTimeImmutable $at): void
     {
         $this->togglSyncedAt = $at;
+    }
+
+    public function isHoursByUser(): bool
+    {
+        return $this->hoursByUser;
+    }
+
+    public function markHoursByUser(): void
+    {
+        $this->hoursByUser = true;
+    }
+
+    /** @return array{start: string, end: string}|null */
+    public function getTogglHours(): ?array
+    {
+        return $this->togglHours;
+    }
+
+    /** @param array{start: string, end: string}|null $hours */
+    public function setTogglHours(?array $hours): void
+    {
+        $this->togglHours = $hours;
     }
 
     public function removeEntry(WorklogEntry $entry): void

@@ -33,6 +33,7 @@ final class ReportBuilder
             $day->hasWorkedThroughFixedBreak() ? null : ($this->settings->get('lunch_from') ?: null),
             $day->hasWorkedThroughFixedBreak() ? null : ($this->settings->get('lunch_to') ?: null),
             $day->getBreakRanges(),
+            'tickets' === $this->settings->get('balance_source'),
         );
     }
 

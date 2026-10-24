@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Domain\DaySummary;
 use App\Domain\Template;
 use App\Domain\TimeFormat;
 use App\Entity\WorkDay;
@@ -32,7 +33,7 @@ final class TogglImport
         $messages = [];
 
         try {
-            $groups = $this->collect($day, $now, $messages, $seen, $allIds);
+            $groups = $this->collect($day, $now, $messages, $seen, $allIds, $hours);
         } catch (TogglException $e) {
             return [['type' => 'error', 'message' => $e->getMessage()]];
         }
@@ -59,8 +60,8 @@ final class TogglImport
                     $matches[$i] = $candidate;
                 }
             }
-            // godzinę startu ustawiamy tylko przy jednym wpisie Toggla – przy kilku aplikacja sama rozłoży godziny
-            $startClock = 1 === count($group['ids']) ? $group['clock'] : null;
+            // „od” = start najwcześniejszego wpisu grupy; „do” wylicza się z czasu wiersza (przy przeplatanych odcinkach wypadnie wcześniej niż realny koniec)
+            $startClock = $this->startClock($day, $group, $messages);
 
             if ([] !== $matches) {
                 foreach ($matches as $m) {
@@ -104,6 +105,10 @@ final class TogglImport
             }
         }
 
+        if (null !== $hours && $this->applyHours($day, $hours)) {
+            $messages[] = ['type' => 'info', 'message' => sprintf('Godziny obecności z Toggla: %s–%s.', $hours['start'], $hours['end'])];
+        }
+
         if (0 === $seen) {
             array_unshift($messages, ['type' => 'info', 'message' => 'Toggl nie ma wpisów z tego dnia.']);
         } elseif ($new + $updated > 0) {
@@ -121,6 +126,51 @@ final class TogglImport
         return $messages;
     }
 
+    /**
+     * Godzina „od” wiersza = start najwcześniejszego wpisu grupy. Wiersz, który kończyłby się po północy
+     * (tak jak liczy to walidacja formularza, z przerwami dnia), nie dostaje jej – inaczej formularz by go odrzucił.
+     *
+     * @param array{key: string, description: string, seconds: int, clock: string} $group
+     * @param list<array{type: string, message: string}> $messages
+     */
+    private function startClock(WorkDay $day, array $group, array &$messages): ?string
+    {
+        $minutes = intdiv($group['seconds'], 60);
+        $from = TimeFormat::clockToMinutes($group['clock']);
+        if (null === $from || 0 === $minutes) {
+            return $group['clock'];
+        }
+        $windows = DaySummary::breakWindows($day->getBreakRanges(), $day->hasWorkedThroughFixedBreak(),
+            $this->settings->get('lunch_from') ?: null, $this->settings->get('lunch_to') ?: null);
+        if (DaySummary::advance($from, $minutes, $windows) > 24 * 60) {
+            $messages[] = ['type' => 'warning', 'message' => sprintf('„%s” (%s, %s): wpis kończyłby się po północy – bez godziny „od”.',
+                '' !== $group['description'] ? $group['description'] : $group['key'], $group['key'], TimeFormat::format($minutes))];
+
+            return null;
+        }
+
+        return $group['clock'];
+    }
+
+    /**
+     * Godziny obecności z Toggla dostaje dzień, w którym użytkownik ich nie wpisywał (hoursByUser) – nowy albo
+     * nigdy nie poprawiany ręcznie. Zwraca true, gdy godziny się zmieniły albo ustawiono je pierwszy raz.
+     *
+     * @param array{start: string, end: string} $hours
+     */
+    private function applyHours(WorkDay $day, array $hours): bool
+    {
+        if ($day->isHoursByUser()) {
+            return false;
+        }
+        $changed = [$day->getStartTime(), $day->getEndTime()] !== [$hours['start'], $hours['end']] || null === $day->getTogglHours();
+        $day->setStartTime($hours['start']);
+        $day->setEndTime($hours['end']);
+        $day->setTogglHours($hours);
+
+        return $changed;
+    }
+
     private static function label(WorklogEntry $row): string
     {
         return '' !== $row->getDescription() ? $row->getDescription() : $row->getIssueKey();
@@ -133,10 +183,11 @@ final class TogglImport
      * @param list<array{type: string, message: string}> $messages ostrzeżenia
      * @param int $seen ile wpisów Toggla z tej doby (z działającym stoperem włącznie)
      * @param list<int> $allIds ich identyfikatory
+     * @param array{start: string, end: string}|null $hours godziny obecności z pierwszego i ostatniego wpisu (null bez wpisów)
      *
      * @return list<array{key: string, description: string, seconds: int, ids: list<int>, clock: string}>
      */
-    private function collect(WorkDay $day, \DateTimeImmutable $now, array &$messages, ?int &$seen, ?array &$allIds): array
+    private function collect(WorkDay $day, \DateTimeImmutable $now, array &$messages, ?int &$seen, ?array &$allIds, ?array &$hours): array
     {
         $tz = new \DateTimeZone(date_default_timezone_get());
         $from = new \DateTimeImmutable($day->getDate()->format('Y-m-d').' 00:00:00', $tz);
@@ -159,6 +210,7 @@ final class TogglImport
         $projects = null;
         $groups = [];
         $skipped = [];
+        $first = $last = null; // obecność: od najwcześniejszego startu do najpóźniejszego końca (także wpisów pominiętych)
         foreach ($entries as [$start, $e]) {
             $description = trim((string) ($e['description'] ?? ''));
             $duration = (int) ($e['duration'] ?? 0);
@@ -166,7 +218,10 @@ final class TogglImport
             $running = $duration < 0;
             if ($running) {
                 $duration = max(0, $now->getTimestamp() - $start->getTimestamp());
-            } elseif (0 === $duration) {
+            }
+            $first ??= $start->getTimestamp();
+            $last = max($last ?? 0, $start->getTimestamp() + $duration);
+            if (0 === $duration && !$running) {
                 continue;
             }
 
@@ -193,9 +248,19 @@ final class TogglImport
             }
 
             $id = $key."\0".$text;
-            $groups[$id] ??= ['key' => $key, 'description' => $text, 'seconds' => 0, 'ids' => [], 'clock' => $start->format('H:i')];
+            $groups[$id] ??= ['key' => $key, 'description' => $text, 'seconds' => 0, 'ids' => [], 'clock' => $start->format('H:i')]; // wpisy są posortowane po starcie, więc pierwszy w grupie jest najwcześniejszy
             $groups[$id]['seconds'] += $duration;
             $groups[$id]['ids'][] = (int) ($e['id'] ?? 0);
+        }
+
+        $hours = null;
+        if (null !== $first) {
+            // pełne minuty w dół; koniec po północy przycinamy do 23:59
+            $end = (new \DateTimeImmutable('@'.$last))->setTimezone($tz);
+            $hours = [
+                'start' => (new \DateTimeImmutable('@'.$first))->setTimezone($tz)->format('H:i'),
+                'end' => $end->format('Y-m-d') > $from->format('Y-m-d') ? '23:59' : $end->format('H:i'),
+            ];
         }
 
         if ([] !== $skipped) {

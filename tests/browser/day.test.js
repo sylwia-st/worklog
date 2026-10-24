@@ -30,7 +30,7 @@ function page(rows, storage, extraHtml = '') {
  <div id="timerbar" hidden><b id="tb-issue"></b><span id="tb-date"></span><span id="tb-since"></span><span id="tb-time"></span><button id="tb-stop"></button><a id="tb-link"></a></div>
  <div id="timerstale" hidden><strong id="ts-msg"></strong><input id="ts-at"><button id="ts-stop-at"></button><button id="ts-stop-now"></button><button id="ts-keep"></button></div>
  <div id="draft-banner" hidden><span id="draft-msg"></span><button id="draft-restore"></button><button id="draft-discard"></button></div>
- <form id="dayform"><input id="start" name="start" value="08:00"><input id="end" name="end" value="16:00"><label id="break-label">Dodatkowa przerwa</label><input id="break" name="break" value="">
+ <form id="dayform"><input type="hidden" name="hours_touched" id="hours_touched" value="0"><input id="start" name="start" value="08:00"><input id="end" name="end" value="16:00"><label id="break-label">Dodatkowa przerwa</label><input id="break" name="break" value="">
   <input type="checkbox" id="lunch_worked" name="lunch_worked" value="1" data-lunch="1h" data-help-on="POMOC-WŁ" data-help-off="POMOC-WYŁ"><p id="lunch-help">POMOC-WYŁ</p>
   <table><tbody id="rows">${rows.map((r, i) => row(i, r)).join('')}</tbody></table>
   <div id="startat" hidden><b id="startat-issue"></b><input type="time" id="startat-time"><button type="button" id="startat-go"></button><button type="button" id="startat-cancel"></button></div>
@@ -109,6 +109,7 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     const saves = w.calls.filter(c => c.url.includes('autosave'));
     check('jeden autozapis', saves.length, 1);
     check('autozapis wysłał nowy ticket', saves[0]?.body['entries[1][issue]'], 'ABC-2');
+    check('edycja wiersza nie ustawia hours_touched', saves[0]?.body['hours_touched'], '0');
     check('id nowego wiersza ustawione', newRow.querySelector('.f-id').value, '100');
     check('szkic usunięty po zapisie', w.localStorage.getItem('worklog-draft-2026-10-20'), null);
     check('status zapisano', w.document.getElementById('savestate').textContent.startsWith('✓ zapisano'), true);
@@ -268,6 +269,21 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     wt2.document.getElementById('togglbtn').click();
     await sleep(100);
     check('Toggl – bez zmian: submit bez zapisu', [wt2.calls.filter(c => c.url.includes('autosave')).length, wt2.submits.length], [0, 1]);
+
+    // 11d. wpisanie godziny dnia ustawia hours_touched i trafia do autozapisu; sama edycja wiersza – nie
+    const wh = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    const startInput = wh.document.getElementById('start');
+    startInput.value = '07:30';
+    fire(wh, startInput, 'input');
+    check('godzina dnia → pole hours_touched', wh.document.getElementById('hours_touched').value, '1');
+    await sleep(1300);
+    check('godzina dnia → autozapis niesie hours_touched', wh.calls.find(c => c.url.includes('autosave'))?.body['hours_touched'], '1');
+    const wh2 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+    await sleep(30);
+    const d2 = wh2.document.querySelector('[data-key="0"] .f-desc');
+    d2.value = 'zmiana'; fire(wh2, d2, 'input');
+    check('edycja wiersza → hours_touched = 0', wh2.document.getElementById('hours_touched').value, '0');
 
     // 12. wszystko zapisane → zamknięcie karty nie wysyła beacona
     const w8 = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);

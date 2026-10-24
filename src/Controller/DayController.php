@@ -182,11 +182,16 @@ final class DayController extends AbstractController
      */
     private function applyForm(\DateTimeImmutable $d, ?WorkDay $day, array $form, bool $partial = false): array
     {
-        if (null === $day) {
+        $isNew = null === $day;
+        if ($isNew) {
             $day = new WorkDay($d);
             $this->em->persist($day);
         }
         if (!$partial || [] === $form['dayErrors']) {
+            // godziny wpisane lub poprawione przez użytkownika (pole z JS; bez JS – różnica względem zapisanych w istniejącym dniu)
+            if ($form['hoursTouched'] || (!$isNew && ($day->getStartTime() !== $form['start'] || $day->getEndTime() !== $form['end']))) {
+                $day->markHoursByUser();
+            }
             $day->setStartTime($form['start']);
             $day->setEndTime($form['end']);
             $day->setBreakMinutes($form['breakMinutes']);
@@ -296,6 +301,7 @@ final class DayController extends AbstractController
             'slack' => $hasEntries ? $this->reports->slackText($day) : null,
             'mail' => $mail,
             'closing' => $closing,
+            'balanceFromTickets' => 'tickets' === $this->settings->get('balance_source'),
             'axis' => $axis,
         ];
     }
@@ -475,6 +481,7 @@ final class DayController extends AbstractController
         return [[
             'start' => $start,
             'end' => $end,
+            'hoursTouched' => '1' === (string) $p->get('hours_touched', '0'),
             'break' => $breakRaw,
             'breakMinutes' => $breakMinutes,
             'lunchWorked' => $lunchWorked,

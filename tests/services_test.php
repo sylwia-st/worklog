@@ -499,6 +499,44 @@ namespace {
     check('dwa maile', App\Domain\ReminderSchedule::plannedTodo([$late, $early], $rtoday),
         'wyślij maile o planowanych zmianach (jutro: późniejsze przyjście; piątek 16.10: wcześniejsze wyjście)');
 
+    // --- ustawienie „bilans dnia liczony z”: obecność (domyślnie) albo czas w ticketach ---
+    check('balance_source domyślnie presence', [Settings::DEFAULTS['balance_source'], array_keys(Settings::BALANCE_SOURCES)], ['presence', ['presence', 'tickets']]);
+    $setBalance = static function (string $source) use ($settings): void {
+        $c = new ReflectionProperty(Settings::class, 'cache');
+        $c->setValue($settings, ['balance_source' => $source] + $c->getValue($settings));
+    };
+    $bday = new WorkDay(new DateTimeImmutable('2026-10-14')); // środa
+    $bday->setStartTime('08:00');
+    $bday->setEndTime('16:00');
+    new WorklogEntry($bday, 'ABC-1', 480, 'dużo', 0);
+    $setBalance('presence');
+    $bs = $reports->summary($bday);
+    check('bilans z obecności: obiad odliczony, w normie', [$bs->presenceMinutes, $bs->basisMinutes(), $bs->difference(), $bs->kind(), $bs->loggedVsPresence(), $reports->presenceMail($bday)], [420, 420, 0, 'ok', 60, null]);
+    $setBalance('tickets');
+    $bs = $reports->summary($bday);
+    check('bilans z ticketów: nadgodziny, obecność nadal liczona', [$bs->presenceMinutes, $bs->basisMinutes(), $bs->difference(), $bs->kind(), $bs->basedOnPresence()], [420, 480, 60, 'over', false]);
+    check('bilans z ticketów: bez ostrzeżenia o różnicy', $bs->loggedVsPresence(), null);
+    $bm = $reports->presenceMail($bday);
+    check('bilans z ticketów: mail o nadgodzinach z {roznica} z ticketów', [$bm?->subject, str_contains((string) $bm?->body, 'dłużej o 1h')], ['Nadgodziny – 14.10.2026', true]);
+    $vv = (new ReflectionMethod(ReportBuilder::class, 'dayVars'))->invoke($reports, $bday, $bs);
+    check('bilans z ticketów: {obecnosc} bez zmian', [$vv['obecnosc'], $vv['roznica']], ['7h', '1h']);
+    $bdayEmpty = new WorkDay(new DateTimeImmutable('2026-10-15'));
+    $bdayEmpty->setStartTime('08:00');
+    $bdayEmpty->setEndTime('16:00');
+    check('bilans z ticketów: godziny bez wierszy to pusty dzień', $reports->summary($bdayEmpty)->kind(), 'empty');
+    // miesiąc: bilans sumuje się z ticketów
+    $mb = new WorkDay(new DateTimeImmutable('2026-11-02'));
+    $mb->setStartTime('08:00');
+    $mb->setEndTime('16:00');
+    new WorklogEntry($mb, 'ABC-1', 480, 'a', 0);
+    $setBalance('presence');
+    $mp = $months->build(new DateTimeImmutable('2026-11-01'), ['2026-11-02' => $mb], new DateTimeImmutable('2026-11-18'))['totals'];
+    $setBalance('tickets');
+    $mtk = $months->build(new DateTimeImmutable('2026-11-01'), ['2026-11-02' => $mb], new DateTimeImmutable('2026-11-18'))['totals'];
+    check('miesiąc z obecności', [$mp['balance'], $mp['worked'], $mp['logged']], [0, 420, 480]);
+    check('miesiąc z ticketów', [$mtk['balance'], $mtk['worked'], $mtk['logged'], $mtk['overDays']], [60, 480, 480, 1]);
+    $setBalance('presence');
+
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);
     check('mail w formie męskiej', str_contains(Settings::defaultsFor('m')['mail_under_body'], 'pracowałem krócej o {roznica}'), true);
@@ -563,6 +601,9 @@ namespace {
     };
     $import = new App\Service\TogglImport($tClient, $tsettings, $titleRepo);
 
+    // komunikaty importu bez informacji o godzinach obecności (te mają osobne testy)
+    $msgs = static fn (array $res): array => array_values(array_map(fn ($r) => $r['type'].': '.$r['message'],
+        array_filter($res, fn ($r) => !str_starts_with($r['message'], 'Godziny obecności z Toggla'))));
     check('Toggl me()', $tClient->me(), ['name' => 'Anna Nowak', 'email' => 'anna@firma.pl']);
     check('Toggl: Basic auth token + api_token', end($tHttp->calls)[3], ['ttok', 'api_token']);
 
@@ -572,16 +613,18 @@ namespace {
     $res = $import->import($tday);
     check('import: zakres dnia w RFC3339', $tHttp->calls[0][2], ['start_date' => '2026-10-20T00:00:00+02:00', 'end_date' => '2026-10-21T00:00:00+02:00']);
     check('import: projekty raz', count(array_filter($tHttp->calls, fn ($c) => str_contains($c[1], '/me/projects'))), 1);
-    check('import: komunikaty', array_map(fn ($r) => [$r['type'], $r['message']], $res), [
-        ['success', 'Pobrano z Toggla: 3 wpisy (3 nowe) – razem 1h 45m.'],
-        ['warning', 'Pominięto wpisy bez numeru ticketu (w opisie ani w nazwie projektu): „spotkanie” 30m, „mail” 15m – dodaj je ręcznie.'],
+    check('import: komunikaty', $msgs($res), [
+        'success: Pobrano z Toggla: 3 wpisy (3 nowe) – razem 1h 45m.',
+        'warning: Pominięto wpisy bez numeru ticketu (w opisie ani w nazwie projektu): „spotkanie” 30m, „mail” 15m – dodaj je ręcznie.',
     ]);
+    check('import: godziny z wszystkich wpisów (także pominiętych)', [$tday->getStartTime(), $tday->getEndTime(), $tday->getTogglHours(), end($res)['message']],
+        ['09:00', '13:45', ['start' => '09:00', 'end' => '13:45'], 'Godziny obecności z Toggla: 09:00–13:45.']);
     $rows = $tday->getActiveEntries();
     check('import: wierszy (ręczny + 3)', count($rows), 4);
     [, $r1, $r2, $r3] = $rows;
     check('import: grupa ABC-123 – suma z resztą', [$r1->getIssueKey(), $r1->getDescription(), $r1->getMinutes(), $r1->getCarrySeconds(), $r1->getTogglIds(), $r1->getStartClock()],
-        ['ABC-123', 'poprawka logowania', 30, 0, [1, 2], null]);
-    check('import: jeden wpis → godzina lokalna, tytuł ze znanych', [$r2->getIssueKey(), $r2->getMinutes(), $r2->getStartClock(), $r2->getIssueTitle(), $r2->getPosition()], ['ABC-9', 60, '11:00', 'Moduł raportów', 2]);
+        ['ABC-123', 'poprawka logowania', 30, 0, [1, 2], '09:00']);
+    check('import: godzina lokalna, tytuł ze znanych', [$r2->getIssueKey(), $r2->getMinutes(), $r2->getStartClock(), $r2->getIssueTitle(), $r2->getPosition()], ['ABC-9', 60, '11:00', 'Moduł raportów', 2]);
     check('import: numer z nazwy projektu, cały opis', [$r3->getIssueKey(), $r3->getDescription(), $r3->getMinutes(), $r3->getStartClock()], ['XYZ-5', 'praca', 15, '12:00']);
     check('import: ręczny wiersz nietknięty', [$manual->getMinutes(), $manual->getTogglIds()], [10, []]);
 
@@ -602,7 +645,6 @@ namespace {
     $res = $import->import($tday);
     check('reimport: stoper aplikacji', [$r2->getMinutes(), in_array(['type' => 'warning', 'message' => 'Przy tickecie ABC-9 działa stoper aplikacji – czasu z Toggla nie zmieniono. Zatrzymaj stoper i pobierz ponownie.'], $res, true)], [1, true]);
 
-    $msgs = static fn (array $res): array => array_map(fn ($r) => $r['type'].': '.$r['message'], $res);
     // działający stoper w Togglu (duration < 0, brak stop) jest doliczany do chwili pobrania
     $tHttp->routes['/me/time_entries'] = [200, [
         $te(40, 'TER-379 workery kolejek', '2026-10-20T12:00:00+00:00', 1200),   // 14:00–14:20
@@ -615,9 +657,10 @@ namespace {
         'success: Pobrano z Toggla: 1 wpis (1 nowy) – razem 37m.',
         'warning: Stoper w Togglu nadal działa („TER-379 workery kolejek”) – doliczono 17m do tej chwili; po zatrzymaniu pobierz ponownie.',
     ]);
-    check('stoper Toggla – 20m + 17m 30s w jednej grupie', [$rr->getMinutes(), $rr->getCarrySeconds(), $rr->getTogglIds(), $rr->getStartClock()], [37, 30, [40, 41], null]);
+    check('stoper Toggla – 20m + 17m 30s w jednej grupie', [$rr->getMinutes(), $rr->getCarrySeconds(), $rr->getTogglIds(), $rr->getStartClock()], [37, 30, [40, 41], '14:00']);
     $import->import($dRun, new DateTimeImmutable('2026-10-20 16:25:00'));
     check('stoper Toggla – kolejne pobranie podnosi czas bez duplikatu', [count($dRun->getActiveEntries()), $rr->getMinutes(), $rr->getCarrySeconds()], [1, 45, 0]);
+    check('stoper Toggla – obecność do „teraz”', [$dRun->getStartTime(), $dRun->getEndTime()], ['14:00', '16:25']);
     // krócej niż minuta: sekundy w carrySeconds
     $tHttp->routes['/me/time_entries'] = [200, [$te(42, 'TER-380 nowe', '2026-10-20T14:00:00+00:00', -1)]];
     $dShort = new WorkDay(new DateTimeImmutable('2026-10-20'));
@@ -645,6 +688,107 @@ namespace {
     $gamma = array_values(array_filter($dd->getActiveEntries(), fn ($r) => 'ABC-3' === $r->getIssueKey()));
     check('deleted=true nie jest dopasowany ani wskrzeszony – grupa daje nowy wiersz', [count($dd->getPendingDeletions()), $dc->isDeleted(), $dc->getMinutes(), count($gamma), $gamma[0]->getTogglIds(), $gamma[0] === $dc], [1, true, 10, 1, [12], false]);
     check('deleted=true – komunikat', $msgs($res)[0], 'success: Pobrano z Toggla: 3 wpisy (1 nowy, 2 zaktualizowane) – razem 1h.');
+
+    // godziny obecności dnia z pierwszego i ostatniego wpisu Toggla (także pominiętych, np. projekt „Przerwa”)
+    $hoursEntries = static fn (int $lastDuration): array => [
+        $te(50, 'ABC-1 a', '2026-10-20T05:23:30+00:00', 14400),             // 07:23–11:23
+        $te(51, 'przerwa', '2026-10-20T09:23:00+00:00', 1800),              // bez ticketu – pominięty, ale liczy się do obecności
+        $te(52, 'ABC-1 b', '2026-10-20T11:23:00+00:00', $lastDuration),     // do 15:23
+    ];
+    $tHttp->routes['/me/time_entries'] = [200, $hoursEntries(7200)];
+    // nowy dzień z domyślnymi godzinami (jak go tworzy kontroler) i przerwą, której import nie rusza
+    $dh = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $dh->setStartTime('08:00');
+    $dh->setEndTime('16:00');
+    $dh->setBreakMinutes(20);
+    $res = $import->import($dh);
+    check('godziny: nowy dzień dostaje godziny z Toggla (pełne minuty w dół)', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours(), $dh->getBreakMinutes(), $dh->getBreakText()],
+        ['07:23', '15:23', ['start' => '07:23', 'end' => '15:23'], 20, null]);
+    check('godziny: komunikat info', array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message'), ['Godziny obecności z Toggla: 07:23–15:23.']);
+    // ponowny import: godziny równe poprzednim z toggl_hours są aktualizowane
+    $tHttp->routes['/me/time_entries'] = [200, $hoursEntries(9000)];
+    $res = $import->import($dh);
+    check('godziny: ponowny import aktualizuje', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end'], array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')],
+        ['07:23', '15:53', '15:53', ['Godziny obecności z Toggla: 07:23–15:53.']]);
+    // te same godziny przy kolejnym imporcie – bez komunikatu
+    $res = $import->import($dh);
+    check('godziny: bez zmiany godzin brak komunikatu', array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message'), []);
+    // flaga hoursByUser (godziny wpisał użytkownik): zostają, toggl_hours bez zmian, bez komunikatu
+    $dh->markHoursByUser();
+    $dh->setEndTime('17:00');
+    $tHttp->routes['/me/time_entries'] = [200, $hoursEntries(10800)];
+    $res = $import->import($dh);
+    check('godziny: hoursByUser – zostają', [$dh->getStartTime(), $dh->getEndTime(), $dh->getTogglHours()['end'], array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')],
+        ['07:23', '17:00', '15:53', []]);
+    // flaga false + dowolne godziny (także inne niż domyślne) → nadpisane
+    $dl = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $dl->setStartTime('08:30');
+    $dl->setEndTime('16:45');
+    check('godziny: domyślnie hoursByUser = false, toggl_hours = null', [$dl->isHoursByUser(), $dl->getTogglHours()], [false, null]);
+    $import->import($dl);
+    check('godziny: bez flagi nadpisane z Toggla', [$dl->getStartTime(), $dl->getEndTime()], ['07:23', '16:23']);
+    // flaga true na dniu bez toggl_hours – zostają
+    $du = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $du->setStartTime('08:00');
+    $du->setEndTime('16:00');
+    $du->markHoursByUser();
+    $res = $import->import($du);
+    check('godziny: hoursByUser bez toggl_hours zostają', [$du->getStartTime(), $du->getEndTime(), $du->getTogglHours(), array_column(array_filter($res, fn ($r) => 'info' === $r['type']), 'message')], ['08:00', '16:00', null, []]);
+    // puste godziny (np. dzień wolny) – import ustawia
+    $de = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $import->import($de);
+    check('godziny: puste → z Toggla', [$de->getStartTime(), $de->getEndTime()], ['07:23', '16:23']);
+    // brak wpisów – godziny bez zmian
+    $tHttp->routes['/me/time_entries'] = [200, []];
+    $dn = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $dn->setStartTime('08:00');
+    $dn->setEndTime('16:00');
+    $res = $import->import($dn);
+    check('godziny: brak wpisów → bez zmian', [$dn->getStartTime(), $dn->getEndTime(), $dn->getTogglHours(), $msgs($res)], ['08:00', '16:00', null, ['info: Toggl nie ma wpisów z tego dnia.']]);
+    // koniec po północy przycięty do 23:59
+    $tHttp->routes['/me/time_entries'] = [200, [$te(60, 'ABC-1 noc', '2026-10-20T20:00:00+00:00', 7200)]]; // 22:00–00:00
+    $dm0 = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $import->import($dm0);
+    check('godziny: koniec po północy → 23:59', [$dm0->getStartTime(), $dm0->getEndTime()], ['22:00', '23:59']);
+
+    // startClock = lokalny start NAJWCZEŚNIEJSZEGO wpisu grupy, także gdy API zwraca wpisy od najnowszego
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(72, 'ABC-6 trzy', '2026-10-20T11:05:59+00:00', 600),   // 13:05 (najnowszy, pierwszy w odpowiedzi)
+        $te(71, 'ABC-6 trzy', '2026-10-20T08:40:30+00:00', 900),   // 10:40
+        $te(70, 'ABC-6 trzy', '2026-10-20T07:15:00+00:00', 300),   // 09:15 (najwcześniejszy)
+    ]];
+    $dsc = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $import->import($dsc);
+    [$sc] = $dsc->getActiveEntries();
+    check('startClock = najwcześniejszy start grupy', [$sc->getMinutes(), $sc->getStartClock(), $sc->getTogglIds()], [30, '09:15', [70, 71, 72]]);
+    // ponowny import aktualizuje startClock tą samą regułą (Toggl jest źródłem czasu)
+    $sc->setStartClock('11:00');
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(72, 'ABC-6 trzy', '2026-10-20T11:05:59+00:00', 600),
+        $te(71, 'ABC-6 trzy', '2026-10-20T08:40:30+00:00', 900),
+        $te(70, 'ABC-6 trzy', '2026-10-20T07:15:00+00:00', 300),
+        $te(73, 'ABC-6 trzy', '2026-10-20T06:50:00+00:00', 60),     // 08:50 – nowy, wcześniejszy
+    ]];
+    $import->import($dsc);
+    check('ponowny import aktualizuje startClock', [count($dsc->getActiveEntries()), $sc->getMinutes(), $sc->getStartClock()], [1, 31, '08:50']);
+
+    // wiersz kończący się po północy nie dostaje godziny „od”
+    $tHttp->routes['/me/time_entries'] = [200, [
+        $te(80, 'ABC-1 późno', '2026-10-20T21:10:00+00:00', 3600),    // 23:10 + 60m → po północy
+        $te(81, 'ABC-2 wcześniej', '2026-10-20T20:00:00+00:00', 3600), // 22:00 + 60m → 23:00
+    ]];
+    $dpm = new WorkDay(new DateTimeImmutable('2026-10-20'));
+    $res = $import->import($dpm);
+    $byKey = [];
+    foreach ($dpm->getActiveEntries() as $r) { $byKey[$r->getIssueKey()] = $r->getStartClock(); }
+    ksort($byKey);
+    check('północ: startClock tylko gdy wiersz się mieści', $byKey, ['ABC-1' => null, 'ABC-2' => '22:00']);
+    check('północ: ostrzeżenie', array_values(array_filter($msgs($res), fn ($m) => str_contains($m, 'po północy'))), ['warning: „późno” (ABC-1, 1h): wpis kończyłby się po północy – bez godziny „od”.']);
+    // ponowny import też zdejmuje godzinę „od”, gdy wiersz urósł ponad północ
+    $tHttp->routes['/me/time_entries'] = [200, [$te(81, 'ABC-2 wcześniej', '2026-10-20T20:00:00+00:00', 7500)]]; // 22:00 + 2h05m
+    $import->import($dpm);
+    $r2 = array_values(array_filter($dpm->getActiveEntries(), fn ($r) => 'ABC-2' === $r->getIssueKey()))[0];
+    check('północ: ponowny import – wiersz urósł', [$r2->getMinutes(), $r2->getStartClock()], [125, null]);
 
     // (c) dwa wiersze pasują do jednej grupy: pierwszy bierze sumę, drugi znika, czas nie liczy się podwójnie
     foreach ([false, true] as $inJira) {

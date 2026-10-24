@@ -76,6 +76,8 @@
 <div>
     {% if togglConfigured %}<form id="togglform" method="post" action="{{ path('day_toggl', {date: date|date('Y-m-d')}) }}"></form>{% endif %}
     <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel dayform" id="dayform">
+        {# 1, gdy użytkownik dotknął godzin od–do – wtedy import z Toggla ich nie nadpisuje #}
+        <input type="hidden" name="hours_touched" id="hours_touched" value="{{ form.hoursTouched|default(false) ? 1 : 0 }}">
         <div class="hours">
             <div class="hfield"><label for="start" class="lbl">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
             <div class="hfield"><label for="end" class="lbl">Do</label><input type="time" id="end" name="end" value="{{ form.end }}"></div>
@@ -257,6 +259,7 @@
     };
     const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} };
 
+    const hoursTouched = document.getElementById('hours_touched');
     const changed = () => {
         dirty++;
         writeDraft();
@@ -264,8 +267,9 @@
         clearTimeout(debounce);
         debounce = setTimeout(save, 900);
     };
-    form.addEventListener('input', changed);
-    form.addEventListener('change', (ev) => { if (!ev.target.classList.contains('f-del')) changed(); });
+    const touchHours = (ev) => { if (hoursTouched && (ev.target.id === 'start' || ev.target.id === 'end')) hoursTouched.value = '1'; };
+    form.addEventListener('input', (ev) => { touchHours(ev); changed(); });
+    form.addEventListener('change', (ev) => { touchHours(ev); if (!ev.target.classList.contains('f-del')) changed(); });
 
     async function save() {
         clearTimeout(debounce); clearTimeout(retryTimer);

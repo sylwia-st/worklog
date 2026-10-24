@@ -4,7 +4,8 @@ namespace App\Domain;
 
 /**
  * Bilans dnia. Podstawą do oceny nadgodzin/krótszego dnia jest czas obecności (od–do minus przerwa),
- * a gdy godzin nie podano – suma czasu zalogowanego w ticketach.
+ * a gdy godzin nie podano – suma czasu zalogowanego w ticketach. Ustawienie „bilans z czasu w ticketach”
+ * ($balanceFromTickets) przestawia podstawę zawsze na sumę ticketów; obecność jest wtedy tylko informacją.
  */
 final class DaySummary
 {
@@ -20,6 +21,8 @@ final class DaySummary
         public readonly int $toleranceMinutes,
         /** Ile odliczono z czasu obecności: część stałej przerwy (np. obiad) przypadająca na godziny pracy + dodatkowa przerwa. */
         public readonly int $breakMinutes = 0,
+        /** Bilans (podstawa, nadgodziny/krócej, mail) liczony z czasu w ticketach, nie z godzin obecności. */
+        public readonly bool $balanceFromTickets = false,
     ) {
     }
 
@@ -38,6 +41,7 @@ final class DaySummary
         ?string $fixedBreakTo = null,
         /** @var list<array{0: int, 1: int}> przerwy podane godzinami, np. 13:30–13:50 (minuty od północy) */
         array $breakRanges = [],
+        bool $balanceFromTickets = false,
     ): self {
         $logged = array_sum($entryMinutes);
         $presence = null;
@@ -64,7 +68,7 @@ final class DaySummary
             $presence = max(0, $span - $deducted);
         }
 
-        return new self($logged, $presence, $normMinutes, max(0, $toleranceMinutes), $deducted);
+        return new self($logged, $presence, $normMinutes, max(0, $toleranceMinutes), $deducted, $balanceFromTickets);
     }
 
     /**
@@ -162,23 +166,31 @@ final class DaySummary
 
     public function basisMinutes(): int
     {
-        return $this->presenceMinutes ?? $this->loggedMinutes;
+        return $this->balanceFromTickets ? $this->loggedMinutes : ($this->presenceMinutes ?? $this->loggedMinutes);
     }
 
+    /** Bilans wychodzi z godzin obecności (a nie z ticketów – z braku godzin albo z ustawienia). */
     public function basedOnPresence(): bool
     {
-        return null !== $this->presenceMinutes;
+        return null !== $this->presenceMinutes && !$this->balanceFromTickets;
     }
 
     /** Dodatnia = nadgodziny, ujemna = krócej. */
     public function difference(): int
     {
-        return $this->basisMinutes() - $this->normMinutes;
+        // pusty dzień nie ma bilansu (inaczej Przegląd liczyłby go jako −norma)
+        return $this->isEmpty() ? 0 : $this->basisMinutes() - $this->normMinutes;
+    }
+
+    /** Nic do rozliczenia: brak czasu w ticketach i (w trybie ticketów albo bez godzin) brak obecności. */
+    private function isEmpty(): bool
+    {
+        return 0 === $this->loggedMinutes && ($this->balanceFromTickets || null === $this->presenceMinutes);
     }
 
     public function kind(): string
     {
-        if (0 === $this->loggedMinutes && null === $this->presenceMinutes) {
+        if ($this->isEmpty()) {
             return self::KIND_EMPTY;
         }
         $diff = $this->difference();
@@ -192,9 +204,9 @@ final class DaySummary
         return self::KIND_OK;
     }
 
-    /** Różnica: zalogowane − obecność (null gdy brak godzin obecności). */
+    /** Różnica: zalogowane − obecność (null gdy brak godzin obecności albo bilans liczony z ticketów – wtedy nie ma czego ostrzegać). */
     public function loggedVsPresence(): ?int
     {
-        return null === $this->presenceMinutes ? null : $this->loggedMinutes - $this->presenceMinutes;
+        return null === $this->presenceMinutes || $this->balanceFromTickets ? null : $this->loggedMinutes - $this->presenceMinutes;
     }
 }

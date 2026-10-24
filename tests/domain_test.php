@@ -99,6 +99,14 @@ check('przyjście w trakcie obiadu', [$s->presenceMinutes, $s->breakMinutes], [3
 $s = DaySummary::calculate([], '08:00', '17:00', 15, 420, 10, '12:00', '13:00');
 check('obiad + dodatkowa', [$s->presenceMinutes, $s->breakMinutes, $s->difference()], [465, 75, 45]);
 check('bez stałej przerwy', DaySummary::calculate([], '08:00', '16:00', 0, 420, 10, null, null)->presenceMinutes, 480);
+$s = DaySummary::calculate([480], '08:00', '16:00', 0, 420, 0, '12:00', '13:00', [], true);
+check('bilans z ticketów', [$s->presenceMinutes, $s->basisMinutes(), $s->difference(), $s->kind(), $s->basedOnPresence(), $s->loggedVsPresence()], [420, 480, 60, DaySummary::KIND_OVER, false, null]);
+$s = DaySummary::calculate([480], '08:00', '16:00', 0, 420, 0, '12:00', '13:00');
+check('bilans z obecności (domyślnie)', [$s->basisMinutes(), $s->difference(), $s->kind(), $s->basedOnPresence(), $s->loggedVsPresence()], [420, 0, DaySummary::KIND_OK, true, 60]);
+check('ticketowy bilans: godziny bez wierszy = pusty dzień', DaySummary::calculate([], '08:00', '16:00', 0, 420, 0, null, null, [], true)->kind(), DaySummary::KIND_EMPTY);
+$empty = DaySummary::calculate([], '08:00', '16:00', 0, 420, 0, null, null, [], true);
+check('pusty dzień nie ma bilansu (nie −norma)', [$empty->difference(), $empty->kind()], [0, DaySummary::KIND_EMPTY]);
+check('pusty dzień bez godzin też', DaySummary::calculate([0], null, null, 0, 420, 0)->difference(), 0);
 
 check('render', Template::render("A {x}\n\n\n\n{y}B {nieznana}", ['x' => '1', 'y' => '']), "A 1\n\nB {nieznana}");
 check('day', Template::dayName(new DateTimeImmutable('2026-10-13')), 'wtorek');
