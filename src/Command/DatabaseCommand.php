@@ -142,7 +142,7 @@ final class DatabaseCommand extends Command
     }
 
     /**
-     * Token Jiry nie trafia do kopii. Zwykle i tak go w bazie nie ma (leży w pliku obok – Settings::loadToken),
+     * Tokeny (Jiry, Toggla) nie trafiają do kopii. Zwykle i tak ich w bazie nie ma (leżą w plikach obok – Settings::loadToken),
      * ale po przywróceniu starej kopii zostaje w bazie, dopóki aplikacja go nie przeniesie.
      * secure_delete nadpisuje zerami miejsce po starej wartości, więc nie da się jej odczytać z pliku.
      */
@@ -151,7 +151,7 @@ final class DatabaseCommand extends Command
         $db = $this->open($file);
         if (null !== $db->querySingle("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'setting'")) {
             $db->exec('PRAGMA secure_delete = ON');
-            $db->exec("UPDATE setting SET value = '' WHERE name = 'jira_token'");
+            $db->exec("UPDATE setting SET value = '' WHERE name IN ('jira_token', 'toggl_token')");
         }
         $db->close();
     }

@@ -6,20 +6,28 @@
 {% block body %}
 <span class="eyebrow">Konfiguracja</span>
 <h1>Ustawienia</h1>
-<p class="sub">Wszystko zapisuje się lokalnie w wolumenie Dockera <code>worklog-data</code>. Jedyne połączenie wychodzące to Twoja Jira.</p>
+<p class="sub">Wszystko zapisuje się lokalnie w wolumenie Dockera <code>worklog-data</code>. Połączenia wychodzące: Twoja Jira i – jeśli wpiszesz token – Toggl Track (api.track.toggl.com).</p>
 
 <div class="settings-layout">
 <nav class="settings-nav" aria-label="Sekcje ustawień">
     <a href="#sec-jira-conn">Połączenie z Jirą</a>
+    <a href="#sec-toggl-conn">Połączenie z Togglem</a>
     {% for section, fields in form %}<a href="#sec-{{ loop.index }}">{{ section }}</a>{% endfor %}
 </nav>
 <div>
 <div class="panel" id="sec-jira-conn" style="scroll-margin-top:86px">
     <h2>{{ icons.i('jira') }}Połączenie z Jirą</h2>
     <div class="actions" style="margin-top:0">
-        <form method="post" action="{{ path('settings_jira_test') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Sprawdź połączenie</button></form>
-        <form method="post" action="{{ path('settings_jira_issues') }}"><button type="submit" {{ not hasToken ? 'disabled' }}>Pobierz moje tickety do podpowiedzi</button></form>
-        <span class="muted small">{{ hasToken ? 'Token zapisany.' : 'Najpierw zapisz adres i token poniżej.' }} W podpowiedziach: {{ issueCount }} ticketów.</span>
+        <form method="post" action="{{ path('settings_jira_test') }}"><button type="submit" {{ not hasTokens.jira_token ? 'disabled' }}>Sprawdź połączenie</button></form>
+        <form method="post" action="{{ path('settings_jira_issues') }}"><button type="submit" {{ not hasTokens.jira_token ? 'disabled' }}>Pobierz moje tickety do podpowiedzi</button></form>
+        <span class="muted small">{{ hasTokens.jira_token ? 'Token zapisany.' : 'Najpierw zapisz adres i token poniżej.' }} W podpowiedziach: {{ issueCount }} ticketów.</span>
+    </div>
+</div>
+<div class="panel" id="sec-toggl-conn" style="scroll-margin-top:86px">
+    <h2>{{ icons.i('toggl') }}Połączenie z Togglem</h2>
+    <div class="actions" style="margin-top:0">
+        <form method="post" action="{{ path('settings_toggl_test') }}"><button type="submit" {{ not hasTokens.toggl_token ? 'disabled' }}>Sprawdź połączenie</button></form>
+        <span class="muted small">{{ hasTokens.toggl_token ? 'Token zapisany – na stronie dnia jest przycisk „Pobierz z Toggla”.' : 'Najpierw zapisz token poniżej (sekcja Toggl).' }}</span>
     </div>
 </div>
 
@@ -72,7 +80,7 @@
                             <button type="button" id="theme-load">Wczytaj kolory</button>
                         </div>
                     {% elseif type == 'password' %}
-                        <input type="password" id="{{ key }}" name="{{ key }}" value="" autocomplete="new-password" placeholder="{{ hasToken ? '•••••••• (zapisany)' : '' }}">
+                        <input type="password" id="{{ key }}" name="{{ key }}" value="" autocomplete="new-password" placeholder="{{ hasTokens[key] ? '•••••••• (zapisany)' : '' }}">
                     {% else %}
                         <input type="{{ type }}" id="{{ key }}" name="{{ key }}" value="{{ values[key] }}"{% if type == 'number' %} min="0"{% endif %}>
                     {% endif %}

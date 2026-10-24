@@ -400,6 +400,8 @@
         .entries tbody tr:hover td { background: var(--hover); }
         .entries tbody tr:focus-within td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
         .entries td:first-child { border-radius: 12px 0 0 12px; } .entries td:last-child { border-radius: 0 12px 12px 0; }
+        .entries td.issue { position: relative; }
+        .entries .from-toggl { position: absolute; top: 2px; right: 6px; display: flex; color: var(--muted); opacity: .8; }
         .entries td.st { width: 14px; padding: 8px 2px 8px 6px; }
         .entries td.st .dot { display: block; width: 4px; height: 32px; border-radius: 3px; box-shadow: none; }
         .entries td.st .dot.none, .entries td.st .dot.new, .entries td.st .dot.empty { background: var(--line); }

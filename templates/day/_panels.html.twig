@@ -3,7 +3,7 @@
 <section class="panel" id="balance-panel">
     {% if summary is null or summary.kind == 'empty' %}
         <div class="panel-h"><h2>{{ icons.i('balance') }}Bilans</h2></div>
-        <p class="muted" style="margin:0">Pojawi się po wpisaniu godzin albo czasu w ticketach.</p>
+        <p class="muted" style="margin:0">{{ balanceFromTickets ? 'Pojawi się po wpisaniu czasu w ticketach.' : 'Pojawi się po wpisaniu godzin albo czasu w ticketach.' }}</p>
     {% else %}
         {% set diff = summary.difference %}
         {% set kind = summary.kind == 'over' ? 'over' : (summary.kind == 'under' ? 'under' : 'okc') %}
@@ -25,11 +25,11 @@
             {% if norm > 0 %}<div class="norm" style="left:{{ (norm / scale * 100)|round(2) }}%"></div>{% endif %}
         </div>
         <p class="muted small" style="margin:6px 0 14px">
-            Liczone z {{ summary.basedOnPresence ? 'godzin obecności' : 'czasu w ticketach (brak godzin od–do)' }}.
+            Liczone z {{ summary.basedOnPresence ? 'godzin obecności' : (summary.balanceFromTickets ? 'czasu w ticketach' : 'czasu w ticketach (brak godzin od–do)') }}.
         </p>
         <dl class="stats">
             <dt>Obecność</dt><dd>{{ summary.presenceMinutes|hm }}</dd>
-            {% if summary.basedOnPresence %}<dt>Odliczona przerwa{{ day.workedThroughFixedBreak ? ' (wzięta później)' }}</dt><dd>{{ summary.breakMinutes|hm }}</dd>{% endif %}
+            {% if summary.presenceMinutes is not null %}<dt>Odliczona przerwa{{ day.workedThroughFixedBreak ? ' (wzięta później)' }}</dt><dd>{{ summary.breakMinutes|hm }}</dd>{% endif %}
             <dt>W ticketach</dt><dd>{{ summary.loggedMinutes|hm }}</dd>
             <dt>Norma</dt><dd>{{ summary.normMinutes|hm }}</dd>
         </dl>

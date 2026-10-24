@@ -76,7 +76,10 @@
 
 <div class="grid daygrid">
 <div>
+    {% if togglConfigured %}<form id="togglform" method="post" action="{{ path('day_toggl', {date: date|date('Y-m-d')}) }}"></form>{% endif %}
     <form method="post" action="{{ path('day_save', {date: date|date('Y-m-d')}) }}" class="panel dayform" id="dayform">
+        {# 1, gdy użytkownik dotknął godzin od–do – wtedy import z Toggla ich nie nadpisuje #}
+        <input type="hidden" name="hours_touched" id="hours_touched" value="{{ form.hoursTouched|default(false) ? 1 : 0 }}">
         <div class="hours">
             <div class="hfield"><label for="start" class="lbl">Od</label><input type="time" id="start" name="start" value="{{ form.start }}"></div>
             <div class="hfield"><label for="end" class="lbl">Do</label><input type="time" id="end" name="end" value="{{ form.end }}"></div>
@@ -114,6 +117,13 @@
             <button type="button" id="addrow" class="link">{{ icons.i('plus') }}Dodaj wpis</button>
             {% if form.rows is empty %}
                 <a class="small" href="{{ path('day', {date: date|date('Y-m-d'), copy: 1}) }}">skopiuj tickety z poprzedniego dnia</a>
+            {% endif %}
+            {% if togglConfigured %}
+                <button type="submit" form="togglform" class="link" title="Wpisy z tym samym ticketem i opisem łączą się w jeden wiersz, a ponowne pobranie aktualizuje czas zamiast dublować wiersze.">{{ icons.i('toggl') }}Pobierz z Toggla</button>
+                {% if day and day.togglSyncedAt %}
+                    {% set togglRows = day.activeEntries|filter(e => e.togglIds is not empty)|length %}
+                    <span class="muted small">pobrano o {{ day.togglSyncedAt|date('H:i') }} · {{ plural(togglRows, 'wiersz', 'wiersze', 'wierszy') }} z Toggla</span>
+                {% endif %}
             {% endif %}
             <span class="hint">Czas: 1h 30m · 1.5 · 90m · 1:30 (sama liczba to godziny, najwyżej 12) – albo ▶ stoper. Od–do niewymagane: start + czas albo start + koniec.</span>
         </div>
@@ -164,12 +174,14 @@
 {% endblock %}
 
 {% macro entry_row(i, row, titles) %}
+    {% import '_icons.html.twig' as icons %}
     <tr class="{{ row.error and row.status != 'error' ? 'has-error' }}{{ row.delete|default(false) ? ' marked-delete' }}" data-key="{{ i }}">
         <td class="st">
             {% set stTitles = {synced: 'Wysłane do Jiry', changed: 'Zmienione – wyślij ponownie', new: 'Jeszcze nie w Jirze', empty: 'Brak czasu – nie będzie wysłane', error: 'Błąd: ' ~ row.error} %}
             <span class="dot {{ row.status ?: 'none' }}" title="{{ row.status ? stTitles[row.status] : '' }}"></span>
         </td>
         <td class="issue">
+            {% if row.toggl|default(false) %}<span class="from-toggl" title="Pobrany z Toggla">{{ icons.i('toggl', 12) }}</span>{% endif %}
             <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
             <input type="hidden" name="entries[{{ i }}][uid]" value="{{ row.uid|default('') }}" class="f-uid">
             {# po błędzie (422) wiersz ma orig z wysłanego formularza – nie nowo wpisany czas #}
@@ -280,6 +292,7 @@
     };
     const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} };
 
+    const hoursTouched = document.getElementById('hours_touched');
     const changed = () => {
         dirty++;
         writeDraft();
@@ -287,8 +300,9 @@
         clearTimeout(debounce);
         debounce = setTimeout(save, 900);
     };
-    form.addEventListener('input', changed);
-    form.addEventListener('change', (ev) => { if (!ev.target.classList.contains('f-del')) changed(); });
+    const touchHours = (ev) => { if (hoursTouched && (ev.target.id === 'start' || ev.target.id === 'end')) hoursTouched.value = '1'; };
+    form.addEventListener('input', (ev) => { touchHours(ev); changed(); });
+    form.addEventListener('change', (ev) => { touchHours(ev); if (!ev.target.classList.contains('f-del')) changed(); });
 
     // Zwraca true, gdy wszystko jest zapisane. W trakcie innego zapisu czeka na jego koniec i zapisuje to, co doszło
     // w międzyczasie – kto czeka na wynik (▶ przy nowym wierszu), dostaje już id wiersza.
@@ -406,6 +420,23 @@
     for (const btn of document.querySelectorAll('[data-sync-again]')) {
         btn.addEventListener('click', () => { const sync = document.getElementById('syncbtn'); if (sync) form.requestSubmit(sync); });
     }
+
+    // „Pobierz z Toggla” to osobny formularz – najpierw czekamy na zapis dnia (jak przy submit #dayform), żeby import
+    // nie ścigał się z autozapisem i nie zgubił niezapisanej edycji. Bez JS to zwykły submit.
+    const togglForm = document.getElementById('togglform');
+    let togglGo = false;
+    window.addEventListener('pageshow', (ev) => { if (ev.persisted) togglGo = false; }); // powrót z pamięci przeglądarki
+    if (togglForm) togglForm.addEventListener('submit', async (ev) => {
+        if (togglGo) return;
+        ev.preventDefault();
+        clearTimeout(debounce); clearTimeout(retryTimer);
+        while (saving) await new Promise(r => setTimeout(r, 50));
+        if (dirty !== savedDirty) await save();
+        if (dirty !== savedDirty) return; // zapis się nie udał – komunikat stoi przy przyciskach, nie importujemy na niezapisany dzień
+        submitting = true; togglGo = true;
+        await new Promise(r => setTimeout(r, 0)); // jw. – nie w trakcie dispatchu zdarzenia submit
+        togglForm.requestSubmit();
+    });
 
     // ---------- usuwanie wierszy: zawsze z potwierdzeniem ----------
     // Serwer też usuwa tylko z potwierdzeniem (confirm_delete), a autozapis nie usuwa nigdy.
