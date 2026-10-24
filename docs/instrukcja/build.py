@@ -252,7 +252,7 @@ box('Uwaga', 'Sama liczba bez jednostki to godziny (2 = 2h), ale najwyżej 12. P
 sub('Praca w przerwie obiadowej (awaria)')
 steps(
     'Zaznacz pole pracy w przerwie obiadowej pod godzinami dnia.',
-    f'W polu {B("Przerwa wzięta (łącznie)")} pojawi się 1h – popraw na tyle, ile przerwy faktycznie było. Na raty '
+    f'W polu {B("Przerwa wzięta (łącznie)")} pojawi się 1h – popraw na tyle, ile przerwy faktycznie było (np. 30m albo 0,5h). Na raty '
     f'możesz wpisać sam czas (20m + 40m) albo godziny od–do (13:30-13:50, 15:00-15:40); da się też łączyć oba '
     f'sposoby. Jeśli przerwy nie było wcale – wpisz 0.',
     'Wpisz tickety normalnie, także czas z 12:00–13:00, i zapisz.')
@@ -299,7 +299,8 @@ bullets(
 
 h('4. Wysłanie do Jiry')
 p(f'Kliknij {G("Zapisz i wyślij do Jiry")}. Wszystkie zmiany dnia idą naraz: nowe wpisy są dodawane, poprawione '
-  f'aktualizowane, a usunięte kasowane. Nad formularzem pojawi się wynik dla każdego wpisu.')
+  f'aktualizowane, a usunięte i te z wyczyszczonym czasem kasowane. Nad formularzem pojawi się wynik dla każdego '
+  f'wpisu. Dopóki w Ustawieniach nie ma adresu Jiry i tokenu, tego przycisku nie ma – wpisy zapisują się tylko lokalnie.')
 table(['Pasek przy wierszu', 'Znaczenie', 'Co zrobić'], [
     [f'{DOT("#2e7d4f")} zielony', 'Wpis jest w Jirze i się zgadza', 'Nic'],
     [f'{DOT("#a86a00")} żółty', 'Poprawiony po wysłaniu', 'Zapisz i wyślij do Jiry'],
@@ -321,6 +322,7 @@ table(['Chcesz…', 'Zrób tak', 'Co stanie się w Jirze'], [
     ['zmienić czas lub opis', 'Popraw w wierszu → Zapisz i wyślij do Jiry', 'Ten sam worklog zostanie zaktualizowany (bez duplikatu).'],
     ['zmienić numer ticketu', 'Popraw numer → Zapisz i wyślij do Jiry', 'Worklog zniknie ze starego ticketu i pojawi się w nowym.'],
     ['usunąć wpis', 'Zaznacz ✕ w wierszu → Zapisz i wyślij do Jiry → Usuń zaznaczone', 'Worklog zostanie usunięty z Jiry.'],
+    ['wyczyścić czas', 'Usuń czas w wierszu → Zapisz i wyślij do Jiry', 'Worklog zostanie usunięty z Jiry, a wiersz zostanie bez czasu.'],
 ], [40, 65, 65])
 bullets(
     f'Usunięcie zawsze wymaga potwierdzenia: po kliknięciu Zapisz przy zaznaczonym ✕ pod przyciskami pojawia się lista '

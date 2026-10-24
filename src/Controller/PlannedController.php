@@ -67,6 +67,8 @@ final class PlannedController extends AbstractController
                 PlannedChange::TYPE_EARLY => 'Podaj, o której wyjdziesz.',
                 default => 'Podaj godziny od i do.',
             };
+        } elseif ($needsFrom && $needsTo && TimeFormat::clockToMinutes((string) $to) <= TimeFormat::clockToMinutes((string) $from)) {
+            $errors[] = 'Godzina wyjścia musi być późniejsza niż godzina przyjścia.';
         }
 
         if ([] !== $errors) {

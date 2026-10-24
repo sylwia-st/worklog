@@ -7,6 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: \App\Repository\WorklogEntryRepository::class)]
 #[ORM\Table(name: 'worklog_entry')]
+#[ORM\UniqueConstraint(name: 'uniq_worklog_entry_client_key', columns: ['client_key'])]
 class WorklogEntry
 {
     #[ORM\Id]
@@ -37,6 +38,13 @@ class WorklogEntry
     /** Godzina rozpoczęcia podana ręcznie („GG:MM”); null = worklog dostaje kolejną wolną godzinę dnia. */
     #[ORM\Column(length: 5, nullable: true)]
     private ?string $startClock = null;
+
+    /**
+     * Klucz nadany wierszowi w przeglądarce, zanim wpis dostał id. Po nim serwer rozpoznaje wiersz zapisany już
+     * wcześniej (np. przez beacon przy zamykaniu karty albo przywrócony szkic) i nie tworzy drugiego wpisu.
+     */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $clientKey = null;
 
     /** Wpis usunięty lokalnie, który trzeba jeszcze skasować w Jirze. */
     #[ORM\Column]
@@ -183,6 +191,16 @@ class WorklogEntry
     public function setStartClock(?string $startClock): void
     {
         $this->startClock = $startClock;
+    }
+
+    public function getClientKey(): ?string
+    {
+        return $this->clientKey;
+    }
+
+    public function setClientKey(?string $clientKey): void
+    {
+        $this->clientKey = $clientKey;
     }
 
     public function getIssueKey(): string

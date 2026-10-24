@@ -13,7 +13,9 @@ FORMA=""           # f = żeńska, m = męska, n = neutralna; pusta = zapytaj (a
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --port) PORT="$2"; shift 2 ;;
+        --port)
+            [[ "${2:-}" =~ ^[0-9]{1,5}$ ]] || { echo "--port: podaj numer portu, np. 8765"; exit 1; }
+            PORT="$2"; shift 2 ;;
         --remind) REMIND="$2"; WITH_REMIND=1; shift 2 ;;
         --no-remind) WITH_REMIND=0; shift ;;
         --vpn) VPN=1; shift ;;
@@ -26,6 +28,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
+# Ścieżka do jednostki systemd, w cudzysłowie (spacje, np. /media/…/My Passport): \ i " poprzedzone \, % jako %%.
+unit_quote() { local s=${1//\\/\\\\}; s=${s//\"/\\\"}; s=${s//%/%%}; printf '%s' "$s"; }
+# Wartość do zamiany w sed (separator #): \, & i # poprzedzone \.
+sed_value() { printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'; }
+
+# .env.compose czyta bash (./worklog robi source) i docker compose – ścieżka w apostrofach działa w obu
+[[ "$BACKUP_DIR" != *"'"* ]] || { echo "--backup-dir: ścieżka nie może zawierać apostrofu (')."; exit 1; }
+# systemd nie uruchomi skryptu ze ścieżki z apostrofem, cudzysłowem albo \ (spacje, nawiasy i polskie litery są w porządku)
+[[ "$DIR" != *[\'\"\\]* ]] || { echo "Katalog z narzędziem ($DIR) nie może zawierać znaków ' \" \\ – systemd nie uruchomi z niego przypomnień i kopii. Przenieś go i uruchom instalację ponownie."; exit 1; }
 
 say "1/5 Sprawdzam Dockera"
 command -v docker >/dev/null || { echo "Brak Dockera – instrukcja: https://docs.docker.com/engine/install/ubuntu/"; exit 1; }
@@ -39,7 +50,7 @@ cd "$DIR"
 # zapamiętaj ustawienia – korzysta z nich skrypt ./worklog
 FILES="compose.yaml"
 (( VPN )) && FILES="compose.yaml:compose.vpn.yaml"
-printf 'WORKLOG_PORT=%s\nCOMPOSE_FILE=%s\nWORKLOG_BACKUP_DIR=%s\n' "$PORT" "$FILES" "$BACKUP_DIR" > .env.compose
+printf "WORKLOG_PORT=%s\nCOMPOSE_FILE=%s\nWORKLOG_BACKUP_DIR='%s'\n" "$PORT" "$FILES" "$BACKUP_DIR" > .env.compose
 chmod +x "$DIR/worklog"
 
 say "2/5 Buduję obraz i uruchamiam kontener"
@@ -79,8 +90,10 @@ say "4/5 Przypomnienie i kopie zapasowe (timery systemd na hoście)"
 UNIT_DIR="$HOME/.config/systemd/user"
 mkdir -p "$UNIT_DIR"
 chmod +x "$DIR/scripts/remind.sh" "$DIR/scripts/backup.sh"
+UNIT_DIR_EXEC="$(sed_value "$(unit_quote "$DIR")")"
+UNIT_BACKUP_DIR="$(sed_value "$(unit_quote "$BACKUP_DIR")")"
 for f in worklog-remind.service worklog-remind.timer worklog-backup.service worklog-backup.timer; do
-    sed -e "s#@DIR@#$DIR#g" -e "s#@PORT@#$PORT#g" -e "s#@REMIND@#$REMIND#g" -e "s#@BACKUP_DIR@#$BACKUP_DIR#g" "$DIR/systemd/$f" > "$UNIT_DIR/$f"
+    sed -e "s#@DIR@#$UNIT_DIR_EXEC#g" -e "s#@PORT@#$PORT#g" -e "s#@BACKUP_DIR@#$UNIT_BACKUP_DIR#g" "$DIR/systemd/$f" > "$UNIT_DIR/$f"
 done
 # usuń usługę ze starej wersji (bez Dockera), jeśli była zainstalowana
 if systemctl --user list-unit-files worklog.service >/dev/null 2>&1 && [[ -f "$UNIT_DIR/worklog.service" ]]; then

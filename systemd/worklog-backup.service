@@ -3,5 +3,6 @@ Description=Kopia zapasowa raportu czasu pracy
 
 [Service]
 Type=oneshot
-Environment=WORKLOG_BACKUP_DIR=@BACKUP_DIR@
-ExecStart=@DIR@/scripts/backup.sh
+# w cudzysłowie – ścieżki mogą mieć spacje (install.sh wstawia je z ucieczką znaków \ " %)
+Environment="WORKLOG_BACKUP_DIR=@BACKUP_DIR@"
+ExecStart="@DIR@/scripts/backup.sh"

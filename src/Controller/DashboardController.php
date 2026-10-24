@@ -114,7 +114,7 @@ final class DashboardController extends AbstractController
      */
     private function chart(array $rows, \DateTimeImmutable $today, int $norm): array
     {
-        $max = max([$norm] + array_map(static fn (array $r) => isset($r['summary']) ? $r['summary']->basisMinutes() : 0, $rows));
+        $max = max([$norm, ...array_map(static fn (array $r) => isset($r['summary']) ? $r['summary']->basisMinutes() : 0, $rows)]);
         $scale = max(60, (int) ceil($max * 1.15 / 60) * 60);
         $bars = [];
         foreach ($rows as $r) {

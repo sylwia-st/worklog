@@ -30,7 +30,13 @@ function Read-Config {
     }
     if (Test-Path -LiteralPath $EnvFile) {
         foreach ($line in [IO.File]::ReadAllLines($EnvFile)) {
-            if ($line -match '^\s*([A-Z_]+)=(.*)$') { $cfg[$Matches[1]] = $Matches[2].Trim() }
+            if ($line -match '^\s*([A-Z_]+)=(.*)$') {
+                $key = $Matches[1]
+                $value = $Matches[2].Trim()
+                # wartość w apostrofach albo cudzysłowie – tak install.sh zapisuje ścieżki (mogą mieć spacje)
+                if ($value -match '^([''"])(.*)\1$') { $value = $Matches[2] }
+                $cfg[$key] = $value
+            }
         }
     }
     return $cfg
@@ -97,12 +103,17 @@ function Get-ErrorText($Result) {
 # Kopia bazy do pliku na tym komputerze. Plik pojawia się dopiero, gdy jest kompletny.
 function Backup-Database([string]$Out) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Out) | Out-Null
-    # VACUUM INTO + sprawdzenie integralności robi aplikacja w kontenerze; tu tylko przenosimy plik
-    $r = Invoke-Native docker @('exec', $Container, 'php', 'bin/console', 'app:db', 'backup', '/data/.backup.db')
-    if ($r.Code -ne 0) { throw (Get-ErrorText $r) }
-    $r = Invoke-Native docker @('cp', "${Container}:/data/.backup.db", "$Out.part")
-    if ($r.Code -ne 0) { throw ('Nie udało się skopiować kopii z kontenera: ' + (Get-ErrorText $r)) }
-    $null = Invoke-Native docker @('exec', $Container, 'rm', '-f', '/data/.backup.db')
+    # osobny plik w kontenerze dla każdej kopii – kopia agenta może biec razem z ręczną albo z tą przed przywróceniem
+    $tmp = '/data/.backup-{0}-{1}.db' -f $PID, (Get-Random)
+    try {
+        # VACUUM INTO + sprawdzenie integralności robi aplikacja w kontenerze; tu tylko przenosimy plik
+        $r = Invoke-Native docker @('exec', $Container, 'php', 'bin/console', 'app:db', 'backup', $tmp)
+        if ($r.Code -ne 0) { throw (Get-ErrorText $r) }
+        $r = Invoke-Native docker @('cp', "${Container}:$tmp", "$Out.part")
+        if ($r.Code -ne 0) { throw ('Nie udało się skopiować kopii z kontenera: ' + (Get-ErrorText $r)) }
+    } finally {
+        $null = Invoke-Native docker @('exec', $Container, 'rm', '-f', $tmp)
+    }
     Move-Item -LiteralPath "$Out.part" -Destination $Out -Force
 }
 

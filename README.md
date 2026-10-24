@@ -4,7 +4,7 @@
 
 Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineBundle 3.3, SQLite) do codziennego raportowania:
 
-1. **Jira** – wpisujesz tickety i czas, jeden przycisk wysyła worklogi (nowe dodaje, zmienione aktualizuje, usunięte kasuje).
+1. **Jira** – wpisujesz tickety i czas, jeden przycisk wysyła worklogi (nowe dodaje, zmienione aktualizuje, usunięte i te z wyczyszczonym czasem kasuje).
 2. **Slack** – gotowe podsumowanie per ticket do skopiowania jednym kliknięciem.
 3. **Mail o nadgodzinach / krótszym dniu** – pojawia się sam, gdy bilans dnia wychodzi poza tolerancję; otwiera się w Twoim programie pocztowym z wypełnionymi adresatami, tematem i treścią.
 4. **Planowane zmiany** – późniejsze przyjście, wcześniejsze wyjście, krótszy dzień: zapisujesz → dostajesz gotowy mail (z ostrzeżeniem, jeśli wysyłasz za późno).
@@ -107,7 +107,7 @@ Jeśli nie widzisz tej opcji, admin wyłączył tokeny – poproś go o Personal
    „Skopiuj tickety z poprzedniego dnia” przenosi same numery.
    Tytuł ticketu wpisujesz razem z numerem („ABC-123 Produkcja nie działa”) – numer zostaje w polu ticketu, tytuł przechodzi do linii pod nim i trafia na Slacka, do `{lista}` w mailu i do CSV. Przy kolejnych dniach podpowiada się sam.
    Kolumna **Od–do** (nieobowiązkowa) ustala, o której zaczął się worklog: wpisz start i czas – koniec wyliczy się sam, albo start i koniec – wyliczy się czas. Obiad i przerwy wpisane godzinami się nie liczą (11:00–14:00 z obiadem 12–13 = 2h).
-2. **Zapisz i wyślij do Jiry.** Pasek z lewej strony wiersza: zielony = w Jirze, żółty = zmieniony po wysłaniu, czerwony = błąd (najedź, żeby zobaczyć treść).
+2. **Zapisz i wyślij do Jiry.** Pasek z lewej strony wiersza: zielony = w Jirze, żółty = zmieniony po wysłaniu, czerwony = błąd (najedź, żeby zobaczyć treść). Bez adresu i tokenu Jiry w Ustawieniach tego przycisku nie ma – wpisy zapisują się tylko lokalnie.
 3. **Kopiuj na Slacka** → wklej w kanał.
 4. Jeśli pojawi się panel maila → **Otwórz w programie pocztowym** → Wyślij.
 
@@ -127,7 +127,7 @@ Nieznana zmienna zostaje w tekście dosłownie – łatwo wyłapać literówkę.
 Domyślnie: norma **7h**, praca 8:00–16:00, stała przerwa obiadowa **12:00–13:00** (zmienisz w Ustawieniach → Dzień pracy).
 Bilans liczony jest z godzin obecności: od–do minus ta część obiadu, która wypada w godzinach pracy, minus ewentualna dodatkowa przerwa; gdy godzin nie podasz – z sumy czasu w ticketach.
 
-**Awaria w porze obiadu:** zaznacz w dniu pole pracy w przerwie obiadowej i wpisz przerwę, która faktycznie była – czasem (`1h`, `20m + 40m`) albo godzinami (`13:30-13:50, 15:00-15:40`). Obiad nie odliczy się wtedy automatycznie, a worklogi w Jirze ominą wpisane godziny przerw.
+**Awaria w porze obiadu:** zaznacz w dniu pole pracy w przerwie obiadowej i wpisz przerwę, która faktycznie była – czasem (`1h`, `0,5h`, `20m + 40m`) albo godzinami (`13:30-13:50, 15:00-15:40`). Obiad nie odliczy się wtedy automatycznie, a worklogi w Jirze ominą wpisane godziny przerw. Samo `0,5` jest niejednoznaczne – trzeba dopisać jednostkę (`0,5h`).
 
 ## Wygląd
 

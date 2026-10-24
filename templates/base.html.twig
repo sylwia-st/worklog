@@ -799,12 +799,13 @@
         const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
         const keepKey = (s) => 'worklog-timer-keep-' + s.startedAt;
 
-        async function call(url, body) {
+        // quiet – odświeżanie w tle (co minutę, po powrocie do karty): błąd bez okienka, inaczej wyskakiwałoby co minutę
+        async function call(url, body, quiet = false) {
             const opts = body === undefined ? {credentials: 'same-origin'} :
                 {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)};
             const res = await fetch(url, opts);
             const json = await res.json().catch(() => ({}));
-            if (!res.ok) { alert(json.error || 'Stoper: błąd ' + res.status); throw new Error(json.error); }
+            if (!res.ok) { if (!quiet) alert(json.error || 'Stoper: błąd ' + res.status); throw new Error(json.error); }
             return json;
         }
         function render(s) {
@@ -830,7 +831,7 @@
             document.dispatchEvent(new CustomEvent('timer:tick', {detail: {...state, elapsedNow}}));
         }
         const api = {
-            refresh: async () => render(await call('{{ path('timer_state') }}')),
+            refresh: async () => render(await call('{{ path('timer_state') }}', undefined, true)),
             start: async (entryId, at) => render(await call('{{ path('timer_start') }}', at ? {entryId, at} : {entryId})),
             stop: async (at) => render(await call('{{ path('timer_stop') }}', at ? {at} : {})),
         };

@@ -8,7 +8,7 @@
     <div>
         <div class="daynav">
             <a class="btn iconbtn" href="{{ path('day', {date: prev|date('Y-m-d')}) }}" title="{{ prev|pl_day|capitalize }} {{ prev|date('d.m') }}" aria-label="Poprzedni dzień"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></a>
-            <input type="date" value="{{ date|date('Y-m-d') }}" aria-label="Wybierz dzień" onchange="location.href='{{ path('day', {date: '0000-00-00'})|replace({'0000-00-00': ''}) }}' + this.value">
+            <input type="date" value="{{ date|date('Y-m-d') }}" aria-label="Wybierz dzień" onchange="if (this.value) location.href='{{ path('day', {date: '0000-00-00'})|replace({'0000-00-00': ''}) }}' + this.value">
             <a class="btn iconbtn" href="{{ path('day', {date: next|date('Y-m-d')}) }}" title="{{ next|pl_day|capitalize }} {{ next|date('d.m') }}" aria-label="Następny dzień"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></a>
             {% if date == today %}<span class="pill-today">dziś</span>{% else %}<a class="pill-today" href="{{ path('today') }}">wróć do dziś</a>{% endif %}
         </div>
@@ -43,7 +43,9 @@
         <ul>
             {% for r in jiraFailed %}<li><b>{{ r.issue }}</b>{{ r.time ? ' (' ~ r.time ~ ')' }}: {{ r.error }}</li>{% endfor %}
         </ul>
-        <button type="submit" form="dayform" name="action" value="sync" class="primary">Wyślij ponownie do Jiry</button>
+        {# zwykły przycisk, nie submit z form="dayform": stojąc przed formularzem, byłby jego przyciskiem domyślnym
+           i Enter w dowolnym polu wysyłałby wszystko do Jiry zamiast zapisać (JS klika #syncbtn) #}
+        <button type="button" class="primary" data-sync-again>Wyślij ponownie do Jiry</button>
     </div>
 {% endif %}
 
@@ -131,8 +133,11 @@
 
         <div class="savebar">
             <span id="savestate" class="badge" aria-live="polite">{{ day ? 'zapisane' : 'nic jeszcze nie zapisano' }}</span>
-            <button type="submit" name="action" value="save">Zapisz</button>
-            <button type="submit" name="action" value="sync" class="primary" id="syncbtn">{{ icons.i('send') }}Zapisz i wyślij do Jiry</button>
+            <button type="submit" name="action" value="save"{% if not closing.jiraConfigured %} class="primary"{% endif %}>Zapisz</button>
+            {# bez adresu i tokenu wysyłka tylko oznaczyłaby każdy wpis jako błąd #}
+            {% if closing.jiraConfigured %}
+                <button type="submit" name="action" value="sync" class="primary" id="syncbtn">{{ icons.i('send') }}Zapisz i wyślij do Jiry</button>
+            {% endif %}
         </div>
         {# Za przyciskami „Zapisz” – żeby Enter w polu (domyślny przycisk formularza) nigdy nie potwierdzał usunięcia. #}
         <div id="delconfirm" class="flash warning" {{ confirmDelete ? '' : 'hidden' }} style="margin-top:12px">
@@ -155,7 +160,7 @@
     {% for key, title in issueOptions %}<option value="{{ key }}">{{ key }}{{ title ? ' – ' ~ title }}</option>{% endfor %}
 </datalist>
 
-<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, issue: '', title: '', from: '', to: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
+<template id="rowtpl">{{ _self.entry_row('__i__', {id: 0, uid: '', issue: '', title: '', from: '', to: '', time: '', desc: '', status: null, error: null}, {}) }}</template>
 {% endblock %}
 
 {% macro entry_row(i, row, titles) %}
@@ -166,7 +171,9 @@
         </td>
         <td class="issue">
             <input type="hidden" name="entries[{{ i }}][id]" value="{{ row.id }}" class="f-id">
-            <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.time }}" class="f-orig">
+            <input type="hidden" name="entries[{{ i }}][uid]" value="{{ row.uid|default('') }}" class="f-uid">
+            {# po błędzie (422) wiersz ma orig z wysłanego formularza – nie nowo wpisany czas #}
+            <input type="hidden" name="entries[{{ i }}][orig]" value="{{ row.orig ?? row.time }}" class="f-orig">
             <input type="text" name="entries[{{ i }}][issue]" value="{{ row.issue }}" list="issues" placeholder="ABC-123" autocomplete="off" class="f-issue" aria-label="Ticket">
             <input type="text" name="entries[{{ i }}][title]" value="{{ row.title|default('') }}" placeholder="{{ titles[row.issue]|default('') ?: 'tytuł' }}" autocomplete="off" class="f-title" aria-label="Tytuł ticketu" title="Tytuł ticketu – na Slacka, do maila i do eksportu CSV">
         </td>
@@ -206,12 +213,32 @@
     const stateEl = document.getElementById('savestate');
     let next = rows.children.length;
 
+    // ---------- czas i godziny – jak TimeFormat w PHP; przy czymś niejasnym null, serwer i tak to oceni ----------
+    const fmt = (m) => { m = Number(m) || 0; if (!m) return ''; const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`; };
+    const parseClock = (s) => { const m = String(s).trim().match(/^([01]?\d|2[0-3])[:.]([0-5]\d)$/); return m ? m[1] * 60 + Number(m[2]) : null; };
+    const toClock = (m) => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+    const parseDur = (raw) => {
+        const s = String(raw).trim().toLowerCase().replace(',', '.');
+        let m, min = null;
+        if ((m = s.match(/^(\d{1,2}):([0-5]\d)$/))) min = m[1] * 60 + Number(m[2]);
+        else if (/^\d+(\.\d+)?$/.test(s)) min = /^\d+$/.test(s) && Number(s) > 12 ? null : Math.round(parseFloat(s) * 60);
+        else if ((m = s.match(/^(?:(\d+(?:\.\d+)?)\s*(?:h|g|godz\.?)\s*)?(?:(\d+)\s*(?:m|min\.?)?)?$/)) && (m[1] || m[2])) min = Math.round(parseFloat(m[1] || 0) * 60) + Number(m[2] || 0);
+        return min > 0 && min <= 1440 ? min : null;
+    };
+
     // ---------- wiersze ----------
+    // Nowy wiersz dostaje klucz, zanim pozna id – po nim serwer rozpoznaje wiersz zapisany już wcześniej (beacon przy
+    // ukryciu albo zamknięciu karty, przywrócony szkic), więc kolejny zapis nie tworzy drugiego wpisu.
+    const newUid = () => globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    const ensureUid = (tr) => { const el = tr.querySelector('.f-uid'); if (el && !el.value && tr.querySelector('.f-id').value === '0') el.value = newUid(); };
     const add = (focus = true) => {
         rows.insertAdjacentHTML('beforeend', tpl.replaceAll('__i__', next++));
-        if (focus) rows.lastElementChild.querySelector('.f-issue').focus();
-        return rows.lastElementChild;
+        const tr = rows.lastElementChild;
+        ensureUid(tr);
+        if (focus) tr.querySelector('.f-issue').focus();
+        return tr;
     };
+    [...rows.children].forEach(ensureUid); // np. tickety skopiowane z poprzedniego dnia
     document.getElementById('addrow').addEventListener('click', () => add());
     if (rows.children.length === 0) { add(false); add(false); add(false); }
     rows.addEventListener('keydown', (ev) => {
@@ -224,19 +251,25 @@
     const rowByKey = (key) => rows.querySelector(`tr[data-key="${key}"]`);
 
     // ---------- autozapis ----------
-    // dirty – licznik zmian, savedDirty – stan licznika przy ostatnim udanym zapisie
-    let dirty = 0, savedDirty = 0, saving = false, submitting = false, retryTimer = null, debounce = null;
+    // dirty – licznik zmian, savedDirty – stan licznika przy ostatnim udanym zapisie, saving – trwający zapis (Promise)
+    let dirty = 0, savedDirty = 0, saving = null, submitting = false, retryTimer = null, debounce = null;
     const setState = (cls, text) => { stateEl.className = 'badge ' + cls; stateEl.textContent = text; };
     const formData = () => { const fd = new FormData(form); fd.delete('action'); return fd; };
 
-    // treść formularza bez technicznych pól (id, orig) – do porównania szkicu z tym, co jest w bazie
+    // Treść formularza bez technicznych pól (id, orig, uid), zapisana tak jak przez serwer (1.5 = 90m = 1h 30m,
+    // abc-1 = ABC-1, 8:00 = 08:00) – do porównania szkicu z tym, co jest w bazie. Bez tego szkic wysłany beaconem
+    // przy zamykaniu karty wyglądałby po powrocie na „zmiany, których nie ma w bazie”.
+    const issueKey = (s) => (s.toUpperCase().match(/\b([A-Z][A-Z0-9_]+-\d+)\b/) || [, s])[1];
+    const parsedOr = (parse, s) => { const v = parse(s); return null === v ? s : v; };
     const content = () => {
-        const fd = formData(), out = {day: [fd.get('start'), fd.get('end'), fd.get('break'), fd.get('lunch_worked') || ''], rows: []};
+        const fd = formData(), out = {day: [fd.get('start'), fd.get('end'), (fd.get('break') || '').trim(), fd.get('lunch_worked') || ''], rows: []};
         for (const tr of rows.children) {
             if (tr.querySelector('.f-del').checked) continue;
             const issue = tr.querySelector('.f-issue').value.trim(), time = tr.querySelector('.f-time').value.trim(), desc = tr.querySelector('.f-desc').value.trim();
             const from = val(tr, '.f-from'), to = val(tr, '.f-to'), title = val(tr, '.f-title');
-            if (issue || time || desc || from || to || title) out.rows.push([issue, title, from, to, time, desc]);
+            if (issue || time || desc || from || to || title) {
+                out.rows.push([issueKey(issue), title, parsedOr(parseClock, from), parsedOr(parseClock, to), parsedOr(parseDur, time), desc]);
+            }
         }
         return JSON.stringify(out);
     };
@@ -257,26 +290,32 @@
     form.addEventListener('input', changed);
     form.addEventListener('change', (ev) => { if (!ev.target.classList.contains('f-del')) changed(); });
 
+    // Zwraca true, gdy wszystko jest zapisane. W trakcie innego zapisu czeka na jego koniec i zapisuje to, co doszło
+    // w międzyczasie – kto czeka na wynik (▶ przy nowym wierszu), dostaje już id wiersza.
     async function save() {
         clearTimeout(debounce); clearTimeout(retryTimer);
-        if (submitting) return;
-        if (saving) { debounce = setTimeout(save, 400); return; }
-        const sentAt = dirty;
-        saving = true;
-        try {
-            const res = await fetch(AUTOSAVE_URL, {method: 'POST', body: formData(), credentials: 'same-origin'});
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            applyResult(await res.json());
-            savedDirty = sentAt;
-            if (dirty === sentAt) { clearDraft(); } else if (!submitting) { writeDraft(); debounce = setTimeout(save, 400); }
-            refreshPanels();
-        } catch (e) {
-            setState('err', '⚠ nie udało się zapisać – zmiany są bezpieczne w przeglądarce, ponawiam…');
-            retryTimer = setTimeout(save, 10000);
-        } finally {
-            saving = false;
+        if (submitting) return false;
+        if (saving) {
+            while (saving) await saving;
+            return dirty === savedDirty || save();
         }
-        return true;
+        const sentAt = dirty;
+        saving = (async () => {
+            try {
+                const res = await fetch(AUTOSAVE_URL, {method: 'POST', body: formData(), credentials: 'same-origin'});
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                applyResult(await res.json());
+                savedDirty = sentAt;
+                if (dirty === sentAt) { clearDraft(); } else if (!submitting) { writeDraft(); debounce = setTimeout(save, 400); }
+                refreshPanels();
+                return true;
+            } catch (e) {
+                setState('err', '⚠ nie udało się zapisać – zmiany są bezpieczne w przeglądarce, ponawiam…');
+                retryTimer = setTimeout(save, 10000);
+                return false;
+            }
+        })();
+        try { return await saving; } finally { saving = null; }
     }
     window.WorklogDay = {save, rowById};
 
@@ -363,6 +402,10 @@
     });
     // powrót przyciskiem Wstecz (strona z pamięci przeglądarki) – przyciski znowu działają
     window.addEventListener('pageshow', (ev) => { if (ev.persisted) submitting = false; });
+    // „Wyślij ponownie do Jiry” na banerze błędów – zwykły przycisk, który wysyła formularz przyciskiem z dołu
+    for (const btn of document.querySelectorAll('[data-sync-again]')) {
+        btn.addEventListener('click', () => { const sync = document.getElementById('syncbtn'); if (sync) form.requestSubmit(sync); });
+    }
 
     // ---------- usuwanie wierszy: zawsze z potwierdzeniem ----------
     // Serwer też usuwa tylko z potwierdzeniem (confirm_delete), a autozapis nie usuwa nigdy.
@@ -416,6 +459,8 @@
             for (const f of Object.values(byKey)) {
                 const tr = add(false);
                 tr.querySelector('.f-id').value = f.id || 0;
+                // klucz ze szkicu: wiersz zapisany już beaconem zaktualizuje się, zamiast zapisać drugi raz
+                if (f.uid && tr.querySelector('.f-uid')) tr.querySelector('.f-uid').value = f.uid;
                 tr.querySelector('.f-orig').value = f.orig || '';
                 tr.querySelector('.f-issue').value = f.issue || '';
                 tr.querySelector('.f-time').value = f.time || '';
@@ -430,14 +475,14 @@
     })();
 
     // ---------- stoper ----------
-    const fmt = (m) => { m = Number(m) || 0; if (!m) return ''; const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h}h ${r}m` : `${h}h`) : `${r}m`; };
     const clock = (s) => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
 
     // Zapisuje wiersz (jeśli trzeba) i włącza przy nim stoper – teraz albo od podanej godziny ('YYYY-MM-DDTHH:MM').
     async function startRow(tr, btn, at) {
         if (!tr.querySelector('.f-issue').value.trim()) { alert('Najpierw wpisz numer ticketu.'); tr.querySelector('.f-issue').focus(); return false; }
         btn.disabled = true;
-        if (dirty || tr.querySelector('.f-id').value === '0') { await save(); }
+        // save() czeka też na trwający autozapis – bez tego nowy wiersz nie miałby jeszcze id i stoper by nie ruszył
+        if (dirty !== savedDirty || tr.querySelector('.f-id').value === '0') { await save(); }
         btn.disabled = false;
         const id = tr.querySelector('.f-id').value;
         if (!id || id === '0') { alert('Nie udało się zapisać wiersza – sprawdź numer ticketu i czas.'); return false; }
@@ -502,17 +547,7 @@
     });
 
     // ---------- od–do: z godziny rozpoczęcia i czasu wylicza koniec, z rozpoczęcia i końca – czas ----------
-    // Liczy tak jak serwer (TimeFormat::parse); przy czymś niejasnym nic nie zmienia, serwer i tak to oceni.
-    const parseClock = (s) => { const m = String(s).trim().match(/^([01]?\d|2[0-3])[:.]([0-5]\d)$/); return m ? m[1] * 60 + Number(m[2]) : null; };
-    const toClock = (m) => { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
-    const parseDur = (raw) => {
-        const s = String(raw).trim().toLowerCase().replace(',', '.');
-        let m, min = null;
-        if ((m = s.match(/^(\d{1,2}):([0-5]\d)$/))) min = m[1] * 60 + Number(m[2]);
-        else if (/^\d+(\.\d+)?$/.test(s)) min = /^\d+$/.test(s) && Number(s) > 12 ? null : Math.round(parseFloat(s) * 60);
-        else if ((m = s.match(/^(?:(\d+(?:\.\d+)?)\s*(?:h|g|godz\.?)\s*)?(?:(\d+)\s*(?:m|min\.?)?)?$/)) && (m[1] || m[2])) min = Math.round(parseFloat(m[1] || 0) * 60) + Number(m[2] || 0);
-        return min > 0 && min <= 1440 ? min : null;
-    };
+    // Liczy tak jak serwer (parseClock, parseDur na górze); przy czymś niejasnym nic nie zmienia.
     // Przerwy, które pomija czas między godzinami (jak DaySummary::breakWindows): obiad, chyba że zaznaczono
     // pracę w przerwie, i przerwy wpisane godzinami (13:30-13:50, 15:00-15:40).
     const breakWindows = () => {

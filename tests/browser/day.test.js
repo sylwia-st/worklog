@@ -17,7 +17,7 @@ function scripts(file) {
         .replace(/\{\{ lunch \}\}/g, '12:00–13:00'));
 }
 const row = (i, r) => `<tr data-key="${i}"><td class="st"><span class="dot ${r.status || 'none'}"></span></td>
- <td class="issue"><input type="hidden" name="entries[${i}][id]" value="${r.id}" class="f-id"><input type="hidden" name="entries[${i}][orig]" value="${r.time}" class="f-orig">
+ <td class="issue"><input type="hidden" name="entries[${i}][id]" value="${r.id}" class="f-id"><input type="hidden" name="entries[${i}][uid]" value="${r.uid || ''}" class="f-uid"><input type="hidden" name="entries[${i}][orig]" value="${r.time}" class="f-orig">
  <input type="text" name="entries[${i}][issue]" value="${r.issue}" class="f-issue"><input name="entries[${i}][title]" value="${r.title || ''}" class="f-title"></td>
  <td class="tm"><button type="button" class="tbtn">▶</button><button type="button" class="tfrom">od…</button></td>
  <td class="fromto"><input name="entries[${i}][from]" value="${r.from || ''}" class="f-from"><input name="entries[${i}][to]" value="${r.to || ''}" class="f-to"></td>
@@ -42,7 +42,11 @@ function page(rows, storage, extraHtml = '') {
     const dom = new JSDOM(html, {runScripts: 'outside-only', url: 'http://127.0.0.1:8765/day/2026-10-20'});
     const w = dom.window;
     if (storage) for (const [k, v] of Object.entries(storage)) w.localStorage.setItem(k, v);
-    w.calls = []; w.fail = false; w.delay = 0; w.nextId = 100; w.timer = {running: false};
+    w.calls = []; w.fail = false; w.delay = 0; w.nextId = 100; w.timer = {running: false}; w.timerFail = false;
+    // nowy wiersz dostaje id raz – serwer rozpoznaje go po kluczu (uid), także gdy zapisał go już beacon
+    w.byUid = {};
+    w.created = (uid) => uid ? (w.byUid[uid] ??= w.nextId++) : w.nextId++;
+    const newRows = (body) => Object.keys(body).map(k => k.match(/^entries\[(\w+)\]\[issue\]$/)?.[1]).filter(k => k !== undefined && body[`entries[${k}][issue]`]);
     // wysłanie formularza (to, które przeglądarka faktycznie wykonałaby – bez preventDefault)
     w.submits = [];
     // nasłuch na window (faza bąbelkowania) – działa po obsłudze zdarzenia przez stronę
@@ -63,13 +67,11 @@ function page(rows, storage, extraHtml = '') {
         w.calls.push({url, method: opts.method || 'GET', body});
         if (w.delay && url.includes('autosave')) await new Promise(r => setTimeout(r, w.delay));
         if (w.fail && url.includes('autosave')) throw new Error('network');
+        if (w.timerFail && url.includes('/timer')) return {ok: false, status: 500, json: async () => ({}), text: async () => ''};
         let json = {};
         if (url.includes('autosave')) {
             const ids = {}, minutes = {};
-            for (const [k, v] of Object.entries(body)) {
-                const m = k.match(/^entries\[(\w+)\]\[issue\]$/);
-                if (m && v) { ids[m[1]] = Number(body[`entries[${m[1]}][id]`]) || w.nextId++; minutes[m[1]] = 60; }
-            }
+            for (const k of newRows(body)) { ids[k] = Number(body[`entries[${k}][id]`]) || w.created(body[`entries[${k}][uid]`]); minutes[k] = 60; }
             json = {ok: true, savedAt: '10:00:00', ids, minutes, statuses: {}, rowErrors: {}, dayErrors: []};
         } else if (url.includes('panels')) {
             return {ok: true, text: async () => w.panelsHtml || '<p>panels</p>'};
@@ -81,7 +83,12 @@ function page(rows, storage, extraHtml = '') {
         } else if (url.includes('/timer')) { json = w.timer; }
         return {ok: true, status: 200, json: async () => json, text: async () => JSON.stringify(json)};
     };
-    w.navigator.sendBeacon = (url, fd) => { w.calls.push({url, method: 'BEACON', body: Object.fromEntries(fd.entries())}); return true; };
+    w.navigator.sendBeacon = (url, fd) => {
+        const body = Object.fromEntries(fd.entries());
+        w.calls.push({url, method: 'BEACON', body});
+        for (const k of newRows(body)) if (!Number(body[`entries[${k}][id]`])) w.created(body[`entries[${k}][uid]`]); // serwer zapisuje też beacon
+        return true;
+    };
     w.alert = (m) => { w.lastAlert = m; };
     for (const s of [...scripts('base.html.twig'), ...scripts('day/show.html.twig')]) w.eval(s);
     return w;
@@ -431,6 +438,90 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
         check('podpowiedź znika przy innym numerze', title.value, '');
         type(issue, 'ABC-1'); type(title, 'Moje SSO'); type(issue, 'ABC-1');
         check('wpisany tytuł się nie nadpisuje', title.value, 'Moje SSO');
+    }
+
+    // 17. nowy wiersz i przełączenie karty przed autozapisem: beacon i autozapis niosą ten sam klucz → jeden wpis
+    {
+        const w = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+        await sleep(30);
+        w.document.getElementById('addrow').click();
+        const tr = w.document.querySelector('[data-key="1"]');
+        tr.querySelector('.f-issue').value = 'ABC-2'; fire(w, tr.querySelector('.f-issue'), 'input');
+        tr.querySelector('.f-time').value = '1h'; fire(w, tr.querySelector('.f-time'), 'input');
+        Object.defineProperty(w.document, 'visibilityState', {value: 'hidden', configurable: true});
+        fire(w, w.document, 'visibilitychange');
+        await sleep(1300);
+        const uid = tr.querySelector('.f-uid').value;
+        const sent = w.calls.filter(c => c.url.includes('autosave')).map(c => [c.method, c.body['entries[1][uid]'] === uid]);
+        check('beacon i autozapis z tym samym kluczem wiersza', [uid.length >= 8, sent], [true, [['BEACON', true], ['POST', true]]]);
+        check('jeden wpis zamiast dwóch', [Object.keys(w.byUid).length, w.nextId, tr.querySelector('.f-id').value], [1, 101, '100']);
+    }
+
+    // 18. karta zamknięta zaraz po wpisaniu (beacon): serwer zapisał „90m” jako „1h 30m” – po powrocie bez fałszywego banera;
+    //     a przywrócony szkic, który różni się od bazy, aktualizuje ten sam wpis (klucz ze szkicu), zamiast tworzyć drugi
+    {
+        let w = page([]);
+        await sleep(30);
+        const tr = w.document.querySelector('[data-key="0"]');
+        tr.querySelector('.f-issue').value = 'abc-2'; fire(w, tr.querySelector('.f-issue'), 'input');
+        tr.querySelector('.f-time').value = '90m'; fire(w, tr.querySelector('.f-time'), 'input');
+        fire(w, w, 'pagehide');
+        const uid = tr.querySelector('.f-uid').value, draft = w.localStorage.getItem('worklog-draft-2026-10-20');
+        const server = {byUid: w.byUid, nextId: w.nextId};
+        check('beacon z kluczem wiersza', w.calls.find(c => c.method === 'BEACON')?.body['entries[0][uid]'], uid);
+        w.close();
+        w = page([{id: 100, issue: 'ABC-2', time: '1h 30m', desc: ''}], {'worklog-draft-2026-10-20': draft});
+        await sleep(30);
+        check('szkic zgodny z bazą po normalizacji – bez banera', [w.document.getElementById('draft-banner').hidden, w.localStorage.getItem('worklog-draft-2026-10-20')], [true, null]);
+        w.close();
+        w = page([{id: 100, issue: 'ABC-2', time: '45m', desc: ''}], {'worklog-draft-2026-10-20': draft});
+        Object.assign(w, server);
+        await sleep(30);
+        check('szkic inny niż baza – baner', w.document.getElementById('draft-banner').hidden, false);
+        w.document.getElementById('draft-restore').click();
+        await sleep(1300);
+        const restored = w.calls.filter(c => c.url.includes('autosave')).pop()?.body;
+        check('przywrócony szkic z kluczem ze szkicu', [restored?.['entries[0][uid]'], w.document.querySelector('[data-key="0"] .f-id').value, w.nextId], [uid, '100', 101]);
+    }
+
+    // 19. ▶ przy nowym wierszu, gdy jego autozapis jeszcze trwa → czeka na zapis i startuje (bez fałszywego alertu)
+    {
+        const w = page([]);
+        await sleep(30);
+        w.delay = 500;
+        const tr = w.document.querySelector('[data-key="0"]');
+        tr.querySelector('.f-issue').value = 'ABC-9'; fire(w, tr.querySelector('.f-issue'), 'input');
+        await sleep(1000); // autozapis wystartował po 0,9 s i czeka na odpowiedź
+        tr.querySelector('.tbtn').click();
+        await sleep(800);
+        check('▶ w trakcie autozapisu – bez alertu, start z id', [w.lastAlert ?? null, w.calls.find(c => c.url.includes('/timer/start'))?.body], [null, {entryId: 100}]);
+        check('▶ w trakcie autozapisu – jeden zapis', w.calls.filter(c => c.url.includes('autosave')).length, 1);
+    }
+
+    // 20. „Wyślij ponownie do Jiry” na banerze błędów: zwykły przycisk – Enter w polu nie wysyła do Jiry; klik wysyła z akcją sync
+    {
+        const src = fs.readFileSync(T + 'day/show.html.twig', 'utf8');
+        check('szablon: żaden przycisk submit spoza formularza (form="dayform")', /<button[^>]*form="dayform"/.test(src), false);
+        check('szablon: wiersz z ukrytym polem klucza', src.includes('[uid]" value="{{ row.uid|default(\'\') }}" class="f-uid"'), true);
+        const w = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}], null,
+            '<div class="flash error jira-failed"><button type="button" class="primary" data-sync-again>Wyślij ponownie do Jiry</button></div>');
+        await sleep(30);
+        w.document.querySelector('[data-sync-again]').click();
+        await sleep(100);
+        check('klik na banerze wysyła formularz z akcją sync', w.submits.map(s => s.action), ['sync']);
+    }
+
+    // 21. odświeżanie stopera w tle przy błędzie serwera – bez okienka (co minutę by wyskakiwało); przy kliknięciu – z okienkiem
+    {
+        const w = page([{id: 7, issue: 'ABC-1', time: '1h', desc: 'a'}]);
+        await sleep(30);
+        w.timerFail = true;
+        Object.defineProperty(w.document, 'visibilityState', {value: 'visible', configurable: true});
+        fire(w, w.document, 'visibilitychange');
+        await sleep(50);
+        check('błąd odświeżania stopera bez alertu', w.lastAlert ?? null, null);
+        await w.WorklogTimer.start(7).catch(() => {});
+        check('błąd po kliknięciu ▶ – alert', w.lastAlert, 'Stoper: błąd 500');
     }
 
     console.log(fails ? `\n${fails} błędów` : 'OK – wszystkie testy przeglądarkowe przeszły');

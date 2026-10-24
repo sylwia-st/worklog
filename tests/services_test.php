@@ -499,6 +499,45 @@ namespace {
     check('dwa maile', App\Domain\ReminderSchedule::plannedTodo([$late, $early], $rtoday),
         'wyślij maile o planowanych zmianach (jutro: późniejsze przyjście; piątek 16.10: wcześniejsze wyjście)');
 
+    // --- czas wyczyszczony po wysłaniu: worklog znika z Jiry, wiersz zostaje bez czasu ---
+    $zday = new WorkDay(new DateTimeImmutable('2026-10-22'));
+    $zday->setStartTime('08:00');
+    $z1 = new WorklogEntry($zday, 'ABC-1', 120, 'praca', 0); setId($z1, 61);
+    $z2 = new WorklogEntry($zday, 'ZLY-1', 30, '', 1); setId($z2, 62);
+    $http->calls = []; $http->fail = [];
+    $sync->sync($zday);
+    $z1->update('ABC-1', 0, 'praca', 0);
+    $z2->update('ZLY-1', 0, '', 1);
+    check('wyczyszczony czas: do ponownego wysłania', $sync->statuses($zday), [61 => 'changed', 62 => 'changed']);
+    $http->calls = []; $http->fail = ['ZLY-1' => 500];
+    $res = $sync->sync($zday);
+    check('wyczyszczony czas: DELETE w Jirze', array_map(fn ($c) => $c[0].' '.basename(dirname($c[1], 2)), $http->calls), ['DELETE ABC-1', 'DELETE ZLY-1']);
+    check('wyczyszczony czas: worklog usunięty, wiersz bez czasu', [$z1->isInJira(), $sync->statuses($zday)[61], $res[0]['type']], [false, 'empty', 'success']);
+    check('wyczyszczony czas: nieudane usunięcie = błąd, worklog zostaje', [$z2->isInJira(), $sync->statuses($zday)[62], $sync->isFullySynced($zday)], [true, 'error', false]);
+    $http->fail = [];
+
+    // --- Jira nieskonfigurowana: wysyłka nie oznacza wpisów jako błędne, dawne błędy nie wiszą ---
+    $noJira = (new ReflectionClass(Settings::class))->newInstanceWithoutConstructor();
+    (new ReflectionProperty(Settings::class, 'cache'))->setValue($noJira, Settings::defaultsFor('n'));
+    $nhttp = new FakeHttp();
+    $nsync = new WorklogSync(new JiraClient($nhttp, $noJira), $noJira);
+    $nday = new WorkDay(new DateTimeImmutable('2026-10-23'));
+    $n1 = new WorklogEntry($nday, 'ABC-1', 60, '', 0); setId($n1, 71);
+    $n2 = new WorklogEntry($nday, 'ABC-2', 30, '', 1); setId($n2, 72);
+    $n2->setJiraError('Uzupełnij adres Jiry i token w Ustawieniach.'); // zapisany przed poprawką
+    $res = $nsync->sync($nday);
+    check('bez Jiry: nic nie wysłane, jeden komunikat', [count($nhttp->calls), count($res), $res[0]['type']], [0, 1, 'warning']);
+    check('bez Jiry: wpisy bez błędu', [$n1->getJiraError(), $nsync->statuses($nday)], [null, [71 => 'new', 72 => 'new']]);
+
+    // --- przerwa liczona z wpisanego tekstu – także dla dni zapisanych, zanim „0,5h” czytało się jako 30m ---
+    $bday = new WorkDay(new DateTimeImmutable('2026-10-23'));
+    $bday->setBreakText('0,5h');
+    $bday->setBreakMinutes(300); // tak zapisał to dawny odczyt (0m + 5h)
+    check('przerwa z tekstu', $bday->getBreakMinutes(), 30);
+    $bday->setBreakText('20,40');
+    $bday->setBreakMinutes(60);
+    check('przerwa: niejednoznaczny tekst zostawia zapisaną wartość', $bday->getBreakMinutes(), 60);
+
     // --- forma w tekstach ---
     check('forma domyślnie neutralna', [Settings::DEFAULTS['forma'], Settings::DEFAULTS['mail_over_body']], ['n', Settings::GENDERED['mail_over_body']['n']]);
     check('mail w formie męskiej', str_contains(Settings::defaultsFor('m')['mail_under_body'], 'pracowałem krócej o {roznica}'), true);

@@ -48,8 +48,9 @@ final class TimeFormat
 
     /**
      * Przerwa, także „na raty”. Części oddzielone przecinkiem, średnikiem, plusem albo nową linią:
-     *  - czas trwania: "30" (sama liczba = minuty), "1h", "20m",
+     *  - czas trwania: "30" (sama liczba = minuty), "1h", "20m", "0,5h" (przecinek przy godzinach jest dziesiętny),
      *  - przedział godzin: "13:30-13:50" (też "13.30–13.50").
+     * Samo "0,5" albo "20,40" jest niejednoznaczne (pół godziny czy 0m i 5m?) – to błąd, trzeba dopisać jednostkę albo spację.
      *
      * @return array{minutes: int, ranges: list<array{0: int, 1: int}>}|null minutes = suma samych czasów trwania,
      *                                                                       ranges = przedziały w minutach od północy; null gdy coś jest niepoprawne
@@ -60,6 +61,12 @@ final class TimeFormat
         $raw = trim($raw);
         if ('' === $raw) {
             return $out;
+        }
+        // „1,5h” to półtorej godziny, a nie 1m + 5h
+        $raw = (string) preg_replace('/(\d),(\d+\s*(?:h|g|godz))/iu', '$1.$2', $raw);
+        // liczba z przecinkiem bez jednostki (poza godzinami typu 13:50,15:00) – nie zgadujemy
+        if (preg_match('/(?<![\d:.])\d+,\d+(?![\d:.]|\s*(?:m|min))/u', $raw)) {
+            return null;
         }
         foreach (preg_split('/\s*[+,;\n]\s*/u', $raw) as $part) {
             $part = trim($part);

@@ -4,4 +4,5 @@ Description=Przypomnienie o raporcie czasu pracy
 [Service]
 Type=oneshot
 Environment=WORKLOG_PORT=@PORT@
-ExecStart=@DIR@/scripts/remind.sh
+# w cudzysłowie – katalog z narzędziem może mieć spacje (install.sh wstawia go z ucieczką znaków \ " %)
+ExecStart="@DIR@/scripts/remind.sh"

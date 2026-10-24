@@ -194,14 +194,22 @@ final class DayController extends AbstractController
         }
 
         $existing = [];
+        $byClientKey = [];
         foreach ($day->getEntries() as $e) {
             $existing[(int) $e->getId()] = $e;
+            if (null !== $e->getClientKey()) {
+                $byClientKey[$e->getClientKey()] = $e;
+            }
         }
 
-        $created = [];
+        $saved = [];
         $position = 0;
         foreach ($form['rows'] as $row) {
             $entry = $row['id'] > 0 ? ($existing[$row['id']] ?? null) : null;
+            // wiersz zapisany już wcześniej, którego id przeglądarka jeszcze nie zna (beacon przy zamykaniu karty,
+            // przywrócony szkic) – ten sam wpis, a nie drugi; obowiązuje czas z formularza
+            $byKey = null === $entry && '' !== $row['uid'] ? ($byClientKey[$row['uid']] ?? null) : null;
+            $entry ??= $byKey;
             if ($row['delete'] && $partial) {
                 continue; // autozapis nigdy nie usuwa – usunięcie zatwierdza się przyciskiem „Zapisz”
             }
@@ -220,31 +228,33 @@ final class DayController extends AbstractController
                 // Czas zmieniamy tylko, gdy użytkownik go zmienił, i nigdy w trakcie działania stopera –
                 // dzięki temu stara karta przeglądarki nie nadpisze czasu doliczonego przez stoper.
                 $minutes = $entry->getMinutes();
-                if (!$entry->isTimerRunning() && $row['minutes'] !== $row['origMinutes']) {
+                if (!$entry->isTimerRunning() && (null !== $byKey || $row['minutes'] !== $row['origMinutes'])) {
                     $minutes = $row['minutes'];
                 }
                 $entry->update($row['issue'], $minutes, $row['desc'], $position);
             } else {
                 $entry = new WorklogEntry($day, $row['issue'], $row['minutes'], $row['desc'], $position);
+                if ('' !== $row['uid']) {
+                    $entry->setClientKey($row['uid']);
+                    $byClientKey[$row['uid']] = $entry;
+                }
                 $this->em->persist($entry);
-                $created[$row['key']] = $entry;
             }
             $entry->setStartClock($row['from']);
             $entry->setIssueTitle($row['title']);
+            $saved[$row['key']] = $entry;
             ++$position;
         }
         $this->em->flush();
 
+        // tylko zapisane wiersze – niepoprawny zostaje w przeglądarce tak, jak go wpisano, żeby dało się go poprawić
         $ids = [];
         $minutes = [];
         $ends = [];
-        foreach ($form['rows'] as $row) {
-            $entry = $created[$row['key']] ?? ($row['id'] > 0 ? ($existing[$row['id']] ?? null) : null);
-            if (null !== $entry && !$row['delete'] && null !== $entry->getId()) {
-                $ids[$row['key']] = (int) $entry->getId();
-                $minutes[$row['key']] = $entry->getMinutes();
-                $ends[$row['key']] = $this->sync->endClock($entry) ?? '';
-            }
+        foreach ($saved as $key => $entry) {
+            $ids[$key] = (int) $entry->getId();
+            $minutes[$key] = $entry->getMinutes();
+            $ends[$key] = $this->sync->endClock($entry) ?? '';
         }
 
         return ['day' => $day, 'ids' => $ids, 'minutes' => $minutes, 'ends' => $ends];
@@ -357,7 +367,8 @@ final class DayController extends AbstractController
                 'time' => $e->getMinutes() > 0 ? TimeFormat::format($e->getMinutes()) : '',
                 'desc' => $e->getDescription(),
                 'status' => $statuses[(int) $e->getId()] ?? null,
-                'error' => $e->getJiraError(),
+                // treść błędu Jiry tylko przy statusie „błąd” – bez skonfigurowanej Jiry stary błąd nic nie znaczy
+                'error' => WorklogSync::STATUS_ERROR === ($statuses[(int) $e->getId()] ?? null) ? $e->getJiraError() : null,
             ], $day->getActiveEntries()),
         ];
     }
@@ -407,7 +418,7 @@ final class DayController extends AbstractController
         $breakSpec = TimeFormat::parseBreakSpec($breakRaw);
         $breakMinutes = 0;
         if (null === $breakSpec) {
-            $dayErrors[] = 'Niepoprawna przerwa – wpisz np. 30m, 1h, na raty: 20m + 40m, albo godziny: 13:30-13:50, 15:00-15:40.';
+            $dayErrors[] = 'Niepoprawna przerwa – wpisz np. 30m, 1h, 0,5h, na raty: 20m + 40m, albo godziny: 13:30-13:50, 15:00-15:40.';
         } else {
             $breakMinutes = $breakSpec['minutes'];
         }
@@ -424,6 +435,7 @@ final class DayController extends AbstractController
             $row = [
                 'key' => (string) $key,
                 'id' => (int) ($raw['id'] ?? 0),
+                'uid' => self::clientKey((string) ($raw['uid'] ?? '')),
                 'issue' => trim((string) ($raw['issue'] ?? '')),
                 'title' => trim((string) ($raw['title'] ?? '')),
                 'from' => trim((string) ($raw['from'] ?? '')),
@@ -432,7 +444,10 @@ final class DayController extends AbstractController
                 'desc' => trim((string) ($raw['desc'] ?? '')),
                 'delete' => !empty($raw['delete']),
                 'minutes' => 0,
-                // czas widoczny w formularzu przy wczytaniu – porównujemy z nim, czy użytkownik zmienił czas
+                // czas widoczny w formularzu przy wczytaniu – porównujemy z nim, czy użytkownik zmienił czas.
+                // Po błędzie (422) formularz wraca z tym samym orig, a nie z nowo wpisanym czasem – inaczej
+                // kolejne „Zapisz” uznałoby nowy czas za niezmieniony i po cichu zostawiło stary.
+                'orig' => trim((string) ($raw['orig'] ?? '')),
                 'origMinutes' => TimeFormat::parse(trim((string) ($raw['orig'] ?? ''))) ?? 0,
                 'status' => null,
                 'error' => null,
@@ -505,6 +520,12 @@ final class DayController extends AbstractController
             $n <= 24 => sprintf('„%1$d” – minuty czy godziny? Wpisz %1$dm albo %1$dh.', $n),
             default => sprintf('„%1$d” – chodziło o minuty? Wpisz %1$dm.', $n),
         };
+    }
+
+    /** Klucz wiersza nadany w przeglądarce (UUID) – coś innego traktujemy jak brak klucza. */
+    private static function clientKey(string $raw): string
+    {
+        return 1 === preg_match('/^[A-Za-z0-9-]{8,64}$/', $raw) ? $raw : '';
     }
 
     /** @param string[] $errors */

@@ -56,6 +56,10 @@ final class DaySummary
             if (null !== $bf && null !== $bt && $bt > $bf) {
                 $windows[] = [$bf, $bt];
             }
+            if ($s + $span > 1440) {
+                // praca po północy: przerwa 00:30–01:00 to dla niej 24:30–25:00
+                $windows = [...$windows, ...array_map(static fn (array $w): array => [$w[0] + 1440, $w[1] + 1440], $windows)];
+            }
             // liczą się tylko przerwy w godzinach pracy; nakładające się przedziały odliczamy raz
             foreach (self::mergeRanges($windows) as [$wf, $wt]) {
                 $deducted += max(0, min($s + $span, $wt) - max($s, $wf));

@@ -8,7 +8,7 @@ use App\Entity\WorkDay;
 use App\Entity\WorklogEntry;
 
 /**
- * Wysyła wpisy dnia do Jiry: tworzy nowe worklogi, aktualizuje zmienione, kasuje usunięte.
+ * Wysyła wpisy dnia do Jiry: tworzy nowe worklogi, aktualizuje zmienione, kasuje usunięte i te z wyczyszczonym czasem.
  * Wpisy dostają kolejne godziny rozpoczęcia (od początku dnia), żeby nie nakładały się w Tempo/kalendarzu.
  */
 final class WorklogSync
@@ -31,6 +31,11 @@ final class WorklogSync
      */
     public function sync(WorkDay $day): array
     {
+        if (!$this->settings->jiraConfigured()) {
+            // bez adresu i tokenu każdy wpis dostałby błąd, który wisiałby do udanej wysyłki – nic nie wysyłamy
+            return [['type' => 'warning', 'message' => 'Jira nie jest skonfigurowana – zapisano tylko lokalnie. Adres Jiry i token wpiszesz w Ustawieniach.']];
+        }
+
         $results = [];
         $plan = $this->plan($day);
 
@@ -53,7 +58,20 @@ final class WorklogSync
             $label = sprintf('%s (%s)', $key, TimeFormat::format($entry->getMinutes()));
 
             if (0 === $entry->getMinutes()) {
-                $results[] = ['type' => 'warning', 'message' => $key.': pominięto – wpis nie ma jeszcze czasu.'];
+                if (!$entry->isInJira()) {
+                    $results[] = ['type' => 'warning', 'message' => $key.': pominięto – wpis nie ma jeszcze czasu.'];
+                    continue;
+                }
+                // czas wyczyszczony po wysłaniu – worklogu bez czasu Jira nie ma, więc usuwamy go (wiersz zostaje)
+                try {
+                    $this->jira->deleteWorklog((string) $entry->getJiraIssueKey(), (string) $entry->getJiraWorklogId());
+                    $results[] = ['type' => 'success', 'message' => sprintf('%s: czas wyczyszczony – usunięto worklog z Jiry.', $entry->getJiraIssueKey())];
+                    $entry->markRemovedFromJira();
+                    $entry->setJiraError(null);
+                } catch (JiraException $e) {
+                    $entry->setJiraError($e->getMessage());
+                    $results[] = ['type' => 'error', 'message' => sprintf('%s: czas wyczyszczony, ale nie udało się usunąć worklogu z Jiry – %s', $entry->getJiraIssueKey(), $e->getMessage())];
+                }
                 continue;
             }
             if ($entry->isTimerRunning()) {
@@ -93,11 +111,13 @@ final class WorklogSync
     public function statuses(WorkDay $day): array
     {
         $plan = $this->plan($day);
+        // bez skonfigurowanej Jiry stary błąd (np. „Uzupełnij adres Jiry…”) nie jest już błędem – wpis po prostu nie jest wysłany
+        $configured = $this->settings->jiraConfigured();
         $out = [];
         foreach ($day->getActiveEntries() as $entry) {
             $out[(int) $entry->getId()] = match (true) {
                 0 === $entry->getMinutes() && !$entry->isInJira() => self::STATUS_EMPTY,
-                null !== $entry->getJiraError() => self::STATUS_ERROR,
+                null !== $entry->getJiraError() && $configured => self::STATUS_ERROR,
                 !$entry->isInJira() => self::STATUS_NEW,
                 $entry->getJiraIssueKey() !== $entry->getIssueKey(),
                 $entry->getJiraSyncHash() !== $plan[spl_object_id($entry)]['hash'] => self::STATUS_CHANGED,

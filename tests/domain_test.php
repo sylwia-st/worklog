@@ -59,6 +59,8 @@ $s = DaySummary::calculate([475], '08:00', '15:55', 0, 480, 10);
 check('kind ok w tolerancji', $s->kind(), DaySummary::KIND_OK);
 check('kind empty', DaySummary::calculate([], null, null, 0, 480, 10)->kind(), DaySummary::KIND_EMPTY);
 check('po północy', DaySummary::calculate([], '22:00', '06:00', 0, 480, 0)->presenceMinutes, 480);
+$s = DaySummary::calculate([], '22:00', '02:00', 0, 420, 0, '12:00', '13:00', [[30, 60], [1380, 1395]]);
+check('po północy: przerwy przed i po północy odliczone, obiad nie', [$s->presenceMinutes, $s->breakMinutes], [195, 45]);
 
 foreach (['' => 0, '30' => 30, '1h' => 60, '20m + 40m' => 60, '15, 15, 30' => 60, '10+5' => 15, 'abc' => null, '20m + x' => null] as $in => $exp) {
     check("parseBreak('$in')", TimeFormat::parseBreak((string) $in), $exp);
@@ -68,6 +70,12 @@ check('spec godziny', TimeFormat::parseBreakSpec('13:30-13:50, 15:00–15:40'), 
 check('spec mieszany', TimeFormat::parseBreakSpec('13.30-13.50 + 40m'), ['minutes' => 40, 'ranges' => [[810, 830]]]);
 check('spec suma', TimeFormat::parseBreak('13:30-13:50, 15:00-15:40'), 60);
 check('spec odwrotny', TimeFormat::parseBreakSpec('14:00-13:00'), null);
+// przecinek dziesiętny przy godzinach: „0,5h” to 30m, a nie 0m + 5h; samo „0,5” albo „20,40” jest niejednoznaczne
+foreach (['0,5h' => 30, '1,5h' => 90, '1,5 godz' => 90, '1h,30m' => 90, '20m,40m' => 60, '20, 40' => 60, '20,40m' => 60, '0,5' => null, '20,40' => null] as $in => $exp) {
+    check("parseBreak('$in')", TimeFormat::parseBreak((string) $in), $exp);
+}
+check('spec godziny bez spacji po przecinku', TimeFormat::parseBreakSpec('13:30-13:50,15:00-15:40'), ['minutes' => 0, 'ranges' => [[810, 830], [900, 940]]]);
+check('spec godziny i czas po przecinku', TimeFormat::parseBreakSpec('13.30-13.50,30'), ['minutes' => 30, 'ranges' => [[810, 830]]]);
 check('merge', DaySummary::mergeRanges([[780, 800], [720, 780], [900, 910]]), [[720, 800], [900, 910]]);
 
 // przerwy dnia, praca między godzinami i koniec pracy z przeskakiwaniem przerw
@@ -116,6 +124,7 @@ check('numer w środku – bez tytułu', Template::issueTitleAfterKey('zobacz AB
 $m = new MailDraft(['a@x.pl', 'b@x.pl'], ['c@x.pl'], 'Nadgodziny – 13.10', "Linia 1\nZażółć & ?");
 check('mailto', $m->mailtoUrl(), 'mailto:a@x.pl,b@x.pl?cc=c@x.pl&subject=Nadgodziny%20%E2%80%93%2013.10&body=Linia%201%0D%0AZa%C5%BC%C3%B3%C5%82%C4%87%20%26%20%3F');
 check('mailto bez treści (długi mail na Windowsie)', $m->mailtoUrl(false), 'mailto:a@x.pl,b@x.pl?cc=c@x.pl&subject=Nadgodziny%20%E2%80%93%2013.10');
+check('mailto: znaki specjalne w adresach zakodowane', (new MailDraft(['jan+raporty@x.pl'], ['a&b@x.pl'], 'T', ''))->mailtoUrl(false), 'mailto:jan%2Braporty@x.pl?cc=a%26b@x.pl&subject=T');
 
 // przypomnienie: raz dziennie, o godzinie z Ustawień albo przy pierwszym sprawdzeniu po niej
 $tue = static fn (string $hm) => new DateTimeImmutable('2026-10-13 '.$hm); // wtorek

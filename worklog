@@ -28,12 +28,13 @@ export_version() {
 has_db_command() { docker exec worklog php bin/console app:db --help >/dev/null 2>&1; }
 
 legacy_backup() {
-    docker exec worklog php -r '
-        @unlink("/data/.backup.db");
+    docker exec -e WORKLOG_TMP="$1" worklog php -r '
+        $tmp = getenv("WORKLOG_TMP");
+        @unlink($tmp);
         $db = new SQLite3("/data/worklog.db");
         $db->busyTimeout(10000);
-        if (!$db->exec("VACUUM INTO \"/data/.backup.db\"")) { fwrite(STDERR, "VACUUM INTO nie powiodło się\n"); exit(1); }
-        $check = (new SQLite3("/data/.backup.db", SQLITE3_OPEN_READONLY))->querySingle("PRAGMA integrity_check");
+        if (!$db->exec("VACUUM INTO \"$tmp\"")) { fwrite(STDERR, "VACUUM INTO nie powiodło się\n"); exit(1); }
+        $check = (new SQLite3($tmp, SQLITE3_OPEN_READONLY))->querySingle("PRAGMA integrity_check");
         if ($check !== "ok") { fwrite(STDERR, "Kopia uszkodzona: $check\n"); exit(1); }
     '
 }
@@ -70,14 +71,16 @@ case "${1:-help}" in
         out="${2:-$HOME/worklog-backup-$(date +%Y%m%d-%H%M%S).db}"
         umask 077
         mkdir -p "$(dirname "$out")"
+        # osobny plik w kontenerze dla każdej kopii – kopia z timera może biec razem z ręczną albo z tą przed restore
+        tmp="/data/.backup-$$-$RANDOM.db"
+        trap 'docker exec worklog rm -f "$tmp" >/dev/null 2>&1 || true' EXIT
         # VACUUM INTO daje spójną kopię także wtedy, gdy aplikacja akurat zapisuje; potem sprawdzamy jej integralność
         if has_db_command; then
-            docker exec worklog php bin/console app:db backup /data/.backup.db
+            docker exec worklog php bin/console app:db backup "$tmp"
         else
-            legacy_backup
+            legacy_backup "$tmp"
         fi
-        docker exec worklog cat /data/.backup.db > "$out.part"
-        docker exec worklog rm -f /data/.backup.db
+        docker exec worklog cat "$tmp" > "$out.part"
         mv "$out.part" "$out"     # plik pojawia się dopiero, gdy jest kompletny
         echo "Kopia zapisana: $out"
         ;;

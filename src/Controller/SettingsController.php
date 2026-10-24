@@ -197,7 +197,8 @@ final class SettingsController extends AbstractController
 
         $back = (string) $request->request->get('back', '');
 
-        return str_starts_with($back, '/') && !str_starts_with($back, '//')
+        // tylko ścieżka w tej aplikacji – „//host” i „/\host” przeglądarka potraktowałaby jak adres innej strony
+        return str_starts_with($back, '/') && !str_starts_with($back, '//') && !str_contains($back, '\\')
             ? $this->redirect($back)
             : $this->redirectToRoute('settings');
     }

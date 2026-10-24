@@ -89,7 +89,11 @@ class WorkDay
 
     public function getBreakMinutes(): int
     {
-        return $this->breakMinutes;
+        // liczone z wpisanego tekstu, jeśli jest (jak getBreakRanges) – poprawki odczytu przerwy, np. „0,5h” = 30m,
+        // obejmują też dni zapisane wcześniej; tekst dziś niepoprawny zostawia zapisaną wartość
+        $spec = null !== $this->breakText ? TimeFormat::parseBreakSpec($this->breakText) : null;
+
+        return $spec['minutes'] ?? $this->breakMinutes;
     }
 
     public function setBreakMinutes(int $breakMinutes): void
