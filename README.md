@@ -178,15 +178,11 @@ Jeśli wolisz rzadsze aktualizacje, możesz zamiast tego użyć LTS: `7.4.*` (ws
 
 ## Testy logiki
 
-`tests/services_test.php` obejmuje m.in. import z Toggla (grupowanie, strefy czasowe, ponowny import) na atrapie HTTP. `tests/sqlite_database_backup_test.php` sprawdza kopię, przywracanie i kopię przed zmianą struktury bazy (`app:db`) na prawdziwych plikach SQLite, a `tests/database_command_test.php` samą komendę (kody wyjścia, komunikaty).
-
-Testy uruchamiamy w jednorazowym kontenerze z bieżącym kodem, a nie przez `docker exec`: działający kontener ma kod z obrazu (montuje tylko `/data`), więc sprawdzałby stary kod do czasu przebudowy.
+`tests/services_test.php` obejmuje m.in. import z Toggla (grupowanie, strefy czasowe, ponowny import) na atrapie HTTP.
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app --entrypoint php worklog-tool:latest tests/domain_test.php
-docker run --rm -v "$PWD":/app -w /app --entrypoint php worklog-tool:latest tests/services_test.php
-docker run --rm -v "$PWD":/app -w /app --entrypoint php worklog-tool:latest tests/sqlite_database_backup_test.php
-docker run --rm -v "$PWD":/app -w /app --entrypoint php worklog-tool:latest tests/database_command_test.php
+docker exec worklog php tests/domain_test.php
+docker exec worklog php tests/services_test.php
 cd tests/browser && npm install && npm test     # autozapis, szkic, stoper, usuwanie, od–do, tytuły – w symulowanej przeglądarce
 ```
 
