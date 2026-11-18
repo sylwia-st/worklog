@@ -13,8 +13,10 @@
         "doctrine/dbal": "^4.3",
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/orm": "^3.7",
+        "mcp/sdk": "^0.10",
         "symfony/console": "8.1.*",
         "symfony/dotenv": "8.1.*",
+        "symfony/finder": "8.1.*",
         "symfony/framework-bundle": "8.1.*",
         "symfony/http-client": "8.1.*",
         "symfony/runtime": "8.1.*",
@@ -24,7 +26,8 @@
     },
     "config": {
         "allow-plugins": {
-            "symfony/runtime": true
+            "symfony/runtime": true,
+            "php-http/discovery": false
         },
         "optimize-autoloader": true,
         "sort-packages": true,

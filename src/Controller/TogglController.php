@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\WorkDay;
 use App\Repository\WorkDayRepository;
 use App\Service\DayDefaults;
 use App\Service\TogglImport;
@@ -34,11 +33,7 @@ final class TogglController extends AbstractController
         $isNew = null === $day;
         if ($isNew) {
             // dzień bez zapisu dostaje te same godziny, które pokazałaby jego pusta strona
-            $defaults = $this->defaults->for($d);
-            $day = new WorkDay($d);
-            $day->setStartTime($defaults['start']);
-            $day->setEndTime($defaults['end']);
-            $day->setBreakMinutes($defaults['breakMinutes']);
+            $day = $this->defaults->newDay($d);
         }
 
         $results = $this->import->import($day);

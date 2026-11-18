@@ -24,6 +24,11 @@ final class WorkCalendar
     {
     }
 
+    public function reset(): void
+    {
+        $this->known = [];
+    }
+
     /** @return array{kind: string, label: string, absence: ?Absence}|null null = dzień roboczy */
     public function dayOff(\DateTimeImmutable $date): ?array
     {

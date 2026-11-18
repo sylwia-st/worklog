@@ -13,6 +13,7 @@ Lokalna aplikacja w Dockerze (PHP 8.5, Symfony 8.1, Doctrine ORM 3.7 + DoctrineB
 7. **Urlopy i święta** – polskie święta ustawowe są wbudowane (także ruchome i Wigilia), a urlop, L4 albo inny dzień wolny dodajesz w zakładce „Wolne” albo jednym kliknięciem na stronie dnia. W dzień wolny nie ma przypomnienia ani „brak raportu” na Przeglądzie, a praca tego dnia (także w weekend) liczy się w całości jako nadgodziny.
 8. **Toggl Track** (nieobowiązkowo) – mierzysz czas w Togglu, a przycisk „Pobierz z Toggla” na stronie dnia wpisuje wpisy z tego dnia do wierszy (ticket, czas, opis, godzina „od” ze startu pierwszego wpisu; „do” wylicza się z czasu wiersza). Numer ticketu bierze się z opisu wpisu albo z nazwy projektu w Togglu; wpisy z tym samym ticketem i opisem łączą się w jeden wiersz. Ponowne pobranie tego samego dnia nie dubluje wierszy, tylko aktualizuje czas – ticket i opis zmienione w aplikacji zostają. Stoper, który w Togglu nadal działa, jest doliczany do chwili pobrania (z ostrzeżeniem) – po jego zatrzymaniu pobierz dzień ponownie, a czas się domknie. Wpisy bez numeru ticketu są pomijane z ostrzeżeniem. Import ustawia też godziny obecności od–do z pierwszego i ostatniego wpisu w Togglu (także pominiętych, np. przerwy), chyba że je zmieniłeś; przerwy i obiad liczą się jak dotąd z ustawień. Wiersz, który kończyłby się po północy, nie dostaje godziny „od” (z ostrzeżeniem). Obok przycisku stoi „pobrano o 16:20 · 5 wierszy z Toggla”, a wiersze pobrane z Toggla mają przy numerze ticketu małą ikonę. Ponowne pobranie zaciąga wszystkie wpisy z Toggla, więc wiersz usunięty w aplikacji wróci, jeśli nadal jest w Togglu.
 9. **Podsumowanie miesiąca** (zakładka „Miesiąc”) – bilans, suma nadgodzin i niedoborów, dni bez raportu, urlopy i czas per ticket; eksport do CSV (dzień po dniu albo wszystkie wpisy) do otwarcia w Excelu.
+10. **Claude (MCP)** (nieobowiązkowo) – Claude wpisuje wiersze dnia za Ciebie, np. z podsumowania Twojej pracy; do Jiry wysyłasz je sam w aplikacji. Patrz sekcja „Claude (MCP)”.
 
 ## Prywatność
 
@@ -106,6 +107,29 @@ Jeśli nie widzisz tej opcji, admin wyłączył tokeny – poproś go o Personal
 
 Token API generujesz sam: Toggl Track → avatar (Profile) → Profile settings → na dole „API Token”. Wpisz go w Ustawienia → Toggl i kliknij „Sprawdź połączenie” (panel „Połączenie z Togglem”). Dopiero z tokenem na stronie dnia pojawia się przycisk „Pobierz z Toggla”. Aplikacja tylko czyta Twoje wpisy; limit Toggla to ok. 1 zapytanie na sekundę.
 
+## Claude (MCP)
+
+Claude Code albo Claude Desktop może wpisywać wiersze dnia za Ciebie, np. gdy prosisz go o podsumowanie dnia z historii pracy. Serwer MCP działa w kontenerze i rozmawia z Claude przez `docker exec`, więc nie otwiera żadnego portu. Protokół obsługuje oficjalne SDK `mcp/sdk`; narzędzia są w `src/Mcp`.
+
+Claude Code:
+
+```bash
+claude mcp add --scope user worklog -- docker exec -i worklog php bin/console app:mcp
+```
+
+Claude Desktop (`claude_desktop_config.json`):
+
+```json
+{"mcpServers": {"worklog": {"command": "docker", "args": ["exec", "-i", "worklog", "php", "bin/console", "app:mcp"]}}}
+```
+
+Narzędzia:
+
+- `get_day` – wpisy dnia (ticket, tytuł, minuty, opis, stan w Jirze), suma i norma w minutach, czy to dzień wolny.
+- `set_day` – zastępuje wszystkie wpisy dnia podaną listą (ticket, minuty, opis, opcjonalnie tytuł). Wiersz z tym samym ticketem zostaje przy swoim worklogu w Jirze, a usunięte wiersze, które były już w Jirze, znikną z niej przy następnej wysyłce. Godzina „od” zapisanych wierszy jest czyszczona.
+
+Claude niczego nie wysyła do Jiry ani na Slacka: otwierasz dzień w aplikacji, sprawdzasz wiersze i klikasz „Zapisz i wyślij do Jiry”. Stronę dnia otwartą przed zapisem przez Claude przeładuj, zanim coś w niej zmienisz – inaczej autozapis przywróci jej stare wiersze. Przy działającym stoperze zapis jest odrzucany.
+
 ## Codzienny przebieg
 
 1. **Dzień** → godziny od–do (domyślne są już wpisane) + wiersze: ticket, czas (`1h 30m`, `1.5`, `90m`, `1:30`; sama liczba to godziny, najwyżej 12 – przy `20` aplikacja zapyta, czy chodzi o minuty), opis.
@@ -170,6 +194,7 @@ Całkowite usunięcie: `./worklog uninstall`. Usuwa kontener, obraz, wolumen z d
 | Doctrine ORM / DBAL | ^3.7 / ^4.3 |
 | DoctrineBundle | ^3.3 |
 | Twig | ^3.21 |
+| MCP SDK (`mcp/sdk`) | ^0.10 – oficjalne SDK (PHP Foundation i Symfony), na razie eksperymentalne |
 
 Dokładne wersje pakietów są przypięte w `composer.lock` – `./worklog update` podnosi je do najnowszych łatek w ramach `composer.json` i przebudowuje obraz.
 

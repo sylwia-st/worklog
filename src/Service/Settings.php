@@ -111,6 +111,11 @@ final class Settings
     {
     }
 
+    public function reset(): void
+    {
+        $this->cache = null;
+    }
+
     public function get(string $name): string
     {
         $all = $this->all();

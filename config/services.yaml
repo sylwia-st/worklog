@@ -9,3 +9,9 @@ services:
             - '../src/Entity/'
             - '../src/Domain/'
             - '../src/Kernel.php'
+
+    App\Service\Settings:
+        tags: [{ name: kernel.reset, method: reset }]
+
+    App\Service\WorkCalendar:
+        tags: [{ name: kernel.reset, method: reset }]

@@ -41,9 +41,12 @@ namespace Symfony\Contracts\HttpClient\Exception {
 }
 
 namespace {
+    use App\Domain\EntryInput;
     use App\Entity\PlannedChange;
     use App\Entity\WorkDay;
     use App\Entity\WorklogEntry;
+    use App\Repository\WorkDayRepository;
+    use App\Service\DayEntriesWriter;
     use App\Service\JiraClient;
     use App\Service\ReportBuilder;
     use App\Service\Settings;
@@ -931,6 +934,90 @@ namespace {
         @unlink($dir.'/'.$f);
     }
     @rmdir($dir);
+
+    $titlesRepository = new class extends WorkDayRepository {
+        public function __construct() {}
+        public function knownIssueTitles(?\DateTimeImmutable $since = null): array { return ['ABC-9' => 'Moduł raportów', 'ABC-1' => 'Stary tytuł']; }
+    };
+    $writer = new DayEntriesWriter($titlesRepository, $settings);
+    $inputs = static fn (array $entries): array => array_map(EntryInput::fromArray(...), $entries);
+    $byPosition = static function (WorkDay $day): array {
+        $entries = $day->getActiveEntries();
+        usort($entries, static fn (WorklogEntry $left, WorklogEntry $right): int => $left->getPosition() <=> $right->getPosition());
+
+        return $entries;
+    };
+    $rowsOf = static fn (WorkDay $day): array => array_map(
+        static fn (WorklogEntry $entry): array => [$entry->getIssueKey(), $entry->getMinutes(), $entry->getDescription(), $entry->getIssueTitle(), $entry->getPosition()],
+        $byPosition($day),
+    );
+    $domainError = static function (callable $action): string {
+        try {
+            $action();
+        } catch (DomainException $exception) {
+            return $exception->getMessage();
+        }
+
+        return '';
+    };
+
+    check('MCP: wpis z tytułem w polu ticketu', array_map(get_object_vars(...), $inputs([
+        ['ticket' => 'abc-9 Raporty miesięczne', 'minutes' => 90, 'description' => ' Eksport CSV '],
+        ['ticket' => 'XYZ-2', 'minutes' => 15],
+    ])), [
+        ['issueKey' => 'ABC-9', 'minutes' => 90, 'description' => 'Eksport CSV', 'title' => 'Raporty miesięczne'],
+        ['issueKey' => 'XYZ-2', 'minutes' => 15, 'description' => '', 'title' => ''],
+    ]);
+    check('MCP: wpis bez numeru ticketu', $domainError(static fn () => $inputs([['ticket' => 'bez numeru', 'minutes' => 30]])), 'Niepoprawny numer ticketu „bez numeru” (np. ABC-123).');
+
+    $mcpDay = new WorkDay(new DateTimeImmutable('2026-11-17'));
+    $writer->replace($mcpDay, $inputs([
+        ['ticket' => 'ABC-9', 'minutes' => 30, 'description' => 'Statystyki'],
+        ['ticket' => 'XYZ-2', 'minutes' => 45, 'description' => 'Daily', 'title' => 'Spotkania'],
+    ]));
+    check('MCP: nowy dzień – wiersze w kolejności, tytuł znany z wcześniejszych dni', $rowsOf($mcpDay), [
+        ['ABC-9', 30, 'Statystyki', 'Moduł raportów', 0],
+        ['XYZ-2', 45, 'Daily', 'Spotkania', 1],
+    ]);
+
+    $mcpDay = new WorkDay(new DateTimeImmutable('2026-11-18'));
+    $sent = new WorklogEntry($mcpDay, 'ABC-1', 60, 'Audyt', 0);
+    $sent->setIssueTitle('Wydanie RC');
+    $sent->setStartClock('09:00');
+    setId($sent, 1);
+    $sent->markSynced('5001', 'hash');
+    $local = new WorklogEntry($mcpDay, 'ABC-2', 20, 'Notatki', 1);
+    setId($local, 2);
+    $sentGone = new WorklogEntry($mcpDay, 'ABC-3', 10, 'Hotfix', 2);
+    setId($sentGone, 3);
+    $sentGone->markSynced('5002', 'hash');
+    $writer->replace($mcpDay, $inputs([
+        ['ticket' => 'XYZ-2', 'minutes' => 14, 'description' => 'Daily'],
+        ['ticket' => 'ABC-1', 'minutes' => 195, 'description' => 'Audyt OWASP i poprawki'],
+    ]));
+    check('MCP: zastąpienie – lista dnia dokładnie jak podana', $rowsOf($mcpDay), [
+        ['XYZ-2', 14, 'Daily', '', 0],
+        ['ABC-1', 195, 'Audyt OWASP i poprawki', 'Wydanie RC', 1],
+    ]);
+    check('MCP: ten sam ticket zostaje przy worklogu w Jirze, bez godziny „od”', [$byPosition($mcpDay)[1] === $sent, $sent->getJiraWorklogId(), $sent->getStartClock()], [true, '5001', null]);
+    check('MCP: usunięty niewysłany znika, wysłany czeka na usunięcie z Jiry', [
+        in_array($local, $mcpDay->getEntries()->toArray(), true),
+        $mcpDay->getPendingDeletions() === [$sentGone],
+    ], [false, true]);
+
+    $mcpDay = new WorkDay(new DateTimeImmutable('2026-11-19'));
+    $first = new WorklogEntry($mcpDay, 'ABC-5', 45, 'Przyciski', 0);
+    $second = new WorklogEntry($mcpDay, 'ABC-5', 60, 'Komunikacja z klientem', 1);
+    $writer->replace($mcpDay, $inputs([
+        ['ticket' => 'ABC-5', 'minutes' => 80, 'description' => 'Komunikacja z klientem'],
+        ['ticket' => 'ABC-5', 'minutes' => 35, 'description' => 'Przyciski i PR'],
+    ]));
+    check('MCP: dwa wiersze jednego ticketu – najpierw dopasowanie po opisie', [$byPosition($mcpDay)[0] === $second, $byPosition($mcpDay)[1] === $first], [true, true]);
+
+    $mcpDay = new WorkDay(new DateTimeImmutable('2026-11-20'));
+    $timed = new WorklogEntry($mcpDay, 'ABC-7', 10, '', 0);
+    $timed->startTimer(new DateTimeImmutable('2026-11-20 10:00'));
+    check('MCP: działający stoper blokuje zapis', [$domainError(static fn () => $writer->replace($mcpDay, [])), count($mcpDay->getActiveEntries())], ['Przy tickecie ABC-7 działa stoper – zatrzymaj go w aplikacji i spróbuj ponownie.', 1]);
 
     echo $fail ? "\n$fail błędów\n" : "OK – wszystkie testy serwisów przeszły\n";
     exit($fail ? 1 : 0);

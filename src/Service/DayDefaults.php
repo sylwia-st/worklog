@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\PlannedChange;
+use App\Entity\WorkDay;
 use App\Repository\PlannedChangeRepository;
 
 /** Godziny i przerwa, które dostaje nowy dzień: z ustawień, zaplanowanych zmian i dni wolnych. */
@@ -35,5 +36,16 @@ final class DayDefaults
         }
 
         return ['start' => $start, 'end' => $end, 'breakMinutes' => $this->settings->int('default_break')];
+    }
+
+    public function newDay(\DateTimeImmutable $date): WorkDay
+    {
+        $defaults = $this->for($date);
+        $day = new WorkDay($date);
+        $day->setStartTime($defaults['start']);
+        $day->setEndTime($defaults['end']);
+        $day->setBreakMinutes($defaults['breakMinutes']);
+
+        return $day;
     }
 }
